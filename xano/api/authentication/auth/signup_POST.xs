@@ -4,38 +4,49 @@ query "auth/signup" verb=POST {
 
   input {
     text name?
-    email email? filters=lower|trim
-    password password?
+    email email? filters=trim|lower
+    text password?
   }
 
   stack {
-    db.get USER {
+    // Check if a user record with that email exists
+    db.get user {
       field_name = "email"
       field_value = $input.email
-    } as $USER
+    } as $user
   
-    db.add USER {
-      enforce_hidden_fields = false
-      data = {
-        name    : $input.name
-        email   : $input.email
-        password: $input.password
-      }
-    } as $USER
-  
-    precondition ($USER == null) {
+    // Verify that the email being used to sign up is unique
+    precondition ($user == null) {
       error_type = "accessdenied"
-      error = "This account is already in use."
+      error = "An account with this email already exists."
     }
   
+    // Create a new user record
+    db.add user {
+      data = {
+        created_at: "now"
+        name      : $input.name
+        email     : $input.email
+        password  : $input.password
+        role      : "member"
+      }
+    } as $user
+  
+    // Create an authentiction token
     security.create_auth_token {
-      table = "USER"
+      table = "user"
       extras = {}
       expiration = 86400
-      id = $USER.id
+      id = $user.id
     } as $authToken
+  
+    // Create an event log for signup
+    function.run "Quick Start/log_event" {
+      input = {user_id: $user.id, action: "signup", metadata: $user}
+    } as $event_log
   }
 
-  response = {authToken: $authToken, USERid: $USER.id}
-  guid = "nZFlYjX9mcwsIuaeoR30Te8sjNU"
+  response = {authToken: $authToken, user_id: $user.id}
+  tags = ["xano:quick-start"]
+  guid = "eKokeeLvnCQlLV83vxYuok8twNI"
 }

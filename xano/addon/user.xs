@@ -1,16 +1,16 @@
 addon user {
   input {
     int user_id? {
-      table = ""
+      table = "user"
     }
   }
 
   stack {
-    db.query "" {
+    db.query user {
       where = $db.user.id == $input.user_id
       return = {type: "single"}
     }
   }
 
-  guid = "fI5VpxYryCJpzhx40j0gOMcUebI"
+  guid = "sEkF91Jkg-tENOsYi_dc1hPXRn0"
 }
