@@ -1,27 +1,43 @@
 schema: spec-driven
 
 context: |
-  Project: HarleyStore
-  Domain: E-commerce e gestão para a loja HarleyStore (produtos, clientes, pedidos e catálogo).
-  Tech stack: Python, Reflex (Frontend), Xano (Backend APIs).
-  Architecture: Frontend desenvolvido exclusivamente em Reflex. Lógica de negócio e persistência geridas no Xano.
-  Development: Implementar mudanças incrementalmente utilizando OpenSpec.
-  Language: Escrever os artefatos OpenSpec em português brasileiro.
+  Project: HarleyDavidsonStore - Concessionária e Oficina Mecânica
+
+  Domain: Sistema para gerenciamento de vendas de motos, peças no balcão, controle de estoque com fornecedores, clientes, e ordens de serviço (OS) para oficina mecânica.
+
+  Tech stack:
+    - Database: Microsoft SQL Server 2019
+    - Schema de banco configurado no repositório
+
+  Architecture:
+    - O banco de dados centraliza as restrições de integridade (Checks, Foreign Keys e Uniques para CPF/CNPJ, Placa e Chassi).
+    - As regras de negócio devem respeitar os estados das Ordens de Serviço (ABERTA, EM_ANDAMENTO, CONCLUIDA, CANCELADA) e tipos de transação.
+
+  Development:
+    - O desenvolvimento será conduzido de forma incremental através do OpenSpec.
+    - Alterações devem ser propostas, revisadas e verificadas em pequenas etapas funcionais antes do arquivamento.
+
+  Language:
+    - Escrever toda a documentação, comunicações e artefatos do OpenSpec em português brasileiro.
 
 rules:
   proposal:
-    - Manter a proposta concisa e com escopo bem delimitado.
-    - Explicitar o que está fora do escopo.
+    - Descrever claramente o problema, objetivo e escopo da alteração.
+    - Deixar explícito o que está fora do escopo da change.
+
   specs:
-    - Escrever requisitos verificáveis.
-    - Utilizar cenários para comportamentos importantes.
+    - Escrever requisitos claros, objetivos e testáveis.
+    - "Definir cenários de aceite para regras de negócio (ex: estoque insuficiente, status inválido de OS)."
+
   tasks:
-    - Dividir a implementação em tarefas pequenas e verificáveis.
+    - Dividir a implementação em tarefas pequenas, ordenadas e facilmente verificáveis.
 
 operations:
   apply:
     guidance:
-      - Garantir que o código esteja funcional antes de concluir.
+      - Validar a conformidade das alterações em relação às restrições do banco de dados SQL Server.
+      - Executar testes e checagens relevantes antes de finalizar as tarefas.
+
   archive:
     guidance:
-      - Confirmar que a especificação reflete exatamente o que foi implementado.
+      - Confirmar que a implementação corresponde exatamente ao que foi especificado nas specs.
