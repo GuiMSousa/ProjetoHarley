@@ -1,0 +1,27 @@
+schema: spec-driven
+
+context: |
+  Project: HarleyStore
+  Domain: E-commerce e gestão para a loja HarleyStore (produtos, clientes, pedidos e catálogo).
+  Tech stack: Python, Reflex (Frontend), Xano (Backend APIs).
+  Architecture: Frontend desenvolvido exclusivamente em Reflex. Lógica de negócio e persistência geridas no Xano.
+  Development: Implementar mudanças incrementalmente utilizando OpenSpec.
+  Language: Escrever os artefatos OpenSpec em português brasileiro.
+
+rules:
+  proposal:
+    - Manter a proposta concisa e com escopo bem delimitado.
+    - Explicitar o que está fora do escopo.
+  specs:
+    - Escrever requisitos verificáveis.
+    - Utilizar cenários para comportamentos importantes.
+  tasks:
+    - Dividir a implementação em tarefas pequenas e verificáveis.
+
+operations:
+  apply:
+    guidance:
+      - Garantir que o código esteja funcional antes de concluir.
+  archive:
+    guidance:
+      - Confirmar que a especificação reflete exatamente o que foi implementado.
