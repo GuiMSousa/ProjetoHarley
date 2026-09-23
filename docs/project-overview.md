@@ -41,9 +41,9 @@ Concessionárias e oficinas de grande porte frequentemente enfrentam descontrole
 - Tipos de funcionários restritos ao domínio: `VENDEDOR`, `MECANICO` ou `GERENTE`.
 
 ## 8. Arquitetura Tecnológica
-- **Banco de Dados:** Microsoft SQL Server 2019.
-- **Backend / API:** A ser definido no ciclo incremental (ex: Node.js / C# .NET / Python).
-- **Frontend:** A ser definido no ciclo incremental (ex: React / Angular).
+- **Backend / API oficial:** Xano, incluindo persistência, autenticação, autorização e regras de negócio expostas por API.
+- **Frontend:** Reflex, no pacote `Projeto_HarleyStore`, consumindo os endpoints do Xano por cliente HTTP.
+- **Banco de dados:** Gerenciado pelo Xano. O arquivo `docs/schema.sql` permanece como referência histórica/conceitual até ser substituído por uma especificação equivalente do Xano.
 
 ## 9. Princípios de Desenvolvimento
 - As regras de integridade do banco (Foreign Keys, Uniques e Checks) devem ser sempre espelhadas nas validações das camadas de aplicação.
@@ -51,4 +51,5 @@ Concessionárias e oficinas de grande porte frequentemente enfrentam descontrole
 - Mudanças devem ser executadas utilizando o OpenSpec de forma incremental.
 
 ## 10. Fonte de Verdade e Documentação
-- O esquema físico de banco de dados (`HarleyDavidsonStore`) e o arquivo `docs/domain-model.md` servem como bases conceituais do projeto.
+- Os exports e contratos do Xano em `xano/`, junto com `docs/domain-model.md`, são a fonte de verdade da aplicação.
+- O arquivo `docs/schema.sql` não é executado pela aplicação e deve ser tratado apenas como referência legada durante a migração conceitual para o Xano.

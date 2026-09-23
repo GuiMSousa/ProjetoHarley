@@ -6,11 +6,12 @@ context: |
   Domain: Sistema para gerenciamento de vendas de motos, peças no balcão, controle de estoque com fornecedores, clientes, e ordens de serviço (OS) para oficina mecânica.
 
   Tech stack:
-    - Database: Microsoft SQL Server 2019
-    - Schema de banco configurado no repositório
+    - Backend e persistência: Xano
+    - Frontend: Reflex no pacote Projeto_HarleyStore
+    - Cliente de integração: HTTP com token JWT do Xano
 
   Architecture:
-    - O banco de dados centraliza as restrições de integridade (Checks, Foreign Keys e Uniques para CPF/CNPJ, Placa e Chassi).
+    - O Xano centraliza as restrições de integridade, relacionamentos e validações persistidas para CPF/CNPJ, Placa e Chassi.
     - As regras de negócio devem respeitar os estados das Ordens de Serviço (ABERTA, EM_ANDAMENTO, CONCLUIDA, CANCELADA) e tipos de transação.
 
   Development:
@@ -35,7 +36,7 @@ rules:
 operations:
   apply:
     guidance:
-      - Validar a conformidade das alterações em relação às restrições do banco de dados SQL Server.
+      - Validar a conformidade das alterações em relação aos schemas, relacionamentos e endpoints do Xano.
       - Executar testes e checagens relevantes antes de finalizar as tarefas.
 
   archive:

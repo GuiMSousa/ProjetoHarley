@@ -5,3 +5,6 @@ assets/external/
 *.db
 .web
 .venv/
+.env
+.env.*
+!.env.example
