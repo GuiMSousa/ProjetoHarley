@@ -1,4 +1,4 @@
-table "clientes" {
+table clientes {
   auth = false
 
   schema {
@@ -14,5 +14,6 @@ table "clientes" {
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "cpf_cnpj"}]}
   ]
+
   guid = "A5pGmh311bAq2U1U4s_ENZNHJzA"
 }

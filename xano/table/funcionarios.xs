@@ -1,4 +1,4 @@
-table "funcionarios" {
+table funcionarios {
   auth = false
 
   schema {
@@ -8,11 +8,10 @@ table "funcionarios" {
     enum tipo {
       values = ["VENDEDOR", "MECANICO", "GERENTE"]
     }
+  
     text contato? filters=trim
   }
 
-  index = [
-    {type: "primary", field: [{name: "id"}]}
-  ]
+  index = [{type: "primary", field: [{name: "id"}]}]
   guid = "iuj8n8pK8uHYU_a_cH2FONbfpBI"
 }

@@ -1,4 +1,4 @@
-table "itens_compra_estoque" {
+table itens_compra_estoque {
   auth = false
 
   schema {
@@ -6,9 +6,11 @@ table "itens_compra_estoque" {
     int id_entrada {
       table = "entrada_mercadoria"
     }
+  
     int id_produto {
       table = "produtos"
     }
+  
     int quantidade filters=min:1
     decimal valor_unitario filters=min:0
   }
@@ -18,5 +20,6 @@ table "itens_compra_estoque" {
     {type: "btree", field: [{name: "id_entrada"}]}
     {type: "btree", field: [{name: "id_produto"}]}
   ]
+
   guid = "jsMsKgGFpDP2mv8PQl3xygWuc3U"
 }

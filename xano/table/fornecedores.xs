@@ -1,4 +1,4 @@
-table "fornecedores" {
+table fornecedores {
   auth = false
 
   schema {
@@ -12,5 +12,6 @@ table "fornecedores" {
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "cnpj"}]}
   ]
+
   guid = "Nao2gq_N6yXgPEHxZDOBdsT1kcM"
 }

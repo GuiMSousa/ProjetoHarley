@@ -6,7 +6,9 @@ from collections.abc import Mapping
 from typing import Any
 
 import httpx
+from pydantic import TypeAdapter
 
+from Projeto_HarleyStore.services.motos import Moto, MotoCreate, MotoUpdate
 from Projeto_HarleyStore.xano_config import xano_api_base_url
 
 
@@ -127,3 +129,44 @@ class XanoClient:
         return self.request(
             "POST", path, json=json, authenticated=authenticated
         )
+
+    def patch(
+        self,
+        path: str,
+        *,
+        json: Mapping[str, Any] | None = None,
+        authenticated: bool = True,
+    ) -> Any:
+        return self.request(
+            "PATCH", path, json=json, authenticated=authenticated
+        )
+
+    def delete(
+        self,
+        path: str,
+        *,
+        authenticated: bool = True,
+    ) -> Any:
+        return self.request("DELETE", path, authenticated=authenticated)
+
+    def list_motos(self) -> list[Moto]:
+        """List motos returned by the Xano motos endpoint."""
+        response = self.get("motos")
+        return TypeAdapter(list[Moto]).validate_python(response)
+
+    def create_moto(self, moto: MotoCreate) -> Moto:
+        """Create a moto in Xano."""
+        response = self.post("motos", json=moto.model_dump())
+        return Moto.model_validate(response)
+
+    def update_moto(self, moto_id: int, moto: MotoUpdate) -> Moto:
+        """Update the provided fields of a moto in Xano."""
+        response = self.patch(
+            f"motos/{moto_id}",
+            json=moto.model_dump(exclude_unset=True),
+        )
+        return Moto.model_validate(response)
+
+    def delete_moto(self, moto_id: int) -> None:
+        """Delete a moto from Xano."""
+        self.delete(f"motos/{moto_id}")

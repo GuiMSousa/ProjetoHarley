@@ -1,4 +1,4 @@
-table "ordens_servico" {
+table ordens_servico {
   auth = false
 
   schema {
@@ -6,11 +6,13 @@ table "ordens_servico" {
     int id_moto_cliente {
       table = "motos_clientes"
     }
+  
     int id_funcionario {
       table = "funcionarios"
     }
+  
     timestamp data_abertura?=now
-    enum status?="ABERTA" {
+    enum status?=ABERTA {
       values = ["ABERTA", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"]
     }
   }
@@ -21,5 +23,6 @@ table "ordens_servico" {
     {type: "btree", field: [{name: "id_funcionario"}]}
     {type: "btree", field: [{name: "status"}]}
   ]
+
   guid = "nm97yVinqIIVdy9hfkXBcCkuJ7c"
 }

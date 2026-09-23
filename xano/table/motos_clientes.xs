@@ -1,4 +1,4 @@
-table "motos_clientes" {
+table motos_clientes {
   auth = false
 
   schema {
@@ -6,6 +6,7 @@ table "motos_clientes" {
     int id_cliente {
       table = "clientes"
     }
+  
     text modelo filters=trim
     text placa filters=trim
     text chassi filters=trim
@@ -17,5 +18,6 @@ table "motos_clientes" {
     {type: "btree|unique", field: [{name: "placa"}]}
     {type: "btree|unique", field: [{name: "chassi"}]}
   ]
+
   guid = "LkTvFmt1cGHQD0lLPcb5V-uP1ac"
 }
