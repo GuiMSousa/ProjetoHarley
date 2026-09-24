@@ -24,6 +24,15 @@ from Projeto_HarleyStore.services.cadastros import (
 from Projeto_HarleyStore.services.xano_client import XanoClient, XanoError
 
 
+def operation_is_blocked(
+    is_loading_list: bool,
+    is_saving: bool,
+    is_deactivating: bool,
+) -> bool:
+    """Return whether a cadastro operation must be rejected as reentrant."""
+    return is_loading_list or is_saving or is_deactivating
+
+
 class CadastrosState(AuthState):
     """Shared state for cadastro lists, forms, and permissions."""
 
@@ -35,6 +44,9 @@ class CadastrosState(AuthState):
     editing_id: str = ""
     form_error: str = ""
     form_data: dict[str, str] = {}
+    is_loading_list: bool = False
+    is_saving: bool = False
+    is_deactivating: bool = False
 
     clientes: list[dict[str, str]] = []
     motos_clientes: list[dict[str, str]] = []
@@ -101,6 +113,14 @@ class CadastrosState(AuthState):
         self.form_open = False
         self.form_error = ""
 
+    @rx.var
+    def is_busy(self) -> bool:
+        return operation_is_blocked(
+            self.is_loading_list,
+            self.is_saving,
+            self.is_deactivating,
+        )
+
     @rx.event
     def set_search_text(self, value: str) -> None:
         self.search_text = value
@@ -155,43 +175,68 @@ class CadastrosState(AuthState):
 
     @rx.event
     def load_clientes(self) -> None:
+        if self.is_loading_list:
+            return
         self.set_section("clientes")
+        self.is_loading_list = True
         try:
             self._load_section("clientes")
         except XanoError as error:
             self.error_message = str(error)
+        finally:
+            self.is_loading_list = False
 
     @rx.event
     def load_motos_clientes(self) -> None:
+        if self.is_loading_list:
+            return
         self.set_section("motos_clientes")
+        self.is_loading_list = True
         try:
             self._load_section("motos_clientes")
         except XanoError as error:
             self.error_message = str(error)
+        finally:
+            self.is_loading_list = False
 
     @rx.event
     def load_produtos(self) -> None:
+        if self.is_loading_list:
+            return
         self.set_section("produtos")
+        self.is_loading_list = True
         try:
             self._load_section("produtos")
         except XanoError as error:
             self.error_message = str(error)
+        finally:
+            self.is_loading_list = False
 
     @rx.event
     def load_fornecedores(self) -> None:
+        if self.is_loading_list:
+            return
         self.set_section("fornecedores")
+        self.is_loading_list = True
         try:
             self._load_section("fornecedores")
         except XanoError as error:
             self.error_message = str(error)
+        finally:
+            self.is_loading_list = False
 
     @rx.event
     def load_funcionarios(self) -> None:
+        if self.is_loading_list:
+            return
         self.set_section("funcionarios")
+        self.is_loading_list = True
         try:
             self._load_section("funcionarios")
         except XanoError as error:
             self.error_message = str(error)
+        finally:
+            self.is_loading_list = False
 
     def _new_form(self, section: str) -> None:
         self.set_section(section)
@@ -302,9 +347,16 @@ class CadastrosState(AuthState):
 
     @rx.event
     def save_form(self):
+        if operation_is_blocked(
+            self.is_loading_list,
+            self.is_saving,
+            self.is_deactivating,
+        ):
+            return
         if not self._can_write(self.active_section):
             self.form_error = "Seu perfil não pode alterar este cadastro."
             return rx.toast(self.form_error, level="error", position="top-right")
+        self.is_saving = True
         try:
             payload, _ = self._payload()
             with XanoClient(token=self.auth_token) as client:
@@ -343,11 +395,20 @@ class CadastrosState(AuthState):
         except XanoError as error:
             self.form_error = str(error)
             return rx.toast(self.form_error, level="error", position="top-right")
+        finally:
+            self.is_saving = False
 
     @rx.event
     def deactivate(self, section: str, record_id: str):
+        if operation_is_blocked(
+            self.is_loading_list,
+            self.is_saving,
+            self.is_deactivating,
+        ):
+            return
         if not self._can_write(section):
             return rx.toast("Seu perfil não pode desativar este cadastro.", level="error", position="top-right")
+        self.is_deactivating = True
         try:
             with XanoClient(token=self.auth_token) as client:
                 if section == "clientes":
@@ -364,3 +425,5 @@ class CadastrosState(AuthState):
             return rx.toast("Registro desativado.", level="success", position="top-right")
         except XanoError as error:
             return rx.toast(str(error), level="error", position="top-right")
+        finally:
+            self.is_deactivating = False

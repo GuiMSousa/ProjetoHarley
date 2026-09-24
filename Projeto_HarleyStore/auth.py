@@ -16,6 +16,15 @@ from Projeto_HarleyStore.services.xano_client import (
 from Projeto_HarleyStore.xano_config import xano_auth_cookie_secure
 
 
+def role_allows_route(role: str, route: str) -> bool:
+    """Return whether a domain employee role may enter a protected route."""
+    allowed_roles = {
+        "/admin": {"GERENTE"},
+        "/workshop": {"GERENTE", "MECANICO"},
+    }
+    return role in allowed_roles.get(route, set())
+
+
 class AuthState(rx.State):
     auth_token: str = rx.Cookie(
         name="harley_auth_token",

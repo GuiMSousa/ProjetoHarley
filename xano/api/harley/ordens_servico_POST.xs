@@ -13,11 +13,16 @@ query ordens_servico verb=POST {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "MECANICO"}
     } as $role_check
+      db.get user {
+      field_name = "id"
+      field_value = $auth.id
+      output = ["id_funcionario"]
+    } as $auth_user
       db.add ordens_servico {
       enforce_hidden_fields = false
       data = {
         id_moto_cliente: $input.id_moto_cliente
-        id_funcionario : $input.id_funcionario
+        id_funcionario : $auth_user.id_funcionario
         data_abertura  : $input.data_abertura
         status         : $input.status
       }

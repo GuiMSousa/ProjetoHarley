@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from Projeto_HarleyStore.auth import AuthState
+from Projeto_HarleyStore.auth import AuthState, role_allows_route
 from Projeto_HarleyStore.services.xano_client import (
     CurrentUserResponse,
     XanoAuthenticationError,
@@ -101,6 +101,14 @@ class AuthenticationTests(unittest.TestCase):
         with patch.dict(os.environ, {"XANO_AUTH_COOKIE_SECURE": "sometimes"}):
             with self.assertRaises(XanoConfigurationError):
                 xano_auth_cookie_secure()
+
+    def test_route_guards_match_domain_roles(self):
+        self.assertTrue(role_allows_route("GERENTE", "/admin"))
+        self.assertFalse(role_allows_route("VENDEDOR", "/admin"))
+        self.assertFalse(role_allows_route("MECANICO", "/admin"))
+        self.assertTrue(role_allows_route("GERENTE", "/workshop"))
+        self.assertTrue(role_allows_route("MECANICO", "/workshop"))
+        self.assertFalse(role_allows_route("VENDEDOR", "/workshop"))
 
 
 if __name__ == "__main__":

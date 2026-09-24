@@ -125,7 +125,12 @@ def cadastro_modal() -> rx.Component:
                 rx.hstack(
                     rx.spacer(),
                     rx.button("Cancelar", on_click=CadastrosState.close_form, variant="outline"),
-                    rx.button("Salvar", on_click=CadastrosState.save_form, **PRIMARY_BUTTON),
+                    rx.button(
+                        rx.cond(CadastrosState.is_saving, "Salvando...", "Salvar"),
+                        on_click=CadastrosState.save_form,
+                        disabled=CadastrosState.is_busy,
+                        **PRIMARY_BUTTON,
+                    ),
                     width="100%",
                 ),
                 align="stretch",
@@ -168,6 +173,7 @@ def cadastro_row(row: rx.Var, section: str) -> rx.Component:
                     on_click=CadastrosState.open_edit(section, row["id"]),
                     variant="outline",
                     size="2",
+                    disabled=CadastrosState.is_busy,
                 ),
                 rx.button(
                     "Desativar",
@@ -175,6 +181,7 @@ def cadastro_row(row: rx.Var, section: str) -> rx.Component:
                     variant="ghost",
                     color=COLORS["danger"],
                     size="2",
+                    disabled=CadastrosState.is_busy,
                 ),
                 spacing="2",
             ),
@@ -203,6 +210,7 @@ def cadastro_page(section: str) -> rx.Component:
                     rx.button(
                         "Novo cadastro",
                         on_click=CadastrosState.open_create(section),
+                        disabled=CadastrosState.is_busy,
                         **PRIMARY_BUTTON,
                     ),
                 ),
@@ -214,6 +222,7 @@ def cadastro_page(section: str) -> rx.Component:
                     placeholder="Buscar neste cadastro...",
                     value=CadastrosState.search_text,
                     on_change=CadastrosState.set_search_text,
+                    disabled=CadastrosState.is_loading_list,
                     width="min(100%, 28rem)",
                 ),
                 rx.spacer(),
@@ -230,24 +239,28 @@ def cadastro_page(section: str) -> rx.Component:
             ),
             rx.box(
                 rx.cond(
-                    CadastrosState.visible_rows.length() > 0,
-                    rx.vstack(
-                        rx.foreach(
-                            CadastrosState.visible_rows,
-                            lambda row: cadastro_row(row, section),
+                    CadastrosState.is_loading_list,
+                    rx.text("Carregando registros...", color=COLORS["muted"], padding="2rem"),
+                    rx.cond(
+                        CadastrosState.visible_rows.length() > 0,
+                        rx.vstack(
+                            rx.foreach(
+                                CadastrosState.visible_rows,
+                                lambda row: cadastro_row(row, section),
+                            ),
+                            align="stretch",
+                            width="100%",
                         ),
-                        align="stretch",
-                        width="100%",
+                        rx.text("Nenhum registro encontrado.", color=COLORS["muted"], padding="2rem"),
                     ),
-                    rx.text("Nenhum registro encontrado.", color=COLORS["muted"], padding="2rem"),
                 ),
                 width="100%",
                 padding="0 1rem",
                 **PANEL,
             ),
             rx.hstack(
-                rx.button("Anterior", on_click=CadastrosState.previous_page, variant="outline"),
-                rx.button("Próxima", on_click=CadastrosState.next_page, variant="outline"),
+                rx.button("Anterior", on_click=CadastrosState.previous_page, variant="outline", disabled=CadastrosState.is_busy),
+                rx.button("Próxima", on_click=CadastrosState.next_page, variant="outline", disabled=CadastrosState.is_busy),
                 spacing="2",
             ),
             rx.cond(CadastrosState.form_open, cadastro_modal()),

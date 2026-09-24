@@ -1,6 +1,6 @@
 import unittest
 
-from Projeto_HarleyStore.cadastros_state import CadastrosState
+from Projeto_HarleyStore.cadastros_state import CadastrosState, operation_is_blocked
 
 
 class CadastrosStateTests(unittest.TestCase):
@@ -38,6 +38,12 @@ class CadastrosStateTests(unittest.TestCase):
         }:
             with self.subTest(section=section):
                 self.assertFalse(CadastrosState._can_write(state, section))
+
+    def test_loading_and_mutation_flags_block_reentrant_operations(self):
+        self.assertTrue(operation_is_blocked(True, False, False))
+        self.assertTrue(operation_is_blocked(False, True, False))
+        self.assertTrue(operation_is_blocked(False, False, True))
+        self.assertFalse(operation_is_blocked(False, False, False))
 
 
 if __name__ == "__main__":

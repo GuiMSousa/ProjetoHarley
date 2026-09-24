@@ -20,7 +20,7 @@ table transacoes {
     }
   
     timestamp data_transacao?=now
-    decimal valor_total? filters=min:0
+    decimal valor_total? filters=min:0.01
   }
 
   index = [

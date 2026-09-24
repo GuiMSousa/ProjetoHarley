@@ -12,7 +12,7 @@ table itens_ordem_servico {
     }
   
     int quantidade filters=min:1
-    decimal valor_total_item filters=min:0
+    decimal valor_total_item filters=min:0.01
   }
 
   index = [

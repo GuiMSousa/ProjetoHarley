@@ -32,10 +32,33 @@ def login() -> rx.Component:
     return login_page()
 
 
-def protected_page(title: str) -> rx.Component:
+def access_denied_page() -> rx.Component:
+    return rx.center(
+        rx.vstack(
+            rx.heading("Acesso negado", size="7"),
+            rx.callout(
+                "Seu perfil não possui permissão para acessar esta área.",
+                icon="lock",
+                color_scheme="red",
+            ),
+            rx.link("Voltar para a visão geral", href="/"),
+            align="center",
+            spacing="4",
+        ),
+        min_height="70vh",
+        padding="2rem",
+    )
+
+
+def protected_page(title: str, route: str) -> rx.Component:
+    allowed = AuthState.can_manage if route == "/admin" else AuthState.can_workshop
     return rx.cond(
         AuthState.is_authenticated,
-        app_shell(rx.heading(title, size="8", padding="2rem")),
+        rx.cond(
+            allowed,
+            app_shell(rx.heading(title, size="8", padding="2rem")),
+            app_shell(access_denied_page()),
+        ),
         login_page(),
     )
 
@@ -43,8 +66,16 @@ def protected_page(title: str) -> rx.Component:
 app = rx.App()
 app.add_page(index, route="/", on_load=AuthState.restore_session)
 app.add_page(login, route="/login")
-app.add_page(lambda: protected_page("Administração"), route="/admin")
-app.add_page(lambda: protected_page("Oficina"), route="/workshop")
+app.add_page(
+    lambda: protected_page("Administração", "/admin"),
+    route="/admin",
+    on_load=AuthState.restore_session,
+)
+app.add_page(
+    lambda: protected_page("Oficina", "/workshop"),
+    route="/workshop",
+    on_load=AuthState.restore_session,
+)
 app.add_page(
     lambda: cadastro_page("clientes"),
     route="/cadastros/clientes",
