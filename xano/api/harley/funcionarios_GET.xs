@@ -1,12 +1,16 @@
 // Query all funcionarios records
 query funcionarios verb=GET {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
   }
 
   stack {
-    db.query funcionarios {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.query funcionarios {
       return = {type: "list"}
     } as $model
   }

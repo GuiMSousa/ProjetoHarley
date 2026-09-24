@@ -1,6 +1,7 @@
 // Edit motos_clientes record
 query "motos_clientes/{motos_clientes_id}" verb=PATCH {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int motos_clientes_id? filters=min:1
@@ -10,7 +11,10 @@ query "motos_clientes/{motos_clientes_id}" verb=PATCH {
   }
 
   stack {
-    util.get_raw_input {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "MECANICO"}
+    } as $role_check
+      util.get_raw_input {
       encoding = "json"
       exclude_middleware = false
     } as $raw_input

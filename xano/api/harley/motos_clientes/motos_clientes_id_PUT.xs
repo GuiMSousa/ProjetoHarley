@@ -1,6 +1,7 @@
 // Update motos_clientes record
 query "motos_clientes/{motos_clientes_id}" verb=PUT {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int motos_clientes_id? filters=min:1
@@ -10,7 +11,10 @@ query "motos_clientes/{motos_clientes_id}" verb=PUT {
   }
 
   stack {
-    db.edit motos_clientes {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "MECANICO"}
+    } as $role_check
+      db.edit motos_clientes {
       field_name = "id"
       field_value = $input.motos_clientes_id
       enforce_hidden_fields = false

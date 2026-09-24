@@ -1,6 +1,7 @@
 // Add transacoes record
 query transacoes verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query transacoes verb=POST {
   }
 
   stack {
-    db.add transacoes {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+    } as $role_check
+      db.add transacoes {
       enforce_hidden_fields = false
       data = {
         tipo_transacao : $input.tipo_transacao

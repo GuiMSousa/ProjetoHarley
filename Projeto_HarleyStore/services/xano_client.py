@@ -149,6 +149,20 @@ class XanoClient:
     ) -> Any:
         return self.request("DELETE", path, authenticated=authenticated)
 
+    def login(self, email: str, password: str) -> dict[str, Any]:
+        """Authenticate against Xano without persisting credentials locally."""
+        response = self.post(
+            "auth/login",
+            json={"email": email, "password": password},
+            authenticated=False,
+        )
+        return dict(response)
+
+    def current_user(self) -> dict[str, Any]:
+        """Return the authenticated technical user and linked employee."""
+        response = self.get("auth/me")
+        return dict(response)
+
     def list_motos(self) -> list[Moto]:
         """List motos returned by the Xano motos endpoint."""
         response = self.get("motos")

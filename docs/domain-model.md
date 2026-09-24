@@ -14,7 +14,7 @@ Representa as empresas parceiras que fornecem peças, produtos e motocicletas pa
 ### Produtos
 Representa os itens físicos comercializados pela concessionária ou utilizados na oficina mecânica.
 - **Atributos:** Identificador (`id_produto`), Nome (`nome_produto`), Descrição (`descricao`), Categoria (`categoria`), Quantidade em Estoque (`estoque_qtd`), Preço de Venda (`preco_venda`).
-- **Regras:** O saldo em estoque e o preço de venda não podem ser negativos.
+- **Regras:** O saldo em estoque deve ser maior ou igual a zero (`estoque_qtd >= 0`) e o preço de venda deve ser estritamente positivo (`preco_venda > 0`).
 
 ### Funcionarios
 Representa os colaboradores da concessionária/oficina.
@@ -27,16 +27,22 @@ Representa os proprietários de motocicletas ou compradores da loja.
 - **Regras:** CPF ou CNPJ deve ser único no sistema.
 
 ### Motos_Clientes
-Representa as motocicletas vinculadas a determinado cliente para prestação de serviços de manutenção ou revisão.
+Representa os veículos pertencentes a clientes e utilizados no fluxo da oficina para manutenção, revisão e histórico de serviços.
 - **Atributos:** Identificador (`id_moto_cliente`), Cliente Vinculado (`id_cliente`), Modelo (`modelo`), Placa (`placa`), Chassi (`chassi`).
 - **Relacionamento:** Pertence a um **Cliente**.
 - **Regras:** Placa e Chassi devem ser únicos no sistema.
+
+### Motos
+Representa as motocicletas mantidas no estoque da loja e destinadas à venda. Esta entidade é independente de `motos_clientes` e não representa o veículo usado no histórico de oficina.
+- **Atributos:** Identificador (`id`), Cliente opcional (`clientes_id`), Marca (`marca`), Modelo (`modelo`), Data de Cadastro (`created_at`).
+- **Relacionamento:** Pode possuir um cliente associado quando a venda for registrada.
 
 ### Entrada_Mercadoria & Itens_Compra_Estoque
 Representa a nota/registro de compra efetuada junto a um fornecedor para abastecimento de estoque.
 - **Atributos Entrada:** Identificador (`id_entrada`), Fornecedor (`id_fornecedor`), Data da Entrada (`data_entrada`), Valor Total (`valor_total`).
 - **Atributos Itens da Compra:** Identificador (`id_item_compra`), Entrada (`id_entrada`), Produto (`id_produto`), Quantidade (`quantidade`), Valor Unitário (`valor_unitario`).
 - **Relacionamentos:** Uma entrada possui um ou mais **Itens de Compra** e pertence a um **Fornecedor**.
+- **Regras:** A quantidade deve ser estritamente positiva (`quantidade > 0`) e o valor unitário deve ser estritamente positivo (`valor_unitario > 0`).
 
 ### Ordens_Servico & Itens_Ordem_Servico
 Representa o atendimento técnico prestado na oficina mecânica para a moto de um cliente.

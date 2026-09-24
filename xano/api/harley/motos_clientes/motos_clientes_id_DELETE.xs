@@ -1,13 +1,17 @@
 // Delete motos_clientes record
 query "motos_clientes/{motos_clientes_id}" verb=DELETE {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int motos_clientes_id? filters=min:1
   }
 
   stack {
-    db.del motos_clientes {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.del motos_clientes {
       field_name = "id"
       field_value = $input.motos_clientes_id
     }

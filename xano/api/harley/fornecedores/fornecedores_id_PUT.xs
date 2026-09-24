@@ -1,6 +1,7 @@
 // Update fornecedores record
 query "fornecedores/{fornecedores_id}" verb=PUT {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int fornecedores_id? filters=min:1
@@ -10,7 +11,10 @@ query "fornecedores/{fornecedores_id}" verb=PUT {
   }
 
   stack {
-    db.edit fornecedores {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.edit fornecedores {
       field_name = "id"
       field_value = $input.fornecedores_id
       enforce_hidden_fields = false

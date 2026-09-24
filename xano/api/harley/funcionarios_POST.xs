@@ -1,6 +1,7 @@
 // Add funcionarios record
 query funcionarios verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query funcionarios verb=POST {
   }
 
   stack {
-    db.add funcionarios {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.add funcionarios {
       enforce_hidden_fields = false
       data = {
         nome_funcionario: $input.nome_funcionario

@@ -1,6 +1,7 @@
 // Update entrada_mercadoria record
 query "entrada_mercadoria/{entrada_mercadoria_id}" verb=PUT {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int entrada_mercadoria_id? filters=min:1
@@ -10,7 +11,10 @@ query "entrada_mercadoria/{entrada_mercadoria_id}" verb=PUT {
   }
 
   stack {
-    db.edit entrada_mercadoria {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.edit entrada_mercadoria {
       field_name = "id"
       field_value = $input.entrada_mercadoria_id
       enforce_hidden_fields = false

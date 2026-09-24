@@ -1,36 +1,45 @@
-"""Welcome to Reflex! This file outlines the steps to create a basic app."""
+"""Application entry point for the authenticated Reflex shell."""
 
 import reflex as rx
 
-from rxconfig import config
+from Projeto_HarleyStore.auth import AuthState
+from Projeto_HarleyStore.components import app_shell, login_page
 
 
-class State(rx.State):
-    """The app state."""
+def dashboard() -> rx.Component:
+    return rx.vstack(
+        rx.heading("Bem-vindo à operação", size="8"),
+        rx.text(
+            "A base autenticada está pronta para receber as próximas fatias funcionais.",
+            color="#a7a7a7",
+        ),
+        padding="2rem",
+        align="start",
+    )
 
 
 def index() -> rx.Component:
-    # Welcome Page (Index)
-    return rx.container(
-        rx.color_mode.button(position="top-right"),
-        rx.vstack(
-            rx.heading("Welcome to Reflex!", size="9"),
-            rx.text(
-                "Get started by editing ",
-                rx.code(f"{config.app_name}/{config.app_name}.py"),
-                size="5",
-            ),
-            rx.link(
-                rx.button("Check out our docs!"),
-                href="https://reflex.dev/docs/getting-started/introduction/",
-                is_external=True,
-            ),
-            spacing="5",
-            justify="center",
-            min_height="85vh",
-        ),
+    return rx.cond(
+        AuthState.is_authenticated,
+        app_shell(dashboard()),
+        login_page(),
+    )
+
+
+def login() -> rx.Component:
+    return login_page()
+
+
+def protected_page(title: str) -> rx.Component:
+    return rx.cond(
+        AuthState.is_authenticated,
+        app_shell(rx.heading(title, size="8", padding="2rem")),
+        login_page(),
     )
 
 
 app = rx.App()
-app.add_page(index)
+app.add_page(index, route="/", on_load=AuthState.restore_session)
+app.add_page(login, route="/login")
+app.add_page(lambda: protected_page("Administração"), route="/admin")
+app.add_page(lambda: protected_page("Oficina"), route="/workshop")

@@ -12,7 +12,7 @@ query "auth/login" verb=POST {
     db.get user {
       field_name = "email"
       field_value = $input.email
-      output = ["id", "created_at", "name", "email", "password", "role"]
+      output = ["id", "created_at", "name", "email", "role", "id_funcionario"]
     } as $user
   
     // Check to make sure a user with that email exists
@@ -43,7 +43,11 @@ query "auth/login" verb=POST {
   
     // Create an event log for login
     function.run "Quick Start/log_event" {
-      input = {user_id: $user.id, action: "login", metadata: $user}
+      input = {
+        user_id : $user.id
+        action  : "login"
+        metadata: {id: $user.id, email: $user.email, role: $user.role, id_funcionario: $user.id_funcionario}
+      }
     } as $event_log
   }
 

@@ -1,12 +1,16 @@
 // Query all produtos records
 query produtos verb=GET {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
   }
 
   stack {
-    db.query produtos {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "ALL"}
+    } as $role_check
+      db.query produtos {
       return = {type: "list"}
     } as $model
   }

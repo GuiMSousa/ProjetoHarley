@@ -1,6 +1,7 @@
 // Add produtos record
 query produtos verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query produtos verb=POST {
   }
 
   stack {
-    db.add produtos {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.add produtos {
       enforce_hidden_fields = false
       data = {
         nome_produto: $input.nome_produto

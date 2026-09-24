@@ -7,7 +7,7 @@ table produtos {
     text descricao? filters=trim
     text categoria filters=trim
     int estoque_qtd? filters=min:0
-    decimal preco_venda filters=min:0
+    decimal preco_venda filters=min:0.01
   }
 
   index = [{type: "primary", field: [{name: "id"}]}]

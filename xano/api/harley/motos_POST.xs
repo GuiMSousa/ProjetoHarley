@@ -1,6 +1,7 @@
 // Add motos record
 query motos verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,9 +10,17 @@ query motos verb=POST {
   }
 
   stack {
-    db.add motos {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.add motos {
       enforce_hidden_fields = false
-      data = {created_at: "now"}
+      data = {
+        clientes_id: $input.clientes_id
+        marca      : $input.marca
+        modelo     : $input.modelo
+        created_at : "now"
+      }
     } as $motos
   }
 

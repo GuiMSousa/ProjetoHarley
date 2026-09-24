@@ -1,0 +1,14 @@
+- [x] Propor e revisar a Change 2.
+- [x] Proteger os 66 endpoints de negócio com autenticação Xano.
+- [x] Aplicar `enforce_role` com cargos `GERENTE`, `VENDEDOR` e `MECANICO`.
+- [x] Remover credenciais sensíveis dos logs de login e signup.
+- [x] Ajustar `auth/me` para retornar usuário e funcionário associado.
+- [x] Criar seed reproduzível de gerente sem segredo versionado.
+- [x] Criar tema central Harley-Davidson em `styles/theme.py`.
+- [x] Implementar cookie JWT, login, restauração de sessão e logout.
+- [x] Implementar shell, sidebar, navbar e menus condicionais.
+- [x] Implementar tratamento de sessão inválida e acesso negado.
+- [x] Validar 98 arquivos XanoScript.
+- [x] Executar `python -m py_compile`.
+- [x] Executar `reflex compile --dry`.
+- [ ] Executar testes de integração contra uma instância Xano configurada.

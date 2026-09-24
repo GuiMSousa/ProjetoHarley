@@ -19,7 +19,8 @@ Concessionárias e oficinas de grande porte frequentemente enfrentam descontrole
 - **Clientes:** Proprietários das motocicletas cadastradas no sistema.
 
 ## 5. Escopo
-- Gestão de Clientes e suas respectivas motocicletas (Placa, Chassi, Modelo).
+- Gestão de Clientes e seus veículos de oficina em `motos_clientes` (Placa, Chassi, Modelo).
+- Gestão de motocicletas em estoque para venda em `motos`.
 - Gestão de Fornecedores e Entrada de Mercadorias (composição do estoque).
 - Gestão do Catálogo de Produtos e Peças com saldo de estoque e preço de venda.
 - Gestão do Corpo de Funcionários e suas tipologias/cargos.
@@ -37,7 +38,7 @@ Concessionárias e oficinas de grande porte frequentemente enfrentam descontrole
 ## 7. Requisitos e Restrições Importantes
 - Unicidade obrigatória para identificadores fiscais e físicos: CNPJ de fornecedores, CPF/CNPJ de clientes, Placa e Chassi das motos.
 - O estoque do produto não pode ser negativo (`estoque_qtd >= 0`).
-- Preços e quantidades de itens devem ser valores estritamente positivos (`> 0`).
+- Preços de venda, valores unitários e quantidades de itens devem ser estritamente positivos (`> 0`).
 - Tipos de funcionários restritos ao domínio: `VENDEDOR`, `MECANICO` ou `GERENTE`.
 
 ## 8. Arquitetura Tecnológica

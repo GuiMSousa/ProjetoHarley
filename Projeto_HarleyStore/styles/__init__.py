@@ -1,0 +1,1 @@
+"""Shared visual language for the Harley-Davidson application."""

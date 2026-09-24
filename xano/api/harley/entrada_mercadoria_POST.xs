@@ -1,6 +1,7 @@
 // Add entrada_mercadoria record
 query entrada_mercadoria verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query entrada_mercadoria verb=POST {
   }
 
   stack {
-    db.add entrada_mercadoria {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.add entrada_mercadoria {
       enforce_hidden_fields = false
       data = {
         id_fornecedor: $input.id_fornecedor

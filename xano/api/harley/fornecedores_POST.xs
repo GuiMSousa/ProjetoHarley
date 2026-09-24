@@ -1,6 +1,7 @@
 // Add fornecedores record
 query fornecedores verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query fornecedores verb=POST {
   }
 
   stack {
-    db.add fornecedores {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      db.add fornecedores {
       enforce_hidden_fields = false
       data = {
         nome_fornecedor: $input.nome_fornecedor

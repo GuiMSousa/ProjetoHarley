@@ -1,65 +1,65 @@
-// Checks that a user has the appropriate role level. This example sets a hierarchy of roles, and a user must pass the minimum level to execute.
+// Checks the authenticated user's linked domain employee role.
 function "Quick Start/enforce_role" {
   input {
-    // The ID of the user to check the role for.
     int user_id
-  
-    // The role required to perform the action.
+
+    // ALL, GERENTE, VENDEDOR or MECANICO.
     text required_role
   }
 
   stack {
-    // Defines a hierarchy of roles with numerical levels.
-    var $role_hierarchy {
-      value = {admin: 2, member: 1}
-    }
-  
-    // Retrieve the user's role from the database.
     db.get user {
       field_name = "id"
       field_value = $input.user_id
-      output = ["role"]
+      output = ["id", "id_funcionario", "role"]
     } as $user
-  
-    // Ensure the user exists
+
     precondition ($user != null) {
-      error_type = "inputerror"
-      error = "User not found with the provided ID."
+      error_type = "accessdenied"
+      error = "Authenticated user was not found."
     }
-  
-    // Extract the user's role from the retrieved user data.
-    var $user_role {
-      value = $user.role
+
+    precondition ($user.id_funcionario != null) {
+      error_type = "accessdenied"
+      error = "A linked employee is required for business operations."
     }
-  
-    // Get the numerical level of the user's role. Defaults to 0 if not defined.
-    var $user_role_level {
-      value = $role_hierarchy|get:$user_role
+
+    db.get funcionarios {
+      field_name = "id"
+      field_value = $user.id_funcionario
+      output = ["id", "nome_funcionario", "cargo", "tipo", "contato"]
+    } as $employee
+
+    precondition ($employee != null) {
+      error_type = "accessdenied"
+      error = "The linked employee was not found."
     }
-  
-    // Get the numerical level of the required role. Defaults to 0 if not defined.
-    var $required_role_level {
-      value = $role_hierarchy|get:$input.required_role
-    }
-  
-    // Ensure the required role is a valid, defined role in the hierarchy.
-    precondition ($required_role_level > 0) {
+
+    precondition (
+      $input.required_role == "ALL" ||
+      $input.required_role == "GERENTE" ||
+      $input.required_role == "VENDEDOR" ||
+      $input.required_role == "MECANICO"
+    ) {
       error_type = "inputerror"
       error = "Invalid required role specified: " ~ $input.required_role
     }
-  
-    // Check if the user's role level is sufficient for the required role.
+
     conditional {
-      if ($user_role_level < $required_role_level) {
+      if (
+        ($input.required_role == "GERENTE" && $employee.tipo != "GERENTE") ||
+        ($input.required_role == "VENDEDOR" && $employee.tipo != "GERENTE" && $employee.tipo != "VENDEDOR") ||
+        ($input.required_role == "MECANICO" && $employee.tipo != "GERENTE" && $employee.tipo != "MECANICO")
+      ) {
         throw {
           name = "accessdenied"
-          value = "User does not have the required role to perform this action. Required: " ~ $input.required_role ~ ", Actual: " ~ $user_role
+          value = "User does not have the required employee role. Required: " ~ $input.required_role ~ ", Actual: " ~ $employee.tipo
         }
       }
     }
   }
 
-  response = null
+  response = $employee
   tags = ["xano:quick-start"]
   guid = "fneBju0BMGn_2IGtLZtZ-eX55iA"
 }

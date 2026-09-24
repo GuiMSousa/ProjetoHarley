@@ -8,6 +8,9 @@ table user {
     text name filters=trim
     email? email filters=trim|lower
     password? password filters=min:8|minAlpha:1|minDigit:1
+    int id_funcionario? {
+      table = "funcionarios"
+    }
   
     // The role of the user within their company (e.g., 'admin', 'member').
     enum role? {
@@ -26,6 +29,7 @@ table user {
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree", field: [{name: "created_at", op: "desc"}]}
+    {type: "btree", field: [{name: "id_funcionario"}]}
     {type: "btree|unique", field: [{name: "email", op: "asc"}]}
   ]
 

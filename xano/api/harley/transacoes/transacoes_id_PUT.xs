@@ -1,6 +1,7 @@
 // Update transacoes record
 query "transacoes/{transacoes_id}" verb=PUT {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int transacoes_id? filters=min:1
@@ -10,7 +11,10 @@ query "transacoes/{transacoes_id}" verb=PUT {
   }
 
   stack {
-    db.edit transacoes {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+    } as $role_check
+      db.edit transacoes {
       field_name = "id"
       field_value = $input.transacoes_id
       enforce_hidden_fields = false

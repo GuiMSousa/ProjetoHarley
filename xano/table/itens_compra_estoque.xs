@@ -12,7 +12,7 @@ table itens_compra_estoque {
     }
   
     int quantidade filters=min:1
-    decimal valor_unitario filters=min:0
+    decimal valor_unitario filters=min:0.01
   }
 
   index = [

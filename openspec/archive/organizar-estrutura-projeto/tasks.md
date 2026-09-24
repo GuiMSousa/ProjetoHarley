@@ -1,0 +1,10 @@
+- [x] Atualizar a proposta para refletir `Projeto_HarleyStore/` e `xano/` na estrutura real.
+- [x] Documentar a distinção entre `motos_clientes` e `motos`.
+- [x] Atualizar contratos e schemas para preços e valores unitários estritamente positivos.
+- [x] Corrigir o POST de `motos` para persistir o payload válido.
+- [x] Adicionar `user.id_funcionario` como referência para `funcionarios`.
+- [x] Criar especificações testáveis para os alinhamentos da Change.
+- [x] Validar sintaxe dos exports Xano alterados e consistência documental.
+- [x] Validar a compilação dos arquivos Python principais.
+- [x] Validar a compilação do Reflex com `reflex compile --dry`.
+- [x] Arquivar a Change após a conclusão das etapas Propose, Apply e Verify.

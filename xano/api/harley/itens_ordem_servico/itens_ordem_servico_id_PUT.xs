@@ -1,6 +1,7 @@
 // Update itens_ordem_servico record
 query "itens_ordem_servico/{itens_ordem_servico_id}" verb=PUT {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int itens_ordem_servico_id? filters=min:1
@@ -10,7 +11,10 @@ query "itens_ordem_servico/{itens_ordem_servico_id}" verb=PUT {
   }
 
   stack {
-    db.edit itens_ordem_servico {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "MECANICO"}
+    } as $role_check
+      db.edit itens_ordem_servico {
       field_name = "id"
       field_value = $input.itens_ordem_servico_id
       enforce_hidden_fields = false

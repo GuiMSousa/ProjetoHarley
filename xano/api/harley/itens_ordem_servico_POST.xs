@@ -1,6 +1,7 @@
 // Add itens_ordem_servico record
 query itens_ordem_servico verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query itens_ordem_servico verb=POST {
   }
 
   stack {
-    db.add itens_ordem_servico {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "MECANICO"}
+    } as $role_check
+      db.add itens_ordem_servico {
       enforce_hidden_fields = false
       data = {
         id_os           : $input.id_os

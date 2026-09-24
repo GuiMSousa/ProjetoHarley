@@ -10,9 +10,13 @@
 
 Cada usuário autorizado a acessar operações de negócio deve possuir um vínculo explícito com um funcionário. O vínculo não deve ser inferido por nome, e-mail ou papel técnico.
 
-O vínculo físico adotado é a referência opcional `user.id_funcionario -> Funcionarios.id`.
+O vínculo físico adotado é a referência opcional `user.id_funcionario -> funcionarios.id`.
 Usuários técnicos podem existir sem vínculo durante a administração inicial, mas não
 podem acessar operações de negócio enquanto o vínculo não estiver preenchido.
+
+No export Xano, `user.id_funcionario` é uma referência à tabela `funcionarios`. O campo
+identifica o funcionário de domínio associado ao usuário autenticado; ele não substitui
+o `user.role` técnico nem deve ser inferido por nome ou email.
 
 ## Cargos de domínio
 

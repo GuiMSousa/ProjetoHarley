@@ -1,6 +1,7 @@
 // Edit entrada_mercadoria record
 query "entrada_mercadoria/{entrada_mercadoria_id}" verb=PATCH {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     int entrada_mercadoria_id? filters=min:1
@@ -10,7 +11,10 @@ query "entrada_mercadoria/{entrada_mercadoria_id}" verb=PATCH {
   }
 
   stack {
-    util.get_raw_input {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+      util.get_raw_input {
       encoding = "json"
       exclude_middleware = false
     } as $raw_input

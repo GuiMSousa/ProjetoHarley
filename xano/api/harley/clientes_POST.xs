@@ -1,6 +1,7 @@
 // Add clientes record
 query clientes verb=POST {
   api_group = "HARLEY"
+  auth = "user"
 
   input {
     dblink {
@@ -9,7 +10,10 @@ query clientes verb=POST {
   }
 
   stack {
-    db.add clientes {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+    } as $role_check
+      db.add clientes {
       enforce_hidden_fields = false
       data = {
         nome_cliente: $input.nome_cliente
