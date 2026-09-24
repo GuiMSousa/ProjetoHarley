@@ -10,6 +10,7 @@ table funcionarios {
     }
   
     text contato? filters=trim
+    bool ativo?=true
   }
 
   index = [{type: "primary", field: [{name: "id"}]}]

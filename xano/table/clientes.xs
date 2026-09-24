@@ -8,6 +8,7 @@ table clientes {
     text telefone? filters=trim
     email? email filters=trim|lower
     text endereco? filters=trim
+    bool ativo?=true
   }
 
   index = [

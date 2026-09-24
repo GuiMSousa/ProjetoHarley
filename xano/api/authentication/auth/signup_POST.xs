@@ -1,14 +1,22 @@
 // Signup and retrieve an authentication token
 query "auth/signup" verb=POST {
   api_group = "Authentication"
+  auth = "user"
 
   input {
     text name?
     email email? filters=trim|lower
     text password?
+    int id_funcionario {
+      table = "funcionarios"
+    }
   }
 
   stack {
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "GERENTE"}
+    } as $role_check
+
     // Check if a user record with that email exists
     db.get user {
       field_name = "email"
@@ -28,6 +36,7 @@ query "auth/signup" verb=POST {
         name      : $input.name
         email     : $input.email
         password  : $input.password
+        id_funcionario: $input.id_funcionario
         role      : "member"
       }
     } as $user

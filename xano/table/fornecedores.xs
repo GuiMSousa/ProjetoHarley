@@ -6,6 +6,7 @@ table fornecedores {
     text nome_fornecedor filters=trim
     text cnpj filters=trim
     text contato? filters=trim
+    bool ativo?=true
   }
 
   index = [

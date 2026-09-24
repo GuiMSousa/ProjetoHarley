@@ -11,7 +11,7 @@ query motos_clientes verb=POST {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "MECANICO"}
+      input = {user_id: $auth.id, required_role: "VENDEDOR"}
     } as $role_check
       db.add motos_clientes {
       enforce_hidden_fields = false

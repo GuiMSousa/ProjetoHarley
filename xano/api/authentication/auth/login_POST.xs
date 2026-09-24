@@ -12,7 +12,7 @@ query "auth/login" verb=POST {
     db.get user {
       field_name = "email"
       field_value = $input.email
-      output = ["id", "created_at", "name", "email", "role", "id_funcionario"]
+      output = ["id", "created_at", "name", "email", "password", "role", "id_funcionario"]
     } as $user
   
     // Check to make sure a user with that email exists

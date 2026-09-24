@@ -3,13 +3,33 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from Projeto_HarleyStore.services.motos import Moto, MotoCreate, MotoUpdate
+from Projeto_HarleyStore.services.cadastros import (
+    Cliente,
+    ClienteCreate,
+    ClienteUpdate,
+    Fornecedor,
+    FornecedorCreate,
+    FornecedorUpdate,
+    Funcionario,
+    FuncionarioCreate,
+    FuncionarioUpdate,
+    MotoCliente,
+    MotoClienteCreate,
+    MotoClienteUpdate,
+    Produto,
+    ProdutoCreate,
+    ProdutoUpdate,
+)
 from Projeto_HarleyStore.xano_config import xano_api_base_url
+
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class XanoError(RuntimeError):
@@ -30,6 +50,44 @@ class XanoPermissionError(XanoError):
 
 class XanoValidationError(XanoError):
     """Raised when Xano rejects the request payload."""
+
+
+class XanoResponseError(XanoError):
+    """Raised when a successful Xano response violates its contract."""
+
+
+class AuthTokenResponse(BaseModel):
+    """Minimal response returned by the Xano login endpoint."""
+
+    authToken: str
+    user_id: int | None = None
+
+
+class XanoUser(BaseModel):
+    """Safe technical identity returned by Xano."""
+
+    id: int
+    name: str | None = None
+    email: str | None = None
+    role: str | None = None
+    id_funcionario: int | None = None
+
+
+class XanoEmployee(BaseModel):
+    """Domain employee linked to the authenticated user."""
+
+    id: int
+    nome_funcionario: str
+    cargo: str | None = None
+    tipo: str
+    contato: str | None = None
+
+
+class CurrentUserResponse(BaseModel):
+    """Safe identity payload returned by ``auth/me``."""
+
+    user: XanoUser
+    funcionario: XanoEmployee | None = None
 
 
 class XanoClient:
@@ -66,6 +124,7 @@ class XanoClient:
         json: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
         authenticated: bool = True,
+        response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
     ) -> Any:
         headers: dict[str, str] = {}
         if authenticated:
@@ -106,7 +165,24 @@ class XanoClient:
             )
         if not response.content:
             return None
-        return response.json()
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise XanoResponseError(
+                "The Xano API returned an invalid JSON response.",
+                status_code=response.status_code,
+            ) from error
+        if response_model is None:
+            return payload
+        try:
+            if isinstance(response_model, TypeAdapter):
+                return response_model.validate_python(payload)
+            return response_model.model_validate(payload)
+        except ValidationError as error:
+            raise XanoResponseError(
+                "The Xano API returned an unexpected response payload.",
+                status_code=response.status_code,
+            ) from error
 
     def get(
         self,
@@ -114,9 +190,14 @@ class XanoClient:
         *,
         params: Mapping[str, Any] | None = None,
         authenticated: bool = True,
+        response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
     ) -> Any:
         return self.request(
-            "GET", path, params=params, authenticated=authenticated
+            "GET",
+            path,
+            params=params,
+            authenticated=authenticated,
+            response_model=response_model,
         )
 
     def post(
@@ -125,9 +206,14 @@ class XanoClient:
         *,
         json: Mapping[str, Any] | None = None,
         authenticated: bool = True,
+        response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
     ) -> Any:
         return self.request(
-            "POST", path, json=json, authenticated=authenticated
+            "POST",
+            path,
+            json=json,
+            authenticated=authenticated,
+            response_model=response_model,
         )
 
     def patch(
@@ -136,9 +222,14 @@ class XanoClient:
         *,
         json: Mapping[str, Any] | None = None,
         authenticated: bool = True,
+        response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
     ) -> Any:
         return self.request(
-            "PATCH", path, json=json, authenticated=authenticated
+            "PATCH",
+            path,
+            json=json,
+            authenticated=authenticated,
+            response_model=response_model,
         )
 
     def delete(
@@ -149,38 +240,134 @@ class XanoClient:
     ) -> Any:
         return self.request("DELETE", path, authenticated=authenticated)
 
+    def _list_resource(self, path: str, model: type[ModelT]) -> list[ModelT]:
+        return self.get(path, response_model=TypeAdapter(list[model]))
+
+    def _create_resource(
+        self, path: str, payload: BaseModel, model: type[ModelT]
+    ) -> ModelT:
+        return self.post(
+            path,
+            json=payload.model_dump(mode="json"),
+            response_model=model,
+        )
+
+    def _update_resource(
+        self,
+        path: str,
+        payload: BaseModel,
+        model: type[ModelT],
+    ) -> ModelT:
+        return self.patch(
+            path,
+            json=payload.model_dump(mode="json", exclude_unset=True),
+            response_model=model,
+        )
+
+    def _deactivate_resource(self, path: str, model: type[ModelT]) -> ModelT:
+        return self.patch(path, json={"ativo": False}, response_model=model)
+
     def login(self, email: str, password: str) -> dict[str, Any]:
         """Authenticate against Xano without persisting credentials locally."""
         response = self.post(
             "auth/login",
             json={"email": email, "password": password},
             authenticated=False,
+            response_model=AuthTokenResponse,
         )
-        return dict(response)
+        return response.model_dump()
 
-    def current_user(self) -> dict[str, Any]:
+    def current_user(self) -> CurrentUserResponse:
         """Return the authenticated technical user and linked employee."""
-        response = self.get("auth/me")
-        return dict(response)
+        return self.get("auth/me", response_model=CurrentUserResponse)
 
     def list_motos(self) -> list[Moto]:
         """List motos returned by the Xano motos endpoint."""
-        response = self.get("motos")
-        return TypeAdapter(list[Moto]).validate_python(response)
+        return self.get("motos", response_model=TypeAdapter(list[Moto]))
 
     def create_moto(self, moto: MotoCreate) -> Moto:
         """Create a moto in Xano."""
-        response = self.post("motos", json=moto.model_dump())
-        return Moto.model_validate(response)
+        return self.post("motos", json=moto.model_dump(), response_model=Moto)
 
     def update_moto(self, moto_id: int, moto: MotoUpdate) -> Moto:
         """Update the provided fields of a moto in Xano."""
         response = self.patch(
             f"motos/{moto_id}",
             json=moto.model_dump(exclude_unset=True),
+            response_model=Moto,
         )
-        return Moto.model_validate(response)
+        return response
 
     def delete_moto(self, moto_id: int) -> None:
         """Delete a moto from Xano."""
         self.delete(f"motos/{moto_id}")
+
+    def list_clientes(self) -> list[Cliente]:
+        return self._list_resource("clientes", Cliente)
+
+    def create_cliente(self, cliente: ClienteCreate) -> Cliente:
+        return self._create_resource("clientes", cliente, Cliente)
+
+    def update_cliente(self, cliente_id: int, cliente: ClienteUpdate) -> Cliente:
+        return self._update_resource(f"clientes/{cliente_id}", cliente, Cliente)
+
+    def deactivate_cliente(self, cliente_id: int) -> Cliente:
+        return self._deactivate_resource(f"clientes/{cliente_id}", Cliente)
+
+    def list_motos_clientes(self) -> list[MotoCliente]:
+        return self._list_resource("motos_clientes", MotoCliente)
+
+    def create_moto_cliente(self, moto: MotoClienteCreate) -> MotoCliente:
+        return self._create_resource("motos_clientes", moto, MotoCliente)
+
+    def update_moto_cliente(
+        self, moto_id: int, moto: MotoClienteUpdate
+    ) -> MotoCliente:
+        return self._update_resource(f"motos_clientes/{moto_id}", moto, MotoCliente)
+
+    def deactivate_moto_cliente(self, moto_id: int) -> MotoCliente:
+        return self._deactivate_resource(f"motos_clientes/{moto_id}", MotoCliente)
+
+    def list_produtos(self) -> list[Produto]:
+        return self._list_resource("produtos", Produto)
+
+    def create_produto(self, produto: ProdutoCreate) -> Produto:
+        return self._create_resource("produtos", produto, Produto)
+
+    def update_produto(self, produto_id: int, produto: ProdutoUpdate) -> Produto:
+        return self._update_resource(f"produtos/{produto_id}", produto, Produto)
+
+    def deactivate_produto(self, produto_id: int) -> Produto:
+        return self._deactivate_resource(f"produtos/{produto_id}", Produto)
+
+    def list_fornecedores(self) -> list[Fornecedor]:
+        return self._list_resource("fornecedores", Fornecedor)
+
+    def create_fornecedor(self, fornecedor: FornecedorCreate) -> Fornecedor:
+        return self._create_resource("fornecedores", fornecedor, Fornecedor)
+
+    def update_fornecedor(
+        self, fornecedor_id: int, fornecedor: FornecedorUpdate
+    ) -> Fornecedor:
+        return self._update_resource(
+            f"fornecedores/{fornecedor_id}", fornecedor, Fornecedor
+        )
+
+    def deactivate_fornecedor(self, fornecedor_id: int) -> Fornecedor:
+        return self._deactivate_resource(f"fornecedores/{fornecedor_id}", Fornecedor)
+
+    def list_funcionarios(self) -> list[Funcionario]:
+        return self._list_resource("funcionarios", Funcionario)
+
+    def create_funcionario(self, funcionario: FuncionarioCreate) -> Funcionario:
+        return self._create_resource("funcionarios", funcionario, Funcionario)
+
+    def update_funcionario(
+        self, funcionario_id: int, funcionario: FuncionarioUpdate
+    ) -> Funcionario:
+        return self._update_resource(
+            f"funcionarios/{funcionario_id}", funcionario, Funcionario
+        )
+
+    def deactivate_funcionario(self, funcionario_id: int) -> Funcionario:
+        return self._deactivate_resource(f"funcionarios/{funcionario_id}", Funcionario)

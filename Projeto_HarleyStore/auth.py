@@ -7,18 +7,20 @@ import re
 import reflex as rx
 
 from Projeto_HarleyStore.services.xano_client import (
+    CurrentUserResponse,
     XanoAuthenticationError,
     XanoClient,
     XanoError,
     XanoPermissionError,
 )
+from Projeto_HarleyStore.xano_config import xano_auth_cookie_secure
 
 
 class AuthState(rx.State):
     auth_token: str = rx.Cookie(
         name="harley_auth_token",
         max_age=86400,
-        secure=False,
+        secure=xano_auth_cookie_secure(),
         same_site="lax",
     )
     email: str = ""
@@ -52,6 +54,49 @@ class AuthState(rx.State):
         self.password = value
         self.error_message = ""
 
+    def _clear_session(self) -> None:
+        self.auth_token = ""
+        self.is_authenticated = False
+        self.user_name = ""
+        self.employee_name = ""
+        self.employee_role = ""
+
+    def _load_user(self) -> bool:
+        if not self.auth_token:
+            self.is_authenticated = False
+            return False
+        try:
+            with XanoClient(token=self.auth_token) as client:
+                response: CurrentUserResponse = client.current_user()
+            employee = response.funcionario
+            if employee is None:
+                self.error_message = (
+                    "Seu usuário ainda não está vinculado a um funcionário."
+                )
+                self.is_authenticated = False
+                return False
+            self.user_name = response.user.name or ""
+            self.employee_name = employee.nome_funcionario
+            self.employee_role = employee.tipo
+            self.is_authenticated = employee.tipo in {
+                "GERENTE",
+                "VENDEDOR",
+                "MECANICO",
+            }
+            if not self.is_authenticated:
+                self.error_message = "Seu funcionário não possui um tipo válido."
+            return self.is_authenticated
+        except XanoAuthenticationError:
+            self._clear_session()
+            self.error_message = "Sua sessão expirou. Entre novamente."
+        except XanoPermissionError:
+            self.is_authenticated = False
+            self.error_message = "Seu perfil não possui acesso a esta operação."
+        except XanoError:
+            self.is_authenticated = False
+            self.error_message = "Não foi possível validar sua sessão no Xano."
+        return False
+
     @rx.event
     def login(self):
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", self.email):
@@ -68,55 +113,41 @@ class AuthState(rx.State):
             self.auth_token = str(response.get("authToken", ""))
             if not self.auth_token:
                 raise XanoAuthenticationError("O Xano não retornou um token válido.")
-            self.load_user()
-            return rx.redirect("/")
-        except XanoError as error:
-            self.error_message = str(error)
-            self.auth_token = ""
-        finally:
-            self.is_loading = False
-        return None
-
-    @rx.event
-    def load_user(self) -> None:
-        if not self.auth_token:
-            self.is_authenticated = False
-            return
-        try:
-            with XanoClient(token=self.auth_token) as client:
-                response = client.current_user()
-            user = response.get("user", response)
-            employee = response.get("funcionario") or {}
-            self.user_name = str(user.get("name", ""))
-            self.employee_name = str(employee.get("nome_funcionario", ""))
-            self.employee_role = str(employee.get("tipo", ""))
-            self.is_authenticated = bool(self.employee_role)
-            if not self.is_authenticated:
-                self.error_message = "Usuário sem funcionário associado."
-        except XanoAuthenticationError:
-            self.logout()
-        except XanoPermissionError:
-            self.error_message = "Seu perfil não possui acesso a esta operação."
-            self.is_authenticated = True
+            if self._load_user():
+                self.password = ""
+                return rx.redirect("/")
             return rx.toast(
-                "Acesso negado para este perfil.",
+                self.error_message,
                 level="error",
                 position="top-right",
             )
         except XanoError as error:
             self.error_message = str(error)
-            self.is_authenticated = False
+            self._clear_session()
+            return rx.toast(
+                self.error_message,
+                level="error",
+                position="top-right",
+            )
+        finally:
+            self.is_loading = False
+
+    @rx.event
+    def load_user(self) -> None:
+        if not self._load_user() and not self.auth_token:
+            return rx.redirect("/login")
+        return rx.toast(
+            self.error_message,
+            level="error",
+            position="top-right",
+        )
 
     @rx.event
     def restore_session(self) -> None:
         if self.auth_token:
-            self.load_user()
+            return self.load_user()
 
     @rx.event
     def logout(self):
-        self.auth_token = ""
-        self.is_authenticated = False
-        self.user_name = ""
-        self.employee_name = ""
-        self.employee_role = ""
+        self._clear_session()
         return rx.redirect("/login")

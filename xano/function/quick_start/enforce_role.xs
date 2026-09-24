@@ -47,9 +47,9 @@ function "Quick Start/enforce_role" {
 
     conditional {
       if (
-        ($input.required_role == "GERENTE" && $employee.tipo != "GERENTE") ||
-        ($input.required_role == "VENDEDOR" && $employee.tipo != "GERENTE" && $employee.tipo != "VENDEDOR") ||
-        ($input.required_role == "MECANICO" && $employee.tipo != "GERENTE" && $employee.tipo != "MECANICO")
+        ($user.role != "admin" && $input.required_role == "GERENTE" && $employee.tipo != "GERENTE") ||
+        ($user.role != "admin" && $input.required_role == "VENDEDOR" && $employee.tipo != "GERENTE" && $employee.tipo != "VENDEDOR") ||
+        ($user.role != "admin" && $input.required_role == "MECANICO" && $employee.tipo != "GERENTE" && $employee.tipo != "MECANICO")
       ) {
         throw {
           name = "accessdenied"

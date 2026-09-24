@@ -12,7 +12,7 @@ query "motos_clientes/{motos_clientes_id}" verb=PATCH {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "MECANICO"}
+      input = {user_id: $auth.id, required_role: "VENDEDOR"}
     } as $role_check
       util.get_raw_input {
       encoding = "json"

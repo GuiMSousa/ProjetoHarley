@@ -16,6 +16,7 @@ query produtos verb=POST {
       db.add produtos {
       enforce_hidden_fields = false
       data = {
+        codigo      : $input.codigo
         nome_produto: $input.nome_produto
         descricao   : $input.descricao
         categoria   : $input.categoria

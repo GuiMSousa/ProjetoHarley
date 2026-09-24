@@ -10,6 +10,7 @@ table motos_clientes {
     text modelo filters=trim
     text placa filters=trim
     text chassi filters=trim
+    bool ativo?=true
   }
 
   index = [
