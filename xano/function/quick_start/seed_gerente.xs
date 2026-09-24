@@ -43,4 +43,5 @@ function "Quick Start/seed_gerente" {
   }
 
   response = {id: $user.id, email: $user.email, role: $user.role, id_funcionario: $user.id_funcionario}
+  guid = "5h1Xrq32pCDjHcPa16gT-QN3iv8"
 }
