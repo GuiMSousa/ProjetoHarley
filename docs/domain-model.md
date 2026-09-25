@@ -24,6 +24,14 @@ Representa os colaboradores da concessionária/oficina.
 - **Atributos:** Identificador (`id_funcionario`), Nome (`nome_funcionario`), Cargo (`cargo`), Tipo (`tipo`), Contato (`contato`), Ativo (`ativo`).
 - **Regras:** O tipo deve ser obrigatoriamente um entre: `VENDEDOR`, `MECANICO` ou `GERENTE`.
 - **Ciclo de vida:** Funcionários não são removidos fisicamente quando já possuem vínculos; usam soft delete.
+- **Acesso:** desativar um funcionário (`ativo = false`) revoga o acesso do usuário vinculado: `enforce_role` nega toda operação de negócio e o Reflex recusa a sessão.
+
+### Usuários (identidade técnica)
+Representa a identidade de autenticação do Xano (`user`), separada do domínio.
+- **Atributos:** Identificador (`id`), Nome (`name`), Email (`email`, único), Senha (hash), Papel técnico (`role`: `admin` ou `member`), Funcionário vinculado (`id_funcionario`).
+- **Regras:** Cada usuário operacional está vinculado a exatamente um funcionário ativo, e cada funcionário possui no máximo um usuário. O cargo de domínio vem de `Funcionarios.tipo`; `role` é apenas técnico.
+- **Criação:** somente um `GERENTE` cria usuários (`auth/signup`), com email e senha obrigatórios; o endpoint não emite token para o novo usuário.
+- **Auditoria:** `event_log` registra login e criação de usuário com id, email, papel e vínculo; senhas, hashes e tokens nunca são gravados.
 
 ### Clientes
 Representa os proprietários de motocicletas ou compradores da loja.
@@ -42,6 +50,7 @@ Representa os veículos pertencentes a clientes e utilizados no fluxo da oficina
 Representa as motocicletas mantidas no estoque da loja e destinadas à venda. Esta entidade é independente de `motos_clientes` e não representa o veículo usado no histórico de oficina.
 - **Atributos:** Identificador (`id`), Cliente opcional (`clientes_id`), Marca (`marca`), Modelo (`modelo`), Data de Cadastro (`created_at`).
 - **Relacionamento:** Pode possuir um cliente associado quando a venda for registrada.
+- **Situação atual:** o schema ainda não possui preço, chassi, status de disponibilidade nem `ativo`, e o endpoint `DELETE` é físico. A modelagem da venda de motos será definida em Change própria.
 
 ### Entrada_Mercadoria & Itens_Compra_Estoque
 Representa a nota/registro de compra efetuada junto a um fornecedor para abastecimento de estoque.
@@ -53,6 +62,7 @@ Representa a nota/registro de compra efetuada junto a um fornecedor para abastec
 - **Regras financeiras:** `valor_total = Σ (quantidade × valor_unitario)`, calculado pelo Xano; valores enviados pelo cliente são ignorados.
 - **Atomicidade:** cabeçalho, itens e incremento de `produtos.estoque_qtd` são gravados em uma única `db.transaction` por `POST entrada_mercadoria`. Qualquer rejeição desfaz a operação inteira.
 - **Autoria:** `id_funcionario` e `data_entrada` são definidos pelo servidor a partir do usuário autenticado.
+- **Registros legados:** `numero_documento` e `id_funcionario` são anuláveis no schema para que entradas anteriores à Change 5 não colidam no índice único; a função `Estoque/normalizar_entradas_legadas` preenche documentos vazios com `LEGADO-<id>`.
 - **Ciclo de vida:** Entradas e itens são imutáveis após o registro; os endpoints de edição e exclusão respondem `403`. Estornos serão tratados em Change futura com movimentação inversa.
 - **Concorrência:** o incremento lê e grava o saldo dentro da transação. Entradas simultâneas do mesmo produto podem, em teoria, sobrescrever uma à outra; o risco foi aceito dado o volume de operações.
 
@@ -62,14 +72,16 @@ Representa o atendimento técnico prestado na oficina mecânica para a moto de u
 - **Atributos Itens OS:** Identificador (`id_item_os`), Ordem de Serviço (`id_os`), Produto (`id_produto`), Quantidade (`quantidade`), Valor Total do Item (`valor_total_item`).
 - **Relacionamentos:** Pertence a uma **Moto_Cliente**, é aberta por um **Funcionario** e é composta por vários **Produtos/Peças**.
 - **Regras:** O status deve obrigatoriamente trafegar entre: `ABERTA`, `EM_ANDAMENTO`, `CONCLUIDA`, `CANCELADA`; `quantidade` e `valor_total_item` devem ser positivos.
-- **Autoria:** `id_funcionario` deve ser derivado do funcionário vinculado ao usuário autenticado no Xano, nunca aceito como autoria arbitrária do cliente.
+- **Autoria:** `id_funcionario` deve ser derivado do funcionário vinculado ao usuário autenticado no Xano, nunca aceito como autoria arbitrária do cliente. `POST`/`PUT` gravam o funcionário do JWT e o `PATCH` descarta `id_funcionario` do payload.
+- **Situação atual:** os endpoints ainda são CRUD genérico: o status é aceito do payload sem regra de transição e os itens não movimentam estoque. Essas regras pertencem às Changes de ordens de serviço.
 
 ### Transacoes
 Registra o fluxo financeiro de vendas e movimentações comerciais do estabelecimento.
 - **Atributos:** Identificador (`id_transacao`), Tipo da Transação (`tipo_transacao`), Funcionário (`id_funcionario`), Cliente (`id_cliente`), Moto do Cliente (`id_moto_cliente`), Data (`data_transacao`), Valor Total (`valor_total`).
 - **Regras:** O tipo de transação deve ser restrito aos valores: `MOTO`, `PECAS`, `BALCAO`, `COMPRA`, `ORDEM_SERVICO`.
 - **Regras financeiras:** `valor_total` deve ser estritamente positivo (`> 0`).
-- **Autoria:** `id_funcionario` deve ser derivado do usuário autenticado e do vínculo `user.id_funcionario`.
+- **Autoria:** `id_funcionario` deve ser derivado do usuário autenticado e do vínculo `user.id_funcionario`. `POST`/`PUT` gravam o funcionário do JWT e o `PATCH` descarta `id_funcionario` do payload.
+- **Situação atual:** transações não possuem linhas de itens; vendas de peças com baixa de estoque dependem de uma decisão de modelagem ainda pendente.
 
 ---
 

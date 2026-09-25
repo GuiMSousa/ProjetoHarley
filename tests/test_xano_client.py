@@ -12,6 +12,7 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoClient,
     XanoError,
+    XanoNotFoundError,
     XanoPermissionError,
     XanoResponseError,
     XanoValidationError,
@@ -64,6 +65,65 @@ class XanoClientTests(unittest.TestCase):
                         client.get("motos")
                     self.assertNotIn("secret", str(context.exception))
                     self.assertNotIn("token", str(context.exception))
+
+    def test_auth_and_business_endpoints_use_their_own_api_groups(self):
+        requested = []
+
+        def handler(request):
+            requested.append(str(request.url))
+            if request.url.path.endswith("auth/login"):
+                return httpx.Response(200, json={"authToken": "jwt"})
+            if request.url.path.endswith("auth/me"):
+                return httpx.Response(200, json={"user": {"id": 1}})
+            return httpx.Response(200, json=[])
+
+        with patch.dict(
+            os.environ,
+            {"XANO_AUTH_API_BASE_URL": "https://xano.test/api:auth/"},
+        ):
+            with self.make_client(handler) as client:
+                client.login("user@example.com", "password")
+                client.current_user()
+                client.list_clientes()
+
+        self.assertEqual(
+            requested,
+            [
+                "https://xano.test/api:auth/auth/login",
+                "https://xano.test/api:auth/auth/me",
+                "https://xano.test/api:test/clientes",
+            ],
+        )
+
+    def test_auth_group_falls_back_to_business_base_url(self):
+        requested = []
+
+        def handler(request):
+            requested.append(str(request.url))
+            return httpx.Response(200, json={"authToken": "jwt"})
+
+        with patch.dict(os.environ, {"XANO_AUTH_API_BASE_URL": ""}):
+            with self.make_client(handler, token=None) as client:
+                client.login("user@example.com", "password")
+        self.assertEqual(requested, ["https://xano.test/api:test/auth/login"])
+
+    def test_missing_resource_is_a_typed_not_found_error(self):
+        with self.make_client(
+            lambda request: httpx.Response(404, json={"message": "secret"})
+        ) as client:
+            with self.assertRaises(XanoNotFoundError) as context:
+                client.get("entrada_mercadoria/999")
+        self.assertNotIn("secret", str(context.exception))
+        self.assertEqual(context.exception.status_code, 404)
+
+    def test_linked_employee_defaults_to_active_and_reads_flag(self):
+        payload = {
+            "user": {"id": 1},
+            "funcionario": {"id": 2, "nome_funcionario": "Ana", "tipo": "GERENTE"},
+        }
+        self.assertTrue(CurrentUserResponse.model_validate(payload).funcionario.ativo)
+        payload["funcionario"]["ativo"] = False
+        self.assertFalse(CurrentUserResponse.model_validate(payload).funcionario.ativo)
 
     def test_validation_errors_expose_only_short_business_message(self):
         for status_code in (400, 422):

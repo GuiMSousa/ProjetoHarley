@@ -37,7 +37,7 @@ query "reset/update_password" verb=POST {
       input = {
         user_id : $user.id
         action  : "reset_password"
-        metadata: $user
+        metadata: {id: $user.id}
       }
     } as $event_log
   }

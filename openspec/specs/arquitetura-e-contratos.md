@@ -49,3 +49,42 @@ A tabela `user` DEVE possuir o campo opcional `id_funcionario` como referência 
 - **DADO** um usuário com `id_funcionario` preenchido
 - **ENTÃO** o valor DEVE identificar um registro existente em `funcionarios`
 - **E** o campo `user.role` DEVE continuar sendo tratado como papel técnico separado do tipo do funcionário
+## Requisito: grupos de API do Xano
+
+O cliente DEVE endereçar cada grupo de APIs pela sua própria URL base: `XANO_API_BASE_URL` para o grupo `HARLEY` e `XANO_AUTH_API_BASE_URL` para o grupo `Authentication`.
+
+### Cenário: login em grupo distinto
+
+- **DADO** grupos `Authentication` e `HARLEY` com canonicals diferentes
+- **QUANDO** o usuário fizer login e depois listar clientes
+- **ENTÃO** `auth/login` e `auth/me` DEVEM usar a URL do grupo `Authentication`
+- **E** `clientes` DEVE usar a URL do grupo `HARLEY`
+
+## Requisito: funcionário ativo
+
+Somente usuários vinculados a um funcionário com `ativo != false` PODEM executar operações de negócio.
+
+### Cenário: funcionário desativado
+
+- **DADO** um usuário cujo funcionário foi desativado
+- **QUANDO** chamar qualquer endpoint de negócio
+- **ENTÃO** o Xano DEVE responder `403`
+- **E** o Reflex NÃO DEVE considerar a sessão autenticada
+
+## Requisito: superfície pública mínima
+
+Somente `auth/login` PODE ser chamado sem JWT. `auth/signup` e `message/send_welcome_email` DEVEM exigir `GERENTE`; `auth/signup` NÃO DEVE devolver token do usuário criado. Fluxos de recuperação de acesso não homologados DEVEM permanecer bloqueados.
+
+### Cenário: gerente cria usuário
+
+- **DADO** um gerente autenticado
+- **QUANDO** criar um usuário para um funcionário ativo sem usuário
+- **ENTÃO** a resposta DEVE conter o id do usuário criado e nenhum token
+
+## Requisito: autoria imutável
+
+Nenhum endpoint DEVE gravar `id_funcionario` vindo do payload. Em `PATCH` de OS e transações, a chave DEVE ser descartada antes da gravação.
+
+## Requisito: auditoria sem segredos
+
+Registros de `event_log` NÃO DEVEM conter senha, hash ou token; `metadata` DEVE ser composto por campos explícitos, nunca pelo registro `user` completo.

@@ -64,4 +64,5 @@ function "Estoque/detalhe_entrada" {
   }
 
   response = $detalhe
+  guid = "ZFO4PNjlY6RMI3s76Or8HcALsJY"
 }

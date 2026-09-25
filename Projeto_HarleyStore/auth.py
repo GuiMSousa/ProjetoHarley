@@ -6,6 +6,7 @@ import re
 
 import reflex as rx
 
+from Projeto_HarleyStore.feedback import error_feedback
 from Projeto_HarleyStore.services.xano_client import (
     CurrentUserResponse,
     XanoAuthenticationError,
@@ -84,12 +85,29 @@ class AuthState(rx.State):
         self.password = value
         self.error_message = ""
 
+    def _session_root(self) -> AuthState:
+        state = self
+        while type(state) is not AuthState and state.parent_state is not None:
+            state = state.parent_state
+        return state
+
     def _clear_session(self) -> None:
         self.auth_token = ""
         self.is_authenticated = False
         self.user_name = ""
         self.employee_name = ""
         self.employee_role = ""
+        # Drop lists and forms loaded by the previous session in page states.
+        for substate in self._session_root().substates.values():
+            substate.reset()
+
+    def _xano_error_response(self, error: XanoError):
+        """Toast a readable message; an invalid session also returns to login."""
+        if isinstance(error, XanoAuthenticationError):
+            self._clear_session()
+            self.error_message = error_feedback(error)
+            return rx.redirect("/login")
+        return rx.toast(error_feedback(error), level="error", position="top-right")
 
     def _load_user(self) -> bool:
         if not self.auth_token:
@@ -102,6 +120,12 @@ class AuthState(rx.State):
             if employee is None:
                 self.error_message = (
                     "Seu usuário ainda não está vinculado a um funcionário."
+                )
+                self.is_authenticated = False
+                return False
+            if not employee.ativo:
+                self.error_message = (
+                    "Seu funcionário está inativo. Procure o gerente responsável."
                 )
                 self.is_authenticated = False
                 return False

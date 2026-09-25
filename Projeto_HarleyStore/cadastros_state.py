@@ -28,7 +28,13 @@ from Projeto_HarleyStore.services.cadastros import (
     ProdutoCreate,
     ProdutoUpdate,
 )
-from Projeto_HarleyStore.services.xano_client import XanoClient, XanoError
+from Projeto_HarleyStore.feedback import error_feedback
+from Projeto_HarleyStore.services.xano_client import (
+    XanoAuthenticationError,
+    XanoClient,
+    XanoError,
+    XanoValidationError,
+)
 
 
 SECTION_ROUTES = {
@@ -172,42 +178,66 @@ class CadastrosState(AuthState):
             elif section == "funcionarios":
                 self.funcionarios = self._rows(client.list_funcionarios(), "nome_funcionario", "tipo", "cargo")
 
-    def _load(self, section: str) -> None:
+    def _clear_section_rows(self, section: str) -> None:
+        """Never keep rows from a previous load next to a load error."""
+        if section in {"clientes", "motos_clientes"}:
+            self.clientes = []
+        if section == "motos_clientes":
+            self.motos_clientes = []
+        elif section == "produtos":
+            self.produtos = []
+        elif section == "fornecedores":
+            self.fornecedores = []
+        elif section == "funcionarios":
+            self.funcionarios = []
+
+    def _load(self, section: str):
         if self.is_loading_list:
-            return
+            return None
         self.set_section(section)
         self.list_error = ""
         if not self.is_authenticated or not role_allows_route(
             self.employee_role, SECTION_ROUTES[section]
         ):
-            return
+            return None
         self.is_loading_list = True
         try:
             self._load_section(section)
         except XanoError as error:
-            self.list_error = str(error)
+            self._clear_section_rows(section)
+            self.list_error = error_feedback(error)
+            if isinstance(error, XanoAuthenticationError):
+                return self._xano_error_response(error)
         finally:
             self.is_loading_list = False
+        return None
+
+    def _refresh_after_mutation(self, section: str) -> None:
+        """Reload a list after a successful write without masking the write result."""
+        try:
+            self._load_section(section)
+        except XanoError as error:
+            self.list_error = error_feedback(error)
 
     @rx.event
-    def load_clientes(self) -> None:
-        self._load("clientes")
+    def load_clientes(self):
+        return self._load("clientes")
 
     @rx.event
-    def load_motos_clientes(self) -> None:
-        self._load("motos_clientes")
+    def load_motos_clientes(self):
+        return self._load("motos_clientes")
 
     @rx.event
-    def load_produtos(self) -> None:
-        self._load("produtos")
+    def load_produtos(self):
+        return self._load("produtos")
 
     @rx.event
-    def load_fornecedores(self) -> None:
-        self._load("fornecedores")
+    def load_fornecedores(self):
+        return self._load("fornecedores")
 
     @rx.event
-    def load_funcionarios(self) -> None:
-        self._load("funcionarios")
+    def load_funcionarios(self):
+        return self._load("funcionarios")
 
     def _new_form(self, section: str) -> None:
         self.set_section(section)
@@ -270,6 +300,7 @@ class CadastrosState(AuthState):
                     for row in self.clientes
                     if row.get("id") == client_id
                 ),
+                "",
             )
             self.form_data["id_cliente"] = option_label(client_id, client_name)
         self.form_open = True
@@ -355,14 +386,17 @@ class CadastrosState(AuthState):
                         client.create_funcionario(payload)
             section = self.active_section
             self.form_open = False
-            self._load_section(section)
+            self._refresh_after_mutation(section)
             return rx.toast("Cadastro salvo com sucesso.", level="success", position="top-right")
         except (ValidationError, ValueError, InvalidOperation) as error:
             self.form_error = "Revise os campos obrigatórios e os valores informados."
             return rx.toast(self.form_error, level="error", position="top-right")
-        except XanoError as error:
-            self.form_error = str(error)
+        except XanoValidationError as error:
+            self.form_error = error_feedback(error)
             return rx.toast(self.form_error, level="error", position="top-right")
+        except XanoError as error:
+            self.form_error = error_feedback(error)
+            return self._xano_error_response(error)
         finally:
             self.is_saving = False
 
@@ -389,9 +423,9 @@ class CadastrosState(AuthState):
                     client.deactivate_fornecedor(int(record_id))
                 else:
                     client.deactivate_funcionario(int(record_id))
-            self._load_section(section)
+            self._refresh_after_mutation(section)
             return rx.toast("Registro desativado.", level="success", position="top-right")
         except XanoError as error:
-            return rx.toast(str(error), level="error", position="top-right")
+            return self._xano_error_response(error)
         finally:
             self.is_deactivating = False

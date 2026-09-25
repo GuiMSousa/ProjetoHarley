@@ -7,11 +7,12 @@ table entrada_mercadoria {
       table = "fornecedores"
     }
 
-    // Número do documento fiscal; obrigatório no endpoint, opcional para registros legados.
-    text numero_documento? filters=trim
+    // Número do documento fiscal; obrigatório no endpoint. Anulável para que registros
+    // legados (null) não colidam no índice único (id_fornecedor, numero_documento).
+    text? numero_documento? filters=trim
 
     // Funcionário responsável, derivado do usuário autenticado.
-    int id_funcionario? {
+    int? id_funcionario? {
       table = "funcionarios"
     }
 

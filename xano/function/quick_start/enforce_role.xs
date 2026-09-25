@@ -27,12 +27,18 @@ function "Quick Start/enforce_role" {
     db.get funcionarios {
       field_name = "id"
       field_value = $user.id_funcionario
-      output = ["id", "nome_funcionario", "cargo", "tipo", "contato"]
+      output = ["id", "nome_funcionario", "cargo", "tipo", "contato", "ativo"]
     } as $employee
 
     precondition ($employee != null) {
       error_type = "accessdenied"
       error = "The linked employee was not found."
+    }
+
+    // Soft-deleted employees lose access to every business operation.
+    precondition ($employee.ativo != false) {
+      error_type = "accessdenied"
+      error = "The linked employee is inactive."
     }
 
     precondition (

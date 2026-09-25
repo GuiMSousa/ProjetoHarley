@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from reflex.state import State
 
+from Projeto_HarleyStore.feedback import error_feedback
 from Projeto_HarleyStore.entradas_state import (
     EntradaFormError,
     EntradasState,
@@ -12,7 +13,6 @@ from Projeto_HarleyStore.entradas_state import (
     build_entrada_payload,
     can_register_entrada,
     entrada_row,
-    error_feedback,
     estimate_total,
     format_currency,
     remove_item_row,
@@ -29,6 +29,7 @@ from Projeto_HarleyStore.services.entradas import EntradaMercadoriaResumo
 from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoError,
+    XanoNotFoundError,
     XanoPermissionError,
     XanoValidationError,
 )
@@ -97,6 +98,7 @@ class EntradaFormRulesTests(unittest.TestCase):
         self.assertIn("permissão", error_feedback(XanoPermissionError("x")))
         self.assertEqual(error_feedback(XanoValidationError("Fornecedor inativo.")), "Fornecedor inativo.")
         self.assertIn("Xano", error_feedback(XanoError("boom")))
+        self.assertIn("não foi encontrado", error_feedback(XanoNotFoundError("x")))
 
     def test_history_row_is_human_readable(self):
         row = entrada_row(

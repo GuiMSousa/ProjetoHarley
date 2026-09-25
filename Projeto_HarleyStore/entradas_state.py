@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from Projeto_HarleyStore.auth import AuthState, role_allows_route
 from Projeto_HarleyStore.cadastros_state import operation_is_blocked
+from Projeto_HarleyStore.feedback import error_feedback
 from Projeto_HarleyStore.listing import (
     filter_rows,
     option_id,
@@ -26,7 +27,6 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoClient,
     XanoError,
-    XanoPermissionError,
     XanoValidationError,
 )
 
@@ -151,16 +151,6 @@ def build_entrada_payload(
         raise EntradaFormError(_validation_text(error)) from error
 
 
-def error_feedback(error: XanoError) -> str:
-    if isinstance(error, XanoAuthenticationError):
-        return "Sua sessão expirou. Entre novamente."
-    if isinstance(error, XanoPermissionError):
-        return "Seu perfil não possui permissão para esta operação."
-    if isinstance(error, XanoValidationError):
-        return str(error)
-    return "Não foi possível comunicar com o Xano. Tente novamente."
-
-
 def entrada_row(entrada: EntradaMercadoriaResumo) -> dict[str, str]:
     return {
         "id": str(entrada.id),
@@ -245,12 +235,6 @@ class EntradasState(AuthState):
     def next_page(self) -> None:
         self.current_page = min(self.total_pages, self.current_page + 1)
 
-    def _feedback(self, error: XanoError):
-        if isinstance(error, XanoAuthenticationError):
-            self._clear_session()
-            return rx.redirect("/login")
-        return rx.toast(error_feedback(error), level="error", position="top-right")
-
     def _reload_entradas(self, client: XanoClient) -> None:
         self.entradas = [entrada_row(entrada) for entrada in client.list_entradas()]
         self.current_page = 1
@@ -269,9 +253,10 @@ class EntradasState(AuthState):
             with XanoClient(token=self.auth_token) as client:
                 self._reload_entradas(client)
         except XanoError as error:
+            self.entradas = []
             self.list_error = error_feedback(error)
             if isinstance(error, XanoAuthenticationError):
-                return self._feedback(error)
+                return self._xano_error_response(error)
         finally:
             self.is_loading_list = False
         return None
@@ -290,7 +275,7 @@ class EntradasState(AuthState):
             self.detalhe_itens = [item_row(item) for item in detalhe.itens]
             self.detail_open = True
         except XanoError as error:
-            return self._feedback(error)
+            return self._xano_error_response(error)
         finally:
             self.is_loading_detail = False
         return None
@@ -316,7 +301,7 @@ class EntradasState(AuthState):
                 fornecedores = client.list_fornecedores()
                 produtos = client.list_produtos()
         except XanoError as error:
-            return self._feedback(error)
+            return self._xano_error_response(error)
         self.fornecedor_options = [
             option_label(fornecedor.id, fornecedor.nome_fornecedor)
             for fornecedor in fornecedores
@@ -399,6 +384,6 @@ class EntradasState(AuthState):
             self.form_error = error_feedback(error)
             return rx.toast(self.form_error, level="error", position="top-right")
         except XanoError as error:
-            return self._feedback(error)
+            return self._xano_error_response(error)
         finally:
             self.is_saving = False

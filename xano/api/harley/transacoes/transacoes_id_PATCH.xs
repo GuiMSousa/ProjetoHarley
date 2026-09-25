@@ -1,4 +1,4 @@
-// Edit transacoes record
+// Edit transacoes record. A autoria (id_funcionario) é definida na criação e nunca é aceita do payload.
 query "transacoes/{transacoes_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
@@ -22,7 +22,7 @@ query "transacoes/{transacoes_id}" verb=PATCH {
     db.patch transacoes {
       field_name = "id"
       field_value = $input.transacoes_id
-      data = `$input|pick:($raw_input|keys)`|filter_null|filter_empty_text
+      data = `$input|pick:($raw_input|keys)`|unset:"id_funcionario"|filter_null|filter_empty_text
     } as $model
   }
 

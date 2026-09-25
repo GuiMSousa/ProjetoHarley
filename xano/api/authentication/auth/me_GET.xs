@@ -22,17 +22,8 @@ query "auth/me" verb=GET {
     db.get funcionarios {
       field_name = "id"
       field_value = $user.id_funcionario
-      output = ["id", "nome_funcionario", "cargo", "tipo", "contato"]
+      output = ["id", "nome_funcionario", "cargo", "tipo", "contato", "ativo"]
     } as $employee
-  
-    // Create an event log for get user record
-    function.run "Quick Start/log_event" {
-      input = {
-        user_id : $user.id
-        action  : "get_auth_user"
-        metadata: {id: $user.id, email: $user.email, role: $user.role, id_funcionario: $user.id_funcionario}
-      }
-    } as $event_log
   }
 
   response = {user: $user, funcionario: $employee}

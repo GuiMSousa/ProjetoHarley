@@ -85,6 +85,41 @@ class AuthenticationTests(unittest.TestCase):
         self.assertFalse(state.is_authenticated)
         self.assertIn("vinculado", state.error_message)
 
+    def test_load_user_rejects_inactive_employee(self):
+        state = self.make_state()
+        response = self.make_user_response()
+        response.funcionario.ativo = False
+        client = MagicMock()
+        client.current_user.return_value = response
+        client.__enter__.return_value = client
+        with patch("Projeto_HarleyStore.auth.XanoClient", return_value=client):
+            self.assertFalse(self.run_load_user(state))
+        self.assertFalse(state.is_authenticated)
+        self.assertIn("inativo", state.error_message)
+
+    def test_clearing_session_resets_page_states(self):
+        from reflex.state import State
+
+        from Projeto_HarleyStore.cadastros_state import CadastrosState
+        from Projeto_HarleyStore.entradas_state import EntradasState
+
+        root = State(_reflex_internal_init=True)
+        cadastros = root.get_substate(CadastrosState.get_full_name().split("."))
+        entradas = root.get_substate(EntradasState.get_full_name().split("."))
+        cadastros.clientes = [{"id": "1", "primary": "Cliente anterior"}]
+        entradas.entradas = [{"id": "7", "documento": "NF-1"}]
+        entradas.auth_token = "token"
+        entradas.is_authenticated = True
+
+        response = entradas._xano_error_response(XanoAuthenticationError("expired"))
+
+        self.assertEqual(cadastros.clientes, [])
+        self.assertEqual(entradas.entradas, [])
+        self.assertEqual(entradas.auth_token, "")
+        self.assertFalse(entradas.is_authenticated)
+        self.assertIn("sessão", entradas.error_message)
+        self.assertIsNotNone(response)
+
     def test_cookie_secure_setting_accepts_explicit_boolean_values(self):
         for value, expected in {
             "false": False,

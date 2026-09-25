@@ -55,8 +55,9 @@ class EstoqueContractTests(unittest.TestCase):
 
     def test_receipt_schema_has_document_author_and_unique_document(self):
         content = self.read("xano/table/entrada_mercadoria.xs")
-        self.assertIn("text numero_documento? filters=trim", content)
-        self.assertRegex(content, r"int id_funcionario\? \{\s*table = \"funcionarios\"")
+        # Nullable so legacy rows (null) never collide in the unique index.
+        self.assertIn("text? numero_documento? filters=trim", content)
+        self.assertRegex(content, r"int\? id_funcionario\? \{\s*table = \"funcionarios\"")
         self.assertRegex(
             content,
             r'type : "btree\|unique"\s*field: \[\{name: "id_fornecedor"\}, \{name: "numero_documento"\}\]',

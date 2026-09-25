@@ -31,7 +31,10 @@ from Projeto_HarleyStore.services.entradas import (
     EntradaMercadoriaDetalhe,
     EntradaMercadoriaResumo,
 )
-from Projeto_HarleyStore.xano_config import xano_api_base_url
+from Projeto_HarleyStore.xano_config import (
+    xano_api_base_url,
+    xano_auth_api_base_url,
+)
 
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -74,6 +77,10 @@ class XanoValidationError(XanoError):
     """Raised when Xano rejects the request payload."""
 
 
+class XanoNotFoundError(XanoError):
+    """Raised when the requested Xano resource does not exist."""
+
+
 class XanoResponseError(XanoError):
     """Raised when a successful Xano response violates its contract."""
 
@@ -103,6 +110,7 @@ class XanoEmployee(BaseModel):
     cargo: str | None = None
     tipo: str
     contato: str | None = None
+    ativo: bool = True
 
 
 class CurrentUserResponse(BaseModel):
@@ -123,6 +131,7 @@ class XanoClient:
         timeout: float = 10.0,
     ) -> None:
         self._token = token.strip() if token else None
+        self._auth_base_url = xano_auth_api_base_url()
         self._client = httpx.Client(
             base_url=xano_api_base_url(),
             timeout=timeout,
@@ -147,8 +156,17 @@ class XanoClient:
         params: Mapping[str, Any] | None = None,
         authenticated: bool = True,
         response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
+        base_url: str | None = None,
     ) -> Any:
+        """Call a Xano endpoint.
+
+        ``base_url`` targets another API group (each group has its own
+        ``/api:<canonical>`` URL); by default the business group is used.
+        """
         headers: dict[str, str] = {}
+        url = path.lstrip("/")
+        if base_url:
+            url = f"{base_url.rstrip('/')}/{url}"
         if authenticated:
             if not self._token:
                 raise XanoAuthenticationError("A JWT is required for this request.")
@@ -157,7 +175,7 @@ class XanoClient:
         try:
             response = self._client.request(
                 method,
-                path.lstrip("/"),
+                url,
                 headers=headers,
                 json=json,
                 params=params,
@@ -173,6 +191,11 @@ class XanoClient:
         if response.status_code == 403:
             raise XanoPermissionError(
                 "The authenticated user is not allowed to perform this action.",
+                status_code=response.status_code,
+            )
+        if response.status_code == 404:
+            raise XanoNotFoundError(
+                "The requested Xano resource was not found.",
                 status_code=response.status_code,
             )
         if response.status_code in {400, 422}:
@@ -213,6 +236,7 @@ class XanoClient:
         params: Mapping[str, Any] | None = None,
         authenticated: bool = True,
         response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
+        base_url: str | None = None,
     ) -> Any:
         return self.request(
             "GET",
@@ -220,6 +244,7 @@ class XanoClient:
             params=params,
             authenticated=authenticated,
             response_model=response_model,
+            base_url=base_url,
         )
 
     def post(
@@ -229,6 +254,7 @@ class XanoClient:
         json: Mapping[str, Any] | None = None,
         authenticated: bool = True,
         response_model: type[ModelT] | TypeAdapter[ModelT] | None = None,
+        base_url: str | None = None,
     ) -> Any:
         return self.request(
             "POST",
@@ -236,6 +262,7 @@ class XanoClient:
             json=json,
             authenticated=authenticated,
             response_model=response_model,
+            base_url=base_url,
         )
 
     def patch(
@@ -296,12 +323,17 @@ class XanoClient:
             json={"email": email, "password": password},
             authenticated=False,
             response_model=AuthTokenResponse,
+            base_url=self._auth_base_url,
         )
         return response.model_dump()
 
     def current_user(self) -> CurrentUserResponse:
         """Return the authenticated technical user and linked employee."""
-        return self.get("auth/me", response_model=CurrentUserResponse)
+        return self.get(
+            "auth/me",
+            response_model=CurrentUserResponse,
+            base_url=self._auth_base_url,
+        )
 
     def list_motos(self) -> list[Moto]:
         """List motos returned by the Xano motos endpoint."""

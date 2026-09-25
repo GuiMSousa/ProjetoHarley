@@ -4,7 +4,41 @@ O Reflex acessa o backend somente através de `Projeto_HarleyStore.services.xano
 
 ## Configuração
 
-Defina `XANO_API_BASE_URL` no ambiente de execução. O valor deve conter a URL base do grupo de APIs do Xano e não deve ser commitado como segredo. O arquivo `.env.example` mostra o formato esperado.
+Cada grupo de APIs do Xano tem a própria URL base (`https://<instância>/api:<canonical>`). O workspace usa dois grupos:
+
+| Variável | Grupo Xano | Canonical no export | Endpoints |
+| --- | --- | --- | --- |
+| `XANO_API_BASE_URL` | `HARLEY` | `AwslAPW3` (`xano/api/harley/harley.xs`) | cadastros, entradas, OS, transações |
+| `XANO_AUTH_API_BASE_URL` | `Authentication` | `mN0Sp2sG` (`xano/api/authentication/authentication.xs`) | `auth/login`, `auth/me` |
+
+`XANO_AUTH_API_BASE_URL` recorre a `XANO_API_BASE_URL` quando omitida. Sem a variável própria, porém, o login falha com `404` sempre que os grupos forem diferentes, como neste workspace.
+
+As variáveis podem vir do ambiente ou de um arquivo `.env` na raiz: `rxconfig.py` declara `env_file=".env"` e o carregamento usa `python-dotenv`. O `.env` está no `.gitignore`; `.env.example` mostra o formato. `XANO_AUTH_COOKIE_SECURE` deve ser `true` quando a aplicação for servida por HTTPS.
+
+## Publicação do backend (deploy)
+
+Os arquivos em `xano/` são a fonte versionada do workspace e são publicados pela CLI do Xano:
+
+```bash
+xano auth                              # uma vez: cria o perfil com instância e workspace
+xano workspace push -d ./xano --dry-run    # pré-visualiza as alterações
+xano workspace push -d ./xano              # publica somente o que mudou
+```
+
+Regras importantes:
+
+- O push padrão é parcial e aditivo: adiciona e atualiza, mas **não remove nem relaxa restrições**. Tornar um campo anulável (por exemplo, `entrada_mercadoria.numero_documento`) ou remover colunas exige `xano workspace push -d ./xano --sync`.
+- `--sync --delete` também remove do workspace objetos ausentes em `xano/`; use apenas depois de revisar o `--dry-run`.
+- Para testar antes de publicar no live, use um branch: `xano workspace push -d ./xano -b <branch>`.
+- O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
+- Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (configurado em `.vscode/mcp.json`).
+
+### Checklist pós-deploy da Change 5 e do saneamento
+
+1. Publicar com `--sync` (o schema de `entrada_mercadoria` relaxou `numero_documento` e `id_funcionario` para anuláveis).
+2. Executar uma vez a função `Estoque/normalizar_entradas_legadas`: entradas antigas sem documento passam a `LEGADO-<id>`.
+3. Conferir que não há produtos antigos com `codigo` vazio repetido; o índice único de `produtos.codigo` falharia na criação.
+4. Rodar a suíte de integração (seção "Testes de integração").
 
 ## Autenticação
 
@@ -14,7 +48,11 @@ A instância autenticada recebe o JWT através do argumento `token`. O cliente e
 Authorization: Bearer <JWT>
 ```
 
-O cliente não persiste tokens, não os registra em logs e não os envia em query strings. A Change de autenticação deverá decidir onde o estado da sessão será mantido pelo Reflex.
+O cliente não persiste tokens, não os registra em logs e não os envia em query strings. O Reflex guarda o JWT no cookie `harley_auth_token` e restaura a sessão com `auth/me` no `on_load` de cada rota protegida.
+
+`auth/me` devolve `{user, funcionario}`. `XanoEmployee.ativo` indica se o funcionário vinculado está ativo; o Reflex recusa a sessão de funcionário inativo, e o Xano (`enforce_role`) nega qualquer operação de negócio a ele.
+
+Somente `auth/login` é público. `auth/signup` exige `GERENTE`, cria o usuário vinculado a um funcionário ativo e ainda sem usuário, e **não** devolve token do novo usuário. `message/send_welcome_email` exige `GERENTE`. O fluxo de recuperação por magic link (`reset/request-reset-link` e `reset/magic-link-login`) está bloqueado até ser homologado por uma Change.
 
 ## DTOs e recursos
 
@@ -28,9 +66,9 @@ O cliente usa modelos Pydantic em `Projeto_HarleyStore.services.cadastros` para 
 
 `Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`; o cliente não deve usar `DELETE` físico para esses recursos.
 
-`Produto.preco_venda` e demais valores financeiros usam validação estrita `> 0`. Quantidades de itens usam `> 0` e saldos de estoque usam `>= 0`.
+`Produto.preco_venda` e demais valores financeiros usam validação estrita `> 0` e são serializados como string decimal em JSON. Quantidades de itens usam `> 0` e saldos de estoque usam `>= 0`. Nenhum DTO de escrita envia `id_funcionario`, totais ou datas de autoria.
 
-O `XanoClient` oferece métodos tipados de listagem, criação, atualização e desativação para esses recursos, além da operação HTTP genérica.
+O `XanoClient` oferece métodos tipados de listagem, criação, atualização e desativação para esses recursos, além da operação HTTP genérica `request(..., base_url=None)`, que permite endereçar outro grupo de APIs.
 
 `ProdutoUpdate` não possui `estoque_qtd`: o saldo é informado somente em `ProdutoCreate` e depois muda apenas por movimentações de estoque.
 
@@ -54,17 +92,23 @@ Métodos:
 
 ## Erros
 
-- `XanoAuthenticationError`: token ausente, inválido ou expirado; a sessão deve ser limpa pela camada de autenticação.
-- `XanoPermissionError`: token válido sem permissão; a sessão deve ser preservada.
-- `XanoValidationError`: payload rejeitado pelo backend (`400` de `precondition` com `inputerror`, ou `422`). Quando o corpo traz um campo `message` textual com até 200 caracteres, essa mensagem de negócio vira o texto da exceção (ex.: "Fornecedor inativo ou inexistente."); caso contrário, usa-se uma mensagem genérica. Nenhum outro campo do corpo é propagado.
-- `XanoError`: falha de transporte ou erro inesperado da API.
-- `XanoResponseError`: resposta HTTP bem-sucedida que não respeita o DTO esperado.
+| Status HTTP | Exceção | Mensagem da exceção | Mensagem exibida (`feedback.error_feedback`) | Efeito no Reflex |
+| --- | --- | --- | --- | --- |
+| sem token | `XanoAuthenticationError` | genérica | "Sua sessão expirou. Entre novamente." | limpa a sessão e os estados das páginas; redireciona para `/login` |
+| `401` | `XanoAuthenticationError` | genérica | idem | idem |
+| `403` | `XanoPermissionError` | genérica | "Seu perfil não possui permissão para esta operação." | preserva a sessão; toast |
+| `404` | `XanoNotFoundError` | genérica | "O registro solicitado não foi encontrado." | toast |
+| `400` / `422` | `XanoValidationError` | `message` do Xano, se texto com até 200 caracteres; senão genérica | a própria mensagem de negócio | mantém o formulário aberto com a mensagem |
+| demais / transporte | `XanoError` | genérica | "Não foi possível comunicar com o Xano. Tente novamente." | toast ou erro da lista |
+| `2xx` fora do DTO | `XanoResponseError` | genérica | idem `XanoError` | idem |
+
+Somente o campo `message` de respostas `400`/`422` é propagado; nenhum outro conteúdo do corpo, token ou payload chega às exceções. Os estados Reflex usam `AuthState._xano_error_response` para aplicar a tabela acima de forma uniforme. Quando uma gravação é concluída mas o recarregamento da lista falha, a UI confirma a gravação e mostra o erro apenas na lista.
 
 O cliente não interpreta payloads de domínio. Cada serviço futuro deve definir seus próprios tipos e endpoints sobre esta fronteira.
 
 ## Autoria operacional
 
-Endpoints de OS e transações devem derivar `id_funcionario` do usuário autenticado no Xano: o backend resolve `$auth.id` para `user.id_funcionario` e persiste esse vínculo. Um `id_funcionario` enviado pelo frontend não é fonte de autoria e deve ser ignorado ou rejeitado pelo endpoint.
+Endpoints de OS e transações derivam `id_funcionario` do usuário autenticado no Xano: o backend resolve `$auth.id` para `user.id_funcionario` e persiste esse vínculo na criação. `POST`/`PUT` não mapeiam `id_funcionario` do input e os `PATCH` de OS e transações removem a chave (`|unset:"id_funcionario"`) antes de gravar. Um `id_funcionario` enviado pelo frontend nunca é fonte de autoria.
 
 O frontend pode esconder ações incompatíveis com o cargo, mas a autorização final, a autoria e a integridade dos dados permanecem no Xano.
 
@@ -78,5 +122,17 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Funcionários | escrita e leitura | sem acesso | sem acesso |
 | Entradas de mercadoria (histórico e detalhe) | leitura | leitura | leitura |
 | Registrar entrada de mercadoria | sim | não | não |
+| Criar usuários e enviar email de boas-vindas | sim | não | não |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
+
+## Testes
+
+```bash
+python -m unittest discover -s tests
+```
+
+- Os testes offline usam `httpx.MockTransport` e contratos estáticos sobre `xano/`; não precisam de rede.
+- `tests/test_integration_xano.py` executa chamadas HTTP reais quando `XANO_API_BASE_URL` está configurada (ambiente ou `.env`); caso contrário, é ignorado.
+- Credenciais por perfil: `XANO_TEST_GERENTE_EMAIL`/`_PASSWORD`, `XANO_TEST_VENDEDOR_*` e `XANO_TEST_MECANICO_*`. Perfis sem credenciais são ignorados individualmente.
+- Os cenários que gravam dados (registro de entrada, documento duplicado e rollback) exigem `XANO_TEST_ALLOW_WRITES=true`. Como as entradas são imutáveis, rode-os em um branch ou workspace de testes.

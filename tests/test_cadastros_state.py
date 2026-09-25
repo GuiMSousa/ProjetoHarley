@@ -5,7 +5,7 @@ from reflex.state import State
 
 from Projeto_HarleyStore.cadastros_state import CadastrosState, operation_is_blocked
 from Projeto_HarleyStore.services.cadastros import ProdutoCreate, ProdutoUpdate
-from Projeto_HarleyStore.services.xano_client import XanoError
+from Projeto_HarleyStore.services.xano_client import XanoAuthenticationError, XanoError
 
 
 class CadastrosStateTests(unittest.TestCase):
@@ -73,8 +73,50 @@ class CadastrosStateTests(unittest.TestCase):
                 XanoError("Unable to reach the Xano API.")
             )
             CadastrosState.load_produtos.fn(state)
-        self.assertEqual(state.list_error, "Unable to reach the Xano API.")
+        self.assertEqual(
+            state.list_error, "Não foi possível comunicar com o Xano. Tente novamente."
+        )
+        self.assertEqual(state.produtos, [])
         self.assertFalse(state.is_loading_list)
+
+    def test_successful_save_is_not_reported_as_failure_when_reload_fails(self):
+        state = self.make_real_state("GERENTE")
+        state.active_section = "clientes"
+        state.editing_id = ""
+        state.form_open = True
+        state.form_data = {"nome_cliente": "Ana", "cpf_cnpj": "12345678900"}
+        with patch("Projeto_HarleyStore.cadastros_state.XanoClient") as client_class:
+            client = client_class.return_value.__enter__.return_value
+            client.list_clientes.side_effect = XanoError("Unable to reach the Xano API.")
+            CadastrosState.save_form.fn(state)
+        client.create_cliente.assert_called_once()
+        self.assertEqual(state.form_error, "")
+        self.assertFalse(state.form_open)
+        self.assertIn("Xano", state.list_error)
+
+    def test_expired_session_on_save_clears_session(self):
+        state = self.make_real_state("GERENTE")
+        state.active_section = "clientes"
+        state.editing_id = ""
+        state.form_data = {"nome_cliente": "Ana", "cpf_cnpj": "12345678900"}
+        with patch("Projeto_HarleyStore.cadastros_state.XanoClient") as client_class:
+            client_class.return_value.__enter__.return_value.create_cliente.side_effect = (
+                XanoAuthenticationError("expired")
+            )
+            CadastrosState.save_form.fn(state)
+        self.assertEqual(state.auth_token, "")
+        self.assertFalse(state.is_authenticated)
+        self.assertFalse(state.is_saving)
+
+    def test_edit_of_bike_with_unloaded_client_does_not_crash(self):
+        state = self.make_real_state("VENDEDOR")
+        state.clientes = []
+        state.motos_clientes = [
+            {"id": "5", "id_cliente": "9", "modelo": "Street", "ativo_value": "true"}
+        ]
+        CadastrosState.open_edit.fn(state, "motos_clientes", "5")
+        self.assertTrue(state.form_open)
+        self.assertEqual(state.form_data["id_cliente"], "9 - ")
 
     def test_product_edit_payload_never_carries_stock_balance(self):
         state = self.make_real_state("GERENTE")
