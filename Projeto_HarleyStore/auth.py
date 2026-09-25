@@ -6,7 +6,7 @@ import re
 
 import reflex as rx
 
-from Projeto_HarleyStore.feedback import error_feedback
+from Projeto_HarleyStore.feedback import error_feedback, toast_error
 from Projeto_HarleyStore.services.xano_client import (
     CurrentUserResponse,
     XanoAuthenticationError,
@@ -59,10 +59,6 @@ class AuthState(rx.State):
         return self.employee_name or self.user_name or "Usuário"
 
     @rx.var
-    def can_manage(self) -> bool:
-        return self.employee_role == "GERENTE"
-
-    @rx.var
     def allowed_routes(self) -> list[str]:
         if not self.is_authenticated:
             return []
@@ -105,7 +101,7 @@ class AuthState(rx.State):
             self._clear_session()
             self.error_message = error_feedback(error)
             return rx.redirect("/login")
-        return rx.toast(error_feedback(error), level="error", position="top-right")
+        return toast_error(error_feedback(error))
 
     def _load_user(self) -> bool:
         if not self.auth_token:
@@ -169,19 +165,11 @@ class AuthState(rx.State):
             if self._load_user():
                 self.password = ""
                 return rx.redirect("/")
-            return rx.toast(
-                self.error_message,
-                level="error",
-                position="top-right",
-            )
+            return toast_error(self.error_message)
         except XanoError as error:
             self.error_message = str(error)
             self._clear_session()
-            return rx.toast(
-                self.error_message,
-                level="error",
-                position="top-right",
-            )
+            return toast_error(self.error_message)
         finally:
             self.is_loading = False
 
@@ -191,11 +179,7 @@ class AuthState(rx.State):
             return None
         if not self.auth_token:
             return rx.redirect("/login")
-        return rx.toast(
-            self.error_message,
-            level="error",
-            position="top-right",
-        )
+        return toast_error(self.error_message)
 
     @rx.event
     def restore_session(self) -> None:

@@ -11,6 +11,7 @@ from Projeto_HarleyStore.services.cadastros import (
     FornecedorCreate,
     FuncionarioCreate,
     MotoClienteCreate,
+    Produto,
     ProdutoCreate,
     ProdutoUpdate,
 )
@@ -98,6 +99,23 @@ class CadastrosTests(unittest.TestCase):
         self.assertEqual(requests[0][0:2], ("GET", "/api:test/clientes"))
         self.assertEqual(requests[1][0:2], ("PATCH", "/api:test/clientes/1"))
         self.assertIn(b'"ativo":false', requests[1][2])
+
+    def test_null_stock_from_xano_reads_as_zero(self):
+        row = {
+            "id": 4,
+            "codigo": "SKU4",
+            "nome_produto": "Filtro",
+            "categoria": "Motor",
+            "estoque_qtd": None,
+            "preco_venda": 45.5,
+        }
+        self.assertEqual(Produto.model_validate(row).estoque_qtd, 0)
+        self.assertEqual(Produto.model_validate({**row, "estoque_qtd": 7}).estoque_qtd, 7)
+        with self.assertRaises(ValidationError):
+            Produto.model_validate({**row, "estoque_qtd": -1})
+        # The write DTO still requires a real balance.
+        with self.assertRaises(ValidationError):
+            ProdutoCreate(**{**row, "estoque_qtd": None})
 
     def test_product_update_does_not_accept_stock_balance(self):
         update = ProdutoUpdate(nome_produto="Filtro", estoque_qtd=999)

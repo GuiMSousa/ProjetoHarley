@@ -180,6 +180,43 @@ class XanoLiveReadTests(XanoLiveTestCase):
                 with self.subTest(path=path), self.assertRaises(XanoPermissionError):
                     client.request(method, path, authenticated=False, base_url=auth_url)
 
+    def test_physical_deletes_are_blocked(self):
+        # A nonexistent id keeps the call harmless even against a workspace without the block.
+        with self.client_for("GERENTE") as client:
+            for resource in (
+                "clientes",
+                "motos_clientes",
+                "produtos",
+                "fornecedores",
+                "funcionarios",
+                "motos",
+                "transacoes",
+            ):
+                with self.subTest(resource=resource), self.assertRaises(XanoPermissionError):
+                    client.delete(f"{resource}/{NONEXISTENT_ID}")
+
+    def test_password_change_requires_the_current_password(self):
+        """The new password sent is the current one, so no scenario changes the credentials."""
+        password = SETTINGS.get("XANO_TEST_VENDEDOR_PASSWORD", "")
+        if password != password.strip():
+            # The endpoint before this sprint trimmed the password and would change it.
+            self.skipTest("Senha de teste com espaços nas pontas.")
+        with self.client_for("VENDEDOR") as client:
+            auth_url = client._auth_base_url
+            payloads = (
+                {"password": password, "confirm_password": password},
+                {
+                    "current_password": f"errada-{uuid.uuid4().hex}",
+                    "password": password,
+                    "confirm_password": password,
+                },
+            )
+            for payload in payloads:
+                with self.subTest(fields=sorted(payload)), self.assertRaises(XanoValidationError):
+                    client.request(
+                        "POST", "reset/update_password", json=payload, base_url=auth_url
+                    )
+
 
 class XanoLiveServiceOrderReadTests(XanoLiveTestCase):
     def test_every_profile_reads_the_workshop(self):

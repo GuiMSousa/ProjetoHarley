@@ -35,6 +35,51 @@ class SecurityContractTests(unittest.TestCase):
         self.assertIn('required_role: "GERENTE"', content)
         self.assertIn('output = ["id", "name", "email"]', content)
 
+    def test_physical_deletes_are_blocked(self):
+        for resource in (
+            "clientes",
+            "motos_clientes",
+            "produtos",
+            "fornecedores",
+            "funcionarios",
+            "motos",
+            "transacoes",
+        ):
+            with self.subTest(resource=resource):
+                content = self.read(f"api/harley/{resource}/{resource}_id_DELETE.xs")
+                self.assertIn(f'query "{resource}/{{{resource}_id}}" verb=DELETE', content)
+                self.assertIn('required_role: "GERENTE"', content)
+                self.assertIn("precondition (false)", content)
+                self.assertIn('error_type = "accessdenied"', content)
+                self.assertNotIn("db.del", content)
+
+    def test_only_open_order_items_are_physically_deleted(self):
+        deleting = [
+            path.relative_to(XANO).as_posix()
+            for path in (XANO / "api").rglob("*.xs")
+            if re.search(r"db\.(del|bulk\.delete) ", path.read_text(encoding="utf-8"))
+        ]
+        self.assertEqual(
+            deleting, ["api/harley/ordens_servico/ordens_servico_id_itens_item_id_DELETE.xs"]
+        )
+
+    def test_password_change_requires_current_password_and_active_employee(self):
+        content = self.read("api/authentication/reset/update_password_POST.xs")
+        for declaration in (
+            "text current_password\n",
+            "text password filters=min:8\n",
+            "text confirm_password\n",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, content)
+        # Passwords are compared raw, as in auth/login and auth/signup.
+        self.assertNotIn("trim", content[content.index("input {"):content.index("stack {")])
+        self.assertIn('required_role: "ALL"', content)
+        self.assertIn("text_password = $input.current_password", content)
+        self.assertLess(content.index("security.check_password"), content.index("db.edit user"))
+        self.assertIn("$input.password != $input.current_password", content)
+        self.assertIn("metadata: {id: $auth.id}", content)
+
     def test_unapproved_recovery_endpoints_are_blocked(self):
         for relative_path in (
             "api/authentication/reset/request_reset_link_GET.xs",

@@ -28,13 +28,14 @@ from Projeto_HarleyStore.services.cadastros import (
     ProdutoCreate,
     ProdutoUpdate,
 )
-from Projeto_HarleyStore.feedback import error_feedback
+from Projeto_HarleyStore.feedback import error_feedback, toast_error, toast_success
 from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoClient,
     XanoError,
     XanoValidationError,
 )
+from Projeto_HarleyStore.ui_helpers import operation_is_blocked
 
 
 SECTION_ROUTES = {
@@ -44,15 +45,6 @@ SECTION_ROUTES = {
     "fornecedores": "/cadastros/fornecedores",
     "funcionarios": "/cadastros/funcionarios",
 }
-
-
-def operation_is_blocked(
-    is_loading_list: bool,
-    is_saving: bool,
-    is_deactivating: bool,
-) -> bool:
-    """Return whether a cadastro operation must be rejected as reentrant."""
-    return is_loading_list or is_saving or is_deactivating
 
 
 class CadastrosState(AuthState):
@@ -354,7 +346,7 @@ class CadastrosState(AuthState):
             return
         if not self._can_write(self.active_section):
             self.form_error = "Seu perfil não pode alterar este cadastro."
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         self.is_saving = True
         try:
             payload, _ = self._payload()
@@ -387,13 +379,13 @@ class CadastrosState(AuthState):
             section = self.active_section
             self.form_open = False
             self._refresh_after_mutation(section)
-            return rx.toast("Cadastro salvo com sucesso.", level="success", position="top-right")
+            return toast_success("Cadastro salvo com sucesso.")
         except (ValidationError, ValueError, InvalidOperation) as error:
             self.form_error = "Revise os campos obrigatórios e os valores informados."
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         except XanoValidationError as error:
             self.form_error = error_feedback(error)
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         except XanoError as error:
             self.form_error = error_feedback(error)
             return self._xano_error_response(error)
@@ -409,7 +401,7 @@ class CadastrosState(AuthState):
         ):
             return
         if not self._can_write(section):
-            return rx.toast("Seu perfil não pode desativar este cadastro.", level="error", position="top-right")
+            return toast_error("Seu perfil não pode desativar este cadastro.")
         self.is_deactivating = True
         try:
             with XanoClient(token=self.auth_token) as client:
@@ -424,7 +416,7 @@ class CadastrosState(AuthState):
                 else:
                     client.deactivate_funcionario(int(record_id))
             self._refresh_after_mutation(section)
-            return rx.toast("Registro desativado.", level="success", position="top-right")
+            return toast_success("Registro desativado.")
         except XanoError as error:
             return self._xano_error_response(error)
         finally:

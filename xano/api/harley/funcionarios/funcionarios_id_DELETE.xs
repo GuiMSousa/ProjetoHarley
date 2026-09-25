@@ -1,4 +1,5 @@
-// Delete funcionarios record
+// Bloqueado no saneamento pós-Change 7: exclusão física desabilitada para que registros
+// vinculados a OS, estoque, entradas e transações nunca fiquem órfãos.
 query "funcionarios/{funcionarios_id}" verb=DELETE {
   api_group = "HARLEY"
   auth = "user"
@@ -11,9 +12,10 @@ query "funcionarios/{funcionarios_id}" verb=DELETE {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
-      db.del funcionarios {
-      field_name = "id"
-      field_value = $input.funcionarios_id
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Exclusão física desabilitada: desative o registro (ativo = false)."
     }
   }
 

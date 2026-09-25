@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CadastroModel(BaseModel):
@@ -76,7 +76,11 @@ class ProdutoUpdate(BaseModel):
 
 
 class Produto(CadastroModel, ProdutoCreate):
-    pass
+    @field_validator("estoque_qtd", mode="before")
+    @classmethod
+    def null_stock_is_zero(cls, value: object) -> object:
+        # Xano allows a null balance (legacy rows); Estoque/movimentar_estoque reads it as 0.
+        return 0 if value is None else value
 
 
 class FornecedorCreate(BaseModel):

@@ -9,8 +9,7 @@ import reflex as rx
 from pydantic import ValidationError
 
 from Projeto_HarleyStore.auth import AuthState, role_allows_route
-from Projeto_HarleyStore.cadastros_state import operation_is_blocked
-from Projeto_HarleyStore.feedback import error_feedback
+from Projeto_HarleyStore.feedback import error_feedback, toast_error, toast_success
 from Projeto_HarleyStore.formatting import (
     EMPTY_VALUE,
     format_currency,
@@ -42,6 +41,7 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoError,
     XanoValidationError,
 )
+from Projeto_HarleyStore.ui_helpers import operation_is_blocked
 
 
 WORKSHOP_ROUTE = "/workshop"
@@ -640,11 +640,7 @@ class WorkshopState(AuthState):
     @rx.event
     def open_create(self):
         if not can_operate_os(self.employee_role):
-            return rx.toast(
-                "Seu perfil pode apenas consultar ordens de serviço.",
-                level="error",
-                position="top-right",
-            )
+            return toast_error("Seu perfil pode apenas consultar ordens de serviço.")
         self.form_error = ""
         self.cliente = ""
         self.moto = ""
@@ -734,7 +730,7 @@ class WorkshopState(AuthState):
             return None
         if not can_operate_os(self.employee_role):
             self.form_error = "Seu perfil pode apenas consultar ordens de serviço."
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         try:
             payload = build_abertura_payload(
                 self.cliente,
@@ -747,7 +743,7 @@ class WorkshopState(AuthState):
             )
         except WorkshopFormError as error:
             self.form_error = str(error)
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
 
         self.is_saving = True
         try:
@@ -755,14 +751,10 @@ class WorkshopState(AuthState):
                 ordem = client.abrir_ordem_servico(payload)
                 self.form_open = False
                 self._refresh_list(client)
-            return rx.toast(
-                f"OS #{ordem.id} aberta.",
-                level="success",
-                position="top-right",
-            )
+            return toast_success(f"OS #{ordem.id} aberta.")
         except XanoValidationError as error:
             self.form_error = error_feedback(error)
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         except XanoError as error:
             return self._xano_error_response(error)
         finally:
@@ -819,11 +811,7 @@ class WorkshopState(AuthState):
                 )
                 self._apply_detail(detalhe, historico)
                 self._refresh_list(client)
-            return rx.toast(
-                f"OS #{os_id}: {STATUS_LABELS[target].lower()}.",
-                level="success",
-                position="top-right",
-            )
+            return toast_success(f"OS #{os_id}: {STATUS_LABELS[target].lower()}.")
         except XanoValidationError as error:
             message = error_feedback(error)
             try:
@@ -840,7 +828,7 @@ class WorkshopState(AuthState):
             }
             self.transition_target = target if still_allowed else ""
             self.transition_error = message
-            return rx.toast(message, level="error", position="top-right")
+            return toast_error(message)
         except XanoError as error:
             return self._xano_error_response(error)
         finally:
@@ -938,12 +926,12 @@ class WorkshopState(AuthState):
                 detalhe = client.adicionar_item_ordem_servico(os_id, payload)
                 self._apply_item_change(client, detalhe)
             self._reset_item_form()
-            return rx.toast("Item incluído na OS.", level="success", position="top-right")
+            return toast_success("Item incluído na OS.")
         except XanoValidationError as error:
             message = error_feedback(error)
             self._reload_after_item_error(os_id)
             self.item_error = message
-            return rx.toast(message, level="error", position="top-right")
+            return toast_error(message)
         except XanoError as error:
             return self._xano_error_response(error)
         finally:
@@ -981,12 +969,12 @@ class WorkshopState(AuthState):
             message = "Item removido da OS."
             if devolvido:
                 message += " A peça voltou ao estoque."
-            return rx.toast(message, level="success", position="top-right")
+            return toast_success(message)
         except XanoValidationError as error:
             message = error_feedback(error)
             self._reload_after_item_error(os_id)
             self.item_error = message
-            return rx.toast(message, level="error", position="top-right")
+            return toast_error(message)
         except XanoError as error:
             return self._xano_error_response(error)
         finally:

@@ -7,23 +7,7 @@ import reflex as rx
 from Projeto_HarleyStore.components import guarded_page, modal_panel
 from Projeto_HarleyStore.entradas_state import ENTRADAS_ROUTE, EntradasState
 from Projeto_HarleyStore.styles.theme import COLORS, PANEL, PRIMARY_BUTTON
-
-
-def error_callout(message: rx.Var) -> rx.Component:
-    return rx.cond(
-        message != "",
-        rx.callout(message, icon="triangle_alert", color_scheme="red", width="100%"),
-    )
-
-
-def labeled(label: str, control: rx.Component, **props) -> rx.Component:
-    return rx.vstack(
-        rx.text(label, size="2", color=COLORS["muted"]),
-        control,
-        align="stretch",
-        spacing="1",
-        **props,
-    )
+from Projeto_HarleyStore.ui_helpers import error_callout, labeled
 
 
 def history_row(row: rx.Var) -> rx.Component:

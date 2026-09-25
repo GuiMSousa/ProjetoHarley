@@ -40,8 +40,5 @@ PRIMARY_BUTTON = {
 }
 
 
-def global_theme() -> rx.Component:
-    return rx.theme(appearance="dark", accent_color="orange", has_background=True)
-
-
-theme_config = rx.theme(appearance="dark", accent_color="orange", has_background=True)
+# Radix theme of the whole app, applied by RadixThemesPlugin in rxconfig.py.
+theme_config =rx.theme(appearance="dark", accent_color="orange", has_background=True)

@@ -7,6 +7,7 @@ import reflex as rx
 from Projeto_HarleyStore.cadastros_state import SECTION_ROUTES, CadastrosState
 from Projeto_HarleyStore.components import guarded_page, modal_panel
 from Projeto_HarleyStore.styles.theme import COLORS, PANEL, PRIMARY_BUTTON
+from Projeto_HarleyStore.ui_helpers import error_callout, labeled
 
 
 SECTIONS = {
@@ -19,16 +20,14 @@ SECTIONS = {
 
 
 def field(label: str, name: str, placeholder: str = "") -> rx.Component:
-    return rx.vstack(
-        rx.text(label, size="2", color=COLORS["muted"]),
+    return labeled(
+        label,
         rx.input(
             value=CadastrosState.form_data[name],
             placeholder=placeholder,
             on_change=lambda value: CadastrosState.set_form_field(name, value),
             width="100%",
         ),
-        align="stretch",
-        spacing="1",
         width="100%",
     )
 
@@ -118,15 +117,7 @@ def cadastro_modal() -> rx.Component:
             rx.button("Fechar", on_click=CadastrosState.close_form, variant="ghost"),
             width="100%",
         ),
-        rx.cond(
-            CadastrosState.form_error != "",
-            rx.callout(
-                CadastrosState.form_error,
-                icon="triangle_alert",
-                color_scheme="red",
-                width="100%",
-            ),
-        ),
+        error_callout(CadastrosState.form_error),
         cadastro_form(),
         rx.hstack(
             rx.spacer(),
@@ -225,15 +216,7 @@ def cadastro_page(section: str) -> rx.Component:
                 ),
                 width="100%",
             ),
-            rx.cond(
-                CadastrosState.list_error != "",
-                rx.callout(
-                    CadastrosState.list_error,
-                    icon="triangle_alert",
-                    color_scheme="red",
-                    width="100%",
-                ),
-            ),
+            error_callout(CadastrosState.list_error),
             rx.box(
                 rx.cond(
                     CadastrosState.is_loading_list,

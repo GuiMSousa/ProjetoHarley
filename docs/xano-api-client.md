@@ -60,6 +60,8 @@ O cliente não persiste tokens, não os registra em logs e não os envia em quer
 
 Somente `auth/login` é público. `auth/signup` exige `GERENTE`, cria o usuário vinculado a um funcionário ativo e ainda sem usuário, e **não** devolve token do novo usuário. `message/send_welcome_email` exige `GERENTE`. O fluxo de recuperação por magic link (`reset/request-reset-link` e `reset/magic-link-login`) está bloqueado até ser homologado por uma Change.
 
+`reset/update_password` troca a senha do próprio usuário autenticado e exige `current_password`, `password` (mínimo de 8 caracteres) e `confirm_password`. O Xano valida o funcionário vinculado ativo (`enforce_role`), confere a senha atual com `security.check_password` e rejeita a nova senha igual à atual, com `400` e mensagem legível. As senhas não passam por `trim`, como em `auth/login` e `auth/signup`, e o log registra apenas o id do usuário. Ainda não há tela nem método no `XanoClient` para essa troca.
+
 ## DTOs e recursos
 
 O cliente usa modelos Pydantic em `Projeto_HarleyStore.services.cadastros` para validar os recursos:
@@ -70,7 +72,9 @@ O cliente usa modelos Pydantic em `Projeto_HarleyStore.services.cadastros` para 
 - `Fornecedor` / `FornecedorCreate` / `FornecedorUpdate`;
 - `Funcionario` / `FuncionarioCreate` / `FuncionarioUpdate`.
 
-`Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`; o cliente não deve usar `DELETE` físico para esses recursos.
+`Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`. Desde o saneamento pós-Change 7, o `DELETE` físico de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações responde `403`; a única exclusão física do sistema é a remoção de item de OS aberta.
+
+`Produto` (modelo de leitura) trata `estoque_qtd` nulo, possível em registros legados do Xano, como `0`, a mesma leitura de `Estoque/movimentar_estoque`. `ProdutoCreate` continua exigindo um saldo inicial válido.
 
 `Produto.preco_venda` e demais valores financeiros usam validação estrita `> 0` e são serializados como string decimal em JSON. Quantidades de itens usam `> 0` e saldos de estoque usam `>= 0`. Nenhum DTO de escrita envia `id_funcionario`, totais ou datas de autoria.
 

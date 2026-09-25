@@ -12,6 +12,8 @@ Representa as empresas parceiras que fornecem peças, produtos e motocicletas pa
 - **Regras:** O CNPJ deve ser único no sistema.
 - **Ciclo de vida:** `ativo = false` representa soft delete; o registro não deve ser removido fisicamente.
 
+> **Exclusão física:** em todos os cadastros (fornecedores, produtos, funcionários, clientes, motos de clientes), nas motos da loja e nas transações, `DELETE` responde `403` desde o saneamento pós-Change 7. A desativação é sempre lógica, e nenhum registro vinculado a OS, estoque, entradas ou transações pode ficar órfão.
+
 ### Produtos
 Representa os itens físicos comercializados pela concessionária ou utilizados na oficina mecânica.
 - **Atributos:** Identificador (`id_produto`), Código (`codigo`), Nome (`nome_produto`), Descrição (`descricao`), Categoria (`categoria`), Quantidade em Estoque (`estoque_qtd`), Preço de Venda (`preco_venda`), Ativo (`ativo`).
@@ -31,6 +33,7 @@ Representa a identidade de autenticação do Xano (`user`), separada do domínio
 - **Atributos:** Identificador (`id`), Nome (`name`), Email (`email`, único), Senha (hash), Papel técnico (`role`: `admin` ou `member`), Funcionário vinculado (`id_funcionario`).
 - **Regras:** Cada usuário operacional está vinculado a exatamente um funcionário ativo, e cada funcionário possui no máximo um usuário. O cargo de domínio vem de `Funcionarios.tipo`; `role` é apenas técnico.
 - **Criação:** somente um `GERENTE` cria usuários (`auth/signup`), com email e senha obrigatórios; o endpoint não emite token para o novo usuário.
+- **Troca de senha:** `reset/update_password` altera apenas a senha do próprio usuário, exige a senha atual e um funcionário vinculado ativo, e rejeita a nova senha igual à atual.
 - **Auditoria:** `event_log` registra login e criação de usuário com id, email, papel e vínculo; senhas, hashes e tokens nunca são gravados.
 
 ### Clientes
@@ -50,7 +53,7 @@ Representa os veículos pertencentes a clientes e utilizados no fluxo da oficina
 Representa as motocicletas mantidas no estoque da loja e destinadas à venda. Esta entidade é independente de `motos_clientes` e não representa o veículo usado no histórico de oficina.
 - **Atributos:** Identificador (`id`), Cliente opcional (`clientes_id`), Marca (`marca`), Modelo (`modelo`), Data de Cadastro (`created_at`).
 - **Relacionamento:** Pode possuir um cliente associado quando a venda for registrada.
-- **Situação atual:** o schema ainda não possui preço, chassi, status de disponibilidade nem `ativo`, e o endpoint `DELETE` é físico. A modelagem da venda de motos será definida em Change própria.
+- **Situação atual:** o schema ainda não possui preço, chassi, status de disponibilidade nem `ativo`. O `DELETE` físico está bloqueado (`403`) até que a Change de catálogo defina o ciclo de vida das motos da loja.
 
 ### Entrada_Mercadoria & Itens_Compra_Estoque
 Representa a nota/registro de compra efetuada junto a um fornecedor para abastecimento de estoque.
@@ -100,7 +103,7 @@ Registra o fluxo financeiro de vendas e movimentações comerciais do estabeleci
 - **Regras:** O tipo de transação deve ser restrito aos valores: `MOTO`, `PECAS`, `BALCAO`, `COMPRA`, `ORDEM_SERVICO`.
 - **Regras financeiras:** `valor_total` deve ser estritamente positivo (`> 0`).
 - **Autoria:** `id_funcionario` deve ser derivado do usuário autenticado e do vínculo `user.id_funcionario`. `POST`/`PUT` gravam o funcionário do JWT e o `PATCH` descarta `id_funcionario` do payload.
-- **Situação atual:** transações não possuem linhas de itens; vendas de peças com baixa de estoque dependem de uma decisão de modelagem ainda pendente.
+- **Situação atual:** transações não possuem linhas de itens; vendas de peças com baixa de estoque dependem de uma decisão de modelagem ainda pendente. O `DELETE` físico está bloqueado (`403`); `PUT`/`PATCH` ainda são genéricos e serão revistos na Change de vendas.
 
 ---
 

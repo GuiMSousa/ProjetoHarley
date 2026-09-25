@@ -360,10 +360,6 @@ class XanoClient:
         )
         return response
 
-    def delete_moto(self, moto_id: int) -> None:
-        """Delete a moto from Xano."""
-        self.delete(f"motos/{moto_id}")
-
     def list_clientes(self) -> list[Cliente]:
         return self._list_resource("clientes", Cliente)
 

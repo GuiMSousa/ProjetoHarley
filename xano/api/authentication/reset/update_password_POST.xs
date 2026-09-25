@@ -1,51 +1,70 @@
-// Allows user to update the password in the password reset flow
+// Troca a senha do usuário autenticado (saneamento pós-Change 7).
+// Exige funcionário vinculado ativo (enforce_role) e a senha atual, para que um token
+// vazado não permita tomar a conta de forma permanente. Os campos são obrigatórios e,
+// como em auth/login e auth/signup, as senhas não passam por trim.
 query "reset/update_password" verb=POST {
   api_group = "Authentication"
   auth = "user"
 
   input {
-    text password? filters=trim|min:8
-    text confirm_password? filters=trim
+    text current_password
+    text password filters=min:8
+    text confirm_password
   }
 
   stack {
-    // Check that the password inputs are matching
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "ALL"}
+    } as $role_check
+
     precondition ($input.password == $input.confirm_password) {
-      error = "Passwords do not match!"
+      error_type = "inputerror"
+      error = "A confirmação não confere com a nova senha."
     }
-  
-    // Get user record based on the id of the auth token
+
     db.get user {
       field_name = "id"
       field_value = $auth.id
+      output = ["id", "password"]
     } as $user
-  
-    // Check that the user record id matches the auth id
-    precondition ($user.id == $auth.id) {
+
+    precondition ($user != null) {
       error_type = "accessdenied"
+      error = "Usuário autenticado não encontrado."
     }
-  
-    // Update user record with the new password
+
+    security.check_password {
+      text_password = $input.current_password
+      hash_password = $user.password
+    } as $senha_atual_confere
+
+    precondition ($senha_atual_confere) {
+      error_type = "inputerror"
+      error = "Senha atual incorreta."
+    }
+
+    precondition ($input.password != $input.current_password) {
+      error_type = "inputerror"
+      error = "A nova senha deve ser diferente da atual."
+    }
+
     db.edit user {
       field_name = "id"
       field_value = $auth.id
       data = {password: $input.password}
-    } as $user
-  
-    // Create event log
+    } as $user_atualizado
+
+    // Somente o id: senha, hash e token nunca vão para o log.
     function.run "Quick Start/log_event" {
       input = {
-        user_id : $user.id
+        user_id : $auth.id
         action  : "reset_password"
-        metadata: {id: $user.id}
+        metadata: {id: $auth.id}
       }
     } as $event_log
   }
 
-  response = {
-    message: {"success":"true","message":"Password updated"}
-  }
-
+  response = {success: true, message: "Senha atualizada."}
   tags = ["xano:quick-start"]
   guid = "cbPQPWYP9vhreyzVjayK97AeAfo"
 }

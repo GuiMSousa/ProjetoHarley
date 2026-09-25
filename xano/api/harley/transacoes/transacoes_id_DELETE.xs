@@ -1,4 +1,5 @@
-// Delete transacoes record
+// Bloqueado no saneamento pós-Change 7: exclusão física desabilitada para que registros
+// vinculados a OS, estoque, entradas e transações nunca fiquem órfãos.
 query "transacoes/{transacoes_id}" verb=DELETE {
   api_group = "HARLEY"
   auth = "user"
@@ -11,9 +12,10 @@ query "transacoes/{transacoes_id}" verb=DELETE {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
-      db.del transacoes {
-      field_name = "id"
-      field_value = $input.transacoes_id
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Exclusão física desabilitada: o ciclo de vida das transações será definido na Change de vendas."
     }
   }
 

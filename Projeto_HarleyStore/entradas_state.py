@@ -8,8 +8,7 @@ import reflex as rx
 from pydantic import ValidationError
 
 from Projeto_HarleyStore.auth import AuthState, role_allows_route
-from Projeto_HarleyStore.cadastros_state import operation_is_blocked
-from Projeto_HarleyStore.feedback import error_feedback
+from Projeto_HarleyStore.feedback import error_feedback, toast_error, toast_success
 from Projeto_HarleyStore.formatting import (
     EMPTY_VALUE,
     format_currency,
@@ -34,6 +33,7 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoError,
     XanoValidationError,
 )
+from Projeto_HarleyStore.ui_helpers import operation_is_blocked
 
 
 ENTRADAS_ROUTE = "/estoque/entradas"
@@ -273,11 +273,7 @@ class EntradasState(AuthState):
     @rx.event
     def open_create(self):
         if not can_register_entrada(self.employee_role):
-            return rx.toast(
-                "Somente o gerente pode registrar entradas de mercadoria.",
-                level="error",
-                position="top-right",
-            )
+            return toast_error("Somente o gerente pode registrar entradas de mercadoria.")
         self.form_error = ""
         self.fornecedor = ""
         self.numero_documento = ""
@@ -343,14 +339,14 @@ class EntradasState(AuthState):
             return None
         if not can_register_entrada(self.employee_role):
             self.form_error = "Somente o gerente pode registrar entradas de mercadoria."
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         try:
             payload = build_entrada_payload(
                 self.fornecedor, self.numero_documento, self.itens_form
             )
         except EntradaFormError as error:
             self.form_error = str(error)
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
 
         self.is_saving = True
         try:
@@ -361,14 +357,10 @@ class EntradasState(AuthState):
                     self._reload_entradas(client)
                 except XanoError as error:
                     self.list_error = error_feedback(error)
-            return rx.toast(
-                "Entrada registrada. Estoque atualizado.",
-                level="success",
-                position="top-right",
-            )
+            return toast_success("Entrada registrada. Estoque atualizado.")
         except XanoValidationError as error:
             self.form_error = error_feedback(error)
-            return rx.toast(self.form_error, level="error", position="top-right")
+            return toast_error(self.form_error)
         except XanoError as error:
             return self._xano_error_response(error)
         finally:

@@ -73,13 +73,37 @@ Somente usuários vinculados a um funcionário com `ativo != false` PODEM execut
 
 ## Requisito: superfície pública mínima
 
-Somente `auth/login` PODE ser chamado sem JWT. `auth/signup` e `message/send_welcome_email` DEVEM exigir `GERENTE`; `auth/signup` NÃO DEVE devolver token do usuário criado. Fluxos de recuperação de acesso não homologados DEVEM permanecer bloqueados.
+Somente `auth/login` PODE ser chamado sem JWT. Recursos auxiliares do quick-start sem uso pela aplicação (como o agente e a ferramenta de exemplo de IA) NÃO DEVEM ser mantidos no export. `auth/signup` e `message/send_welcome_email` DEVEM exigir `GERENTE`; `auth/signup` NÃO DEVE devolver token do usuário criado. Fluxos de recuperação de acesso não homologados DEVEM permanecer bloqueados.
 
 ### Cenário: gerente cria usuário
 
 - **DADO** um gerente autenticado
 - **QUANDO** criar um usuário para um funcionário ativo sem usuário
 - **ENTÃO** a resposta DEVE conter o id do usuário criado e nenhum token
+
+## Requisito: troca de senha autenticada
+
+`reset/update_password` DEVE exigir `current_password`, `password` (mínimo de 8 caracteres) e `confirm_password`, validar o funcionário vinculado ativo e conferir a senha atual antes de gravar. A nova senha DEVE diferir da atual, e as senhas NÃO DEVEM passar por `trim`.
+
+### Cenário: token sem a senha atual
+
+- **DADO** um JWT válido de um usuário
+- **QUANDO** alguém tentar trocar a senha informando uma senha atual incorreta ou omitindo-a
+- **ENTÃO** a resposta DEVE ser `400` e a senha NÃO DEVE mudar
+
+## Requisito: exclusão somente lógica
+
+O `DELETE` de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações DEVE responder `403`; a desativação é feita por `PATCH` com `ativo = false`. A única exclusão física permitida é a de item de OS `ABERTA` ou `EM_ANDAMENTO`, que devolve a peça ao estoque.
+
+### Cenário: exclusão forjada
+
+- **DADO** um gerente autenticado
+- **QUANDO** enviar `DELETE produtos/{id}`
+- **ENTÃO** a resposta DEVE ser `403` e o produto, seus itens de OS e suas movimentações DEVEM permanecer intactos
+
+## Requisito: helpers compartilhados da interface
+
+Componentes e regras repetidos entre páginas DEVEM viver em módulos compartilhados: `ui_helpers.py` (`labeled`, `error_callout`, `operation_is_blocked`) e `feedback.py` (`error_feedback`, `toast_error`, `toast_success`). Os estados NÃO DEVEM chamar `rx.toast` diretamente nem importar funções de outros estados de página.
 
 ## Requisito: autoria imutável
 
