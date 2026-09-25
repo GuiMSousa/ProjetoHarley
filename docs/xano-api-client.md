@@ -40,6 +40,12 @@ Regras importantes:
 3. Conferir que não há produtos antigos com `codigo` vazio repetido; o índice único de `produtos.codigo` falharia na criação.
 4. Rodar a suíte de integração (seção "Testes de integração").
 
+### Checklist de deploy da Change 7 (itens de OS e livro de estoque)
+
+1. Publicar com `--sync`: `itens_ordem_servico.id_produto` foi relaxado para anulável (itens do tipo `SERVICO`). Revise antes o `--dry-run`, de preferência num branch.
+2. Os demais objetos são aditivos: tabela `movimentacoes_estoque`, campos novos em `itens_ordem_servico`, `ordens_servico` e `produtos`, funções `Estoque/movimentar_estoque` e `Oficina/totais_os`, rotas `POST`/`DELETE ordens_servico/{id}/itens`.
+3. Rodar a suíte de integração com `XANO_TEST_ALLOW_WRITES=true` e, para validar as travas de concorrência, `XANO_TEST_CONCURRENCY=true`.
+
 ## Autenticação
 
 A instância autenticada recebe o JWT através do argumento `token`. O cliente envia o cabeçalho:
@@ -88,7 +94,19 @@ Métodos:
 | `get_entrada(id)` | `GET entrada_mercadoria/{id}` | todos |
 | `registrar_entrada(entrada)` | `POST entrada_mercadoria` | `GERENTE` |
 
-`registrar_entrada` envia somente cabeçalho e itens. `id_funcionario`, `valor_total` e `data_entrada` são definidos pelo Xano, que grava cabeçalho, itens e incremento de estoque na mesma transação. Não existem métodos de edição ou exclusão de entradas: elas são imutáveis.
+`registrar_entrada` envia somente cabeçalho e itens. `id_funcionario`, `valor_total` e `data_entrada` são definidos pelo Xano, que grava cabeçalho, itens e incremento de estoque na mesma transação. O incremento passa por `Estoque/movimentar_estoque` e gera uma linha `ENTRADA` no livro de movimentações. Não existem métodos de edição ou exclusão de entradas: elas são imutáveis.
+
+## Livro de movimentações de estoque
+
+Toda alteração de `produtos.estoque_qtd` depois da criação do produto passa pela função Xano `Estoque/movimentar_estoque`, sempre dentro da transação de quem a chama:
+
+| Tipo | Origem | Efeito |
+| --- | --- | --- |
+| `ENTRADA` | `POST entrada_mercadoria` | soma a quantidade |
+| `SAIDA_OS` | inclusão de peça na OS | subtrai; rejeita saldo insuficiente e produto inativo |
+| `ESTORNO_OS` | remoção de peça ou cancelamento da OS | soma a quantidade baixada |
+
+Cada movimentação grava em `movimentacoes_estoque` o saldo anterior e posterior, o funcionário autenticado e a origem. O índice único `(id_produto, versao_anterior)`, somado a `produtos.versao_estoque`, faz a segunda movimentação concorrente do mesmo produto falhar e desfazer a transação inteira. O livro não tem endpoints nem métodos no cliente nesta etapa.
 
 ## Ordens de serviço
 
@@ -96,8 +114,10 @@ Os DTOs ficam em `Projeto_HarleyStore.services.ordens_servico`:
 
 - `OrdemServicoCreate` — `id_moto_cliente`, `id_mecanico` (opcional), `tipo_servico` (`PREVENTIVA` | `CORRETIVA`), `descricao_problema` e `quilometragem` (opcional, `>= 0`);
 - `TransicaoStatusOS` — `status_atual` (o status que o usuário está vendo), `status_novo` e `observacao` (obrigatória para `CANCELADA`); valida a tabela `TRANSICOES_OS`, espelho da função Xano `Oficina/validar_transicao_os`;
-- `OrdemServicoResumo` — linha da lista com `nome_cliente`, `placa`, `modelo`, `nome_funcionario` (autor) e `nome_mecanico`; os campos da Change 6 são opcionais para OS antigas;
-- `OrdemServicoDetalhe` — resumo com `quilometragem`, `motivo_cancelamento`, `historico` (`HistoricoStatusOS`) e `itens` (`ItemOrdemServico`, somente leitura);
+- `OrdemServicoResumo` — linha da lista com `nome_cliente`, `placa`, `modelo`, `nome_funcionario` (autor), `nome_mecanico` e `valor_total`; os campos das Changes 6 e 7 são opcionais para OS antigas;
+- `OrdemServicoDetalhe` — resumo com `quilometragem`, `motivo_cancelamento`, `valor_pecas`, `valor_servicos`, `historico` (`HistoricoStatusOS`) e `itens` (`ItemOrdemServico`);
+- `ItemOSCreate` — `tipo_item` (`PECA` | `SERVICO`), `id_produto` (peça), `descricao` e `valor_unitario` (serviço, `> 0`, duas casas) e `quantidade > 0`; a peça descarta descrição e valor, porque o preço vem do produto, e o serviço descarta o produto;
+- `ItemOrdemServico` — item lido, com `tipo_item` (nulo em itens legados, lido como `PECA`), `valor_unitario`, `valor_total_item` e `estoque_baixado`;
 - `Mecanico` — `id` e `nome_funcionario`.
 
 Métodos:
@@ -109,10 +129,23 @@ Métodos:
 | `abrir_ordem_servico(ordem)` | `POST ordens_servico` | `GERENTE`, `MECANICO` |
 | `transicionar_ordem_servico(id, transicao)` | `POST ordens_servico/{id}/status` | `GERENTE`, `MECANICO` |
 | `list_mecanicos()` | `GET oficina/mecanicos` | `GERENTE`, `MECANICO` |
+| `adicionar_item_ordem_servico(id, item)` | `POST ordens_servico/{id}/itens` | `GERENTE`, `MECANICO` |
+| `remover_item_ordem_servico(id, item_id)` | `DELETE ordens_servico/{id}/itens/{item_id}` | `GERENTE`, `MECANICO` |
 
-`abrir_ordem_servico` omite campos nulos e nunca envia `status`, `data_abertura`, `id_funcionario` ou `id_cliente`: o Xano define a OS como `ABERTA`, grava o autor a partir do JWT e o cliente a partir da moto. Os filtros de `list_ordens_servico` vão como query string e também servem para o histórico da moto. `PUT`, `PATCH` e `DELETE ordens_servico/{id}` e as mutações de `itens_ordem_servico` respondem `403`.
+`abrir_ordem_servico` omite campos nulos e nunca envia `status`, `data_abertura`, `id_funcionario` ou `id_cliente`: o Xano define a OS como `ABERTA`, grava o autor a partir do JWT e o cliente a partir da moto. Os filtros de `list_ordens_servico` vão como query string e também servem para o histórico da moto. `PUT`, `PATCH` e `DELETE ordens_servico/{id}` e as rotas legadas de mutação de `itens_ordem_servico` respondem `403`.
 
 Uma transição recusada porque a OS mudou (`status_atual` desatualizado) chega como `XanoValidationError`; o Reflex recarrega o detalhe e exibe o status real.
+
+### Itens da OS
+
+As duas rotas de itens devolvem o `OrdemServicoDetalhe` atualizado e só aceitam OS `ABERTA` ou `EM_ANDAMENTO`:
+
+- **Peça:** o Xano grava `valor_unitario = produtos.preco_venda` (fotografia), `valor_total_item = quantidade × valor_unitario` e baixa o estoque na mesma transação (`SAIDA_OS`). Produto inativo, produto já presente na OS e quantidade acima do saldo são rejeitados com `400` ("Saldo insuficiente para <código>: disponível X, solicitado Y.").
+- **Serviço:** descrição e valor informados, sem movimentação de estoque.
+- **Remoção:** a peça baixada volta ao estoque (`ESTORNO_OS`); serviços e itens legados (`estoque_baixado` diferente de `true`) não movimentam estoque.
+- **Cancelamento da OS:** devolve todas as peças baixadas na mesma transação da transição; concluir não movimenta estoque. Os itens e totais da OS cancelada ficam como registro.
+- **Totais:** a cada mutação o Xano grava `valor_pecas`, `valor_servicos` e `valor_total` na OS (usados pela lista); o detalhe sempre os recalcula a partir dos itens (`Oficina/totais_os`).
+- **Concorrência:** toda mutação da OS começa atualizando `ordens_servico.atualizado_em`, o que trava a linha e serializa inclusões, remoções e transições da mesma OS. Uma falha dentro da transação (corrida) responde `400` "O estoque ou a OS foram alterados por outra operação. Atualize e tente novamente."; o Reflex recarrega detalhe, itens e saldos.
 
 ## Erros
 
@@ -149,6 +182,7 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Criar usuários e enviar email de boas-vindas | sim | não | não |
 | Oficina: consultar OS, detalhe e histórico por moto | sim | sim | sim |
 | Oficina: abrir OS e transicionar status | sim | não | sim |
+| Oficina: incluir e remover peças e serviços em OS aberta ou em andamento | sim | não | sim |
 | Oficina: listar mecânicos | sim | não | sim |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
@@ -162,5 +196,6 @@ python -m unittest discover -s tests
 - Os testes offline usam `httpx.MockTransport` e contratos estáticos sobre `xano/`; não precisam de rede.
 - `tests/test_integration_xano.py` executa chamadas HTTP reais quando `XANO_API_BASE_URL` está configurada (ambiente ou `.env`); caso contrário, é ignorado.
 - Credenciais por perfil: `XANO_TEST_GERENTE_EMAIL`/`_PASSWORD`, `XANO_TEST_VENDEDOR_*` e `XANO_TEST_MECANICO_*`. Perfis sem credenciais são ignorados individualmente.
-- Os cenários que gravam dados (registro de entrada, documento duplicado, rollback e ciclo completo de OS com as rejeições da máquina de estados) exigem `XANO_TEST_ALLOW_WRITES=true`. Como entradas e OS encerradas são imutáveis, rode-os em um branch ou workspace de testes.
-- Os testes de OS exigem a Change 6 publicada; antes do push, os endpoints novos respondem `404`.
+- Os cenários que gravam dados (registro de entrada, documento duplicado, rollback, ciclo completo de OS com as rejeições da máquina de estados, e ciclo de itens com baixa, devolução, totais e cancelamento) exigem `XANO_TEST_ALLOW_WRITES=true`. Como entradas, OS encerradas e movimentações de estoque são imutáveis, rode-os em um branch ou workspace de testes. As OS abertas pelos testes são canceladas ao final, devolvendo as peças.
+- `XANO_TEST_CONCURRENCY=true` (junto com as escritas) roda as corridas: duas OS disputando todo o saldo de um produto e uma inclusão simultânea ao cancelamento. Exige duas motos de cliente sem OS em aberto.
+- Os testes de cada Change exigem o respectivo push; antes dele, os endpoints novos respondem `404`.

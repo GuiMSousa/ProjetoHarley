@@ -132,6 +132,8 @@ As pré-checagens feitas **fora** da transação dão as mensagens específicas,
 
 No Apply, verificar se `$error.message` preserva o texto de uma `precondition` disparada dentro da transação. Se preservar, o `catch` pode repassá-lo quando o erro não vier do banco, o que é uma melhoria opcional.
 
+> **Implementado:** a melhoria opcional não foi aplicada, porque só é verificável no Xano real. O `catch` usa a mensagem genérica de conflito.
+
 ## Funções (Xano)
 
 ### `Estoque/movimentar_estoque`
@@ -372,6 +374,8 @@ O seletor de peças reutiliza `list_produtos()`, que chama `GET produtos` (`ALL`
   - recarrega o catálogo e o detalhe, o que mostra o saldo e o status reais;
   - mantém o formulário para correção.
 - **Outros erros:** `_xano_error_response`, como no restante da página, com a sessão tratada em `401`.
+
+> **Implementado de outra forma:** não há evento `load_catalogo`. O catálogo é carregado dentro de `open_detail` quando a OS é editável pelo perfil, porque o formulário fica sempre visível nesse caso, e é recarregado depois de cada mutação ou rejeição. Os bloqueios de reentrada ficaram em `_operation_blocked()`, e `parse_decimal` foi movido para `formatting.py`.
 
 ### Componentes — `workshop_pages.py`
 

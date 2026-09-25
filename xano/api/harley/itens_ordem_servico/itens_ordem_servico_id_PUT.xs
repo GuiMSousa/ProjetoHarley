@@ -1,5 +1,5 @@
-// Bloqueado na Change 6: OS mudam somente por abertura e transição de status;
-// itens de OS aguardam a Change de itens com baixa de estoque.
+// Bloqueado: itens de OS mudam somente por POST/DELETE ordens_servico/{id}/itens,
+// que aplicam a baixa e a devolução de estoque (Change 7).
 query "itens_ordem_servico/{itens_ordem_servico_id}" verb=PUT {
   api_group = "HARLEY"
   auth = "user"
@@ -15,7 +15,7 @@ query "itens_ordem_servico/{itens_ordem_servico_id}" verb=PUT {
 
     precondition (false) {
       error_type = "accessdenied"
-      error = "Itens de OS estarão disponíveis na etapa de itens com baixa de estoque."
+      error = "Use POST/DELETE ordens_servico/{id}/itens."
     }
   }
 

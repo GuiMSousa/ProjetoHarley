@@ -165,3 +165,58 @@ Permitir que `GERENTE` e `MECANICO` incluam e removam peças e serviços em OS `
 - **D9 — Rotas aninhadas:** `POST ordens_servico/{id}/itens` e `DELETE ordens_servico/{id}/itens/{item_id}`, ambas devolvendo o detalhe atualizado da OS. As rotas legadas de mutação continuam em `403`, e `GET itens_ordem_servico` é mantido. *Recomendado.*
 - **D10 — Itens legados:** `tipo_item` nulo é tratado como `PECA` e `estoque_baixado` nulo como "sem baixa". Esses itens podem ser removidos e não devolvem estoque. *Recomendado.*
 - **D11 — Quem edita itens:** qualquer `GERENTE` ou `MECANICO` edita os itens de qualquer OS editável, coerente com a D7 da Change 6. *Confirmar.*
+
+## Resultado aplicado
+
+Decisões D1 a D11 aprovadas integralmente, incluindo D3 e D11: o valor do serviço é informado por `GERENTE` ou `MECANICO`, e ambos editam os itens de qualquer OS editável.
+
+- **Xano — schema:**
+  - `itens_ordem_servico` com `id_produto` anulável e `tipo_item`, `descricao`, `valor_unitario`, `estoque_baixado`, `id_funcionario` e `created_at`;
+  - `ordens_servico` com `valor_pecas`, `valor_servicos`, `valor_total` e `atualizado_em`;
+  - `produtos` com `versao_estoque`;
+  - tabela nova `movimentacoes_estoque` com índice único `(id_produto, versao_anterior)`.
+- **Xano — funções:**
+  - `Estoque/movimentar_estoque`, único ponto de alteração de saldo;
+  - `Oficina/totais_os`;
+  - `Oficina/detalhe_os` passou a devolver os totais recalculados.
+- **Xano — endpoints:**
+  - `POST ordens_servico/{id}/itens` e `DELETE ordens_servico/{id}/itens/{item_id}`, com pré-checagens, trava da OS, releitura, baixa ou devolução, totais e `try_catch`;
+  - cancelamento em `POST ordens_servico/{id}/status` devolvendo as peças na mesma transação;
+  - `POST entrada_mercadoria` usando `movimentar_estoque(ENTRADA)` e ordenando os itens por produto;
+  - `PATCH produtos/{id}` descartando `versao_estoque`;
+  - rotas legadas de itens ainda em `403`, com a mensagem apontando para as rotas novas.
+- **Python:** `TipoItemOS`, `STATUS_EDITAVEIS_OS`, `ItemOSCreate`, `ItemOrdemServico` tolerante a legado, totais nos DTOs de OS, e `adicionar_item_ordem_servico` e `remover_item_ordem_servico` no `XanoClient`.
+- **Reflex (`/workshop`):**
+  - no detalhe, resumo "Peças + Mão de obra = Total OS" com prévia do item em edição, e tabela de itens com remoção confirmada;
+  - formulário Peça | Serviço com busca sem distinção de acento, saldo e preço, e produtos sem saldo desabilitados;
+  - validação local de saldo, e recarga do detalhe e do catálogo depois de rejeição;
+  - coluna "Total" na lista;
+  - edição oculta para `VENDEDOR` e para OS encerrada.
+- **Testes:** a suíte passou de 146 para 190 testes.
+
+### Notas de implementação
+
+- **Catálogo:** `load_catalogo` não virou um evento próprio. O catálogo de produtos ativos é carregado ao abrir o detalhe de uma OS editável, e só para perfis que editam, porque o formulário de itens fica sempre visível nesse caso. Depois de cada inclusão, remoção ou rejeição, ele é recarregado. Uma falha do catálogo não impede ver o detalhe.
+- **Mensagem dentro da transação:** a melhoria opcional de repassar `$error.message` no `catch` não foi aplicada, porque não é verificável sem o Xano real. Falhas dentro da transação, que só ocorrem em corridas, respondem com a mensagem genérica de conflito. As mensagens específicas (saldo, produto repetido, OS encerrada) vêm das pré-checagens fora da transação.
+- **Premissas validadas só pela gramática:** o validador aceita `function.run` dentro de `db.transaction`, rota `DELETE` com dois parâmetros, `db.del`, `|round:2`, `|sort` de array e índice único composto. Ficam para a integração, depois do push:
+  - o rollback de efeitos de função, coberto por `test_invalid_item_rolls_back_the_whole_receipt`, já que a entrada agora usa a função;
+  - a trava de linha da D7, coberta pelos testes de `XANO_TEST_CONCURRENCY`.
+- **Reuso:** `parse_decimal` saiu de `entradas_state.py` para `formatting.py`, compartilhado pela entrada de mercadoria e pela oficina. Os bloqueios de reentrada da oficina foram concentrados em `WorkshopState._operation_blocked()`, que também cobre as operações de itens.
+- **Testes:**
+  - bases de fixtures extraídas (`MockedClientTestCase`, `WorkshopStateTestCase` e `XanoLiveWriteTestCase`) para reaproveitar setup sem repetir testes herdados;
+  - novos contratos garantem que só `Estoque/movimentar_estoque` e `POST produtos` escrevem `estoque_qtd`;
+  - os testes de integração de escrita cancelam as OS criadas ao final.
+
+## Status
+
+Aplicada, verificada e arquivada em 2026-09-25.
+
+- `python -m unittest discover -s tests`: 190 testes, com 164 executados e aprovados e 26 de integração ignorados por falta de credenciais de perfil, `XANO_TEST_ALLOW_WRITES` e `XANO_TEST_CONCURRENCY`. `test_public_surface_is_closed` rodou contra o Xano real e passou.
+- `python -m py_compile`: 36 módulos, OK.
+- `reflex compile --dry`: OK.
+- Validador XanoScript (`@xano/developer-mcp`): 110 arquivos, 0 erros.
+
+Pendente fora do repositório:
+
+- publicar com `xano workspace push -d ./xano --sync`, revisando antes o `--dry-run`, porque o relaxamento de `itens_ordem_servico.id_produto` exige `--sync`;
+- executar a suíte de integração com credenciais por perfil, `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true`.

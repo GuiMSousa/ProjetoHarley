@@ -128,5 +128,144 @@ class OrdemServicoContractTests(unittest.TestCase):
                 self.assertIsNone(re.search(r"db\.(add|edit|patch|del) ", content))
 
 
+ITENS_POST = f"{API}/ordens_servico/ordens_servico_id_itens_POST.xs"
+ITENS_DELETE = f"{API}/ordens_servico/ordens_servico_id_itens_item_id_DELETE.xs"
+STATUS_POST = f"{API}/ordens_servico/ordens_servico_id_status_POST.xs"
+
+
+class ItemOrdemServicoContractTests(unittest.TestCase):
+    def read(self, relative_path):
+        return (XANO / relative_path).read_text(encoding="utf-8")
+
+    def transaction(self, content):
+        return content[content.index("db.transaction {"):]
+
+    def test_item_schema_supports_services_and_legacy_rows(self):
+        content = self.read("table/itens_ordem_servico.xs")
+        for declaration in (
+            "int? id_produto?",
+            "enum? tipo_item?",
+            'values = ["PECA", "SERVICO"]',
+            "text? descricao? filters=trim",
+            "decimal? valor_unitario? filters=min:0.01",
+            "bool? estoque_baixado?",
+            "int? id_funcionario?",
+            "decimal valor_total_item filters=min:0.01",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, content)
+        order = self.read("table/ordens_servico.xs")
+        for declaration in (
+            "decimal? valor_pecas?",
+            "decimal? valor_servicos?",
+            "decimal? valor_total?",
+            "timestamp? atualizado_em?",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, order)
+
+    def test_item_routes_are_operator_only_and_declare_explicit_inputs(self):
+        routes = {
+            ITENS_POST: 'query "ordens_servico/{ordens_servico_id}/itens" verb=POST',
+            ITENS_DELETE: 'query "ordens_servico/{ordens_servico_id}/itens/{item_id}" verb=DELETE',
+        }
+        for relative_path, route in routes.items():
+            with self.subTest(path=relative_path):
+                content = self.read(relative_path)
+                self.assertIn(route, content)
+                self.assertIn('required_role: "MECANICO"', content)
+                self.assertNotIn("dblink", content)
+                self.assertIn("try_catch {", content)
+                self.assertIn('function.run "Oficina/detalhe_os"', content)
+                self.assertIn("OS encerrada não permite alterar itens.", content)
+
+    def test_mutations_lock_the_order_before_rereading_status(self):
+        for relative_path in (ITENS_POST, ITENS_DELETE):
+            with self.subTest(path=relative_path):
+                transaction = self.transaction(self.read(relative_path))
+                lock = transaction.index("data = {atualizado_em: now}")
+                self.assertLess(lock, transaction.index("db.get ordens_servico"))
+                self.assertLess(lock, transaction.index('"Estoque/movimentar_estoque"'))
+                self.assertIn('function.run "Oficina/totais_os"', transaction)
+                self.assertIn("valor_total   : $totais.valor_total", transaction)
+
+    def test_part_is_priced_by_server_and_leaves_stock_in_the_same_transaction(self):
+        content = self.read(ITENS_POST)
+        transaction = self.transaction(content)
+        self.assertIn("valor_unitario  : $produto.preco_venda", transaction)
+        self.assertIn(
+            "valor_total_item: ($input.quantidade * $produto.preco_venda)|round:2", transaction
+        )
+        self.assertIn("estoque_baixado : true", transaction)
+        self.assertIn('tipo          : "SAIDA_OS"', transaction)
+        self.assertIn("id_item_os    : $item_peca.id", transaction)
+        self.assertIn("id_funcionario  : $auth_user.id_funcionario", transaction)
+        for untrusted in ("$input.valor_total_item", "$input.estoque_baixado", "$input.id_funcionario"):
+            with self.subTest(field=untrusted):
+                self.assertNotIn(untrusted, content)
+        for message in (
+            "Selecione o produto.",
+            "Este produto já está na OS.",
+            '"Saldo insuficiente para "',
+            "Informe a descrição do serviço.",
+            "Informe o valor do serviço.",
+        ):
+            with self.subTest(message=message):
+                self.assertIn(message, content)
+
+    def test_service_does_not_move_stock(self):
+        transaction = self.transaction(self.read(ITENS_POST))
+        servico = transaction[transaction.index('tipo_item       : "SERVICO"'):]
+        servico = servico[: servico.index("function.run")]
+        self.assertIn("estoque_baixado : false", servico)
+        self.assertIn("valor_unitario  : $input.valor_unitario", servico)
+
+    def test_removal_returns_only_parts_taken_from_stock(self):
+        transaction = self.transaction(self.read(ITENS_DELETE))
+        self.assertIn("if ($item.estoque_baixado == true)", transaction)
+        self.assertIn('tipo          : "ESTORNO_OS"', transaction)
+        self.assertLess(
+            transaction.index('"ESTORNO_OS"'), transaction.index("db.del itens_ordem_servico")
+        )
+        self.assertIn("$item.id_os == $input.ordens_servico_id", transaction)
+
+    def test_cancellation_returns_parts_after_locking_the_order(self):
+        transaction = self.transaction(self.read(STATUS_POST))
+        self.assertLess(
+            transaction.index("db.add historico_status_os"),
+            transaction.index("db.patch ordens_servico"),
+        )
+        self.assertLess(
+            transaction.index("db.patch ordens_servico"),
+            transaction.index("db.query itens_ordem_servico"),
+        )
+        self.assertIn('if ($input.status_novo == "CANCELADA")', transaction)
+        self.assertIn("$db.itens_ordem_servico.estoque_baixado == true", transaction)
+        self.assertIn('sort = {id_produto: "asc"}', transaction)
+        self.assertIn('tipo          : "ESTORNO_OS"', transaction)
+        self.assertIn("atualizado_em: $agora", self.read(STATUS_POST))
+
+    def test_totals_are_recalculated_from_items(self):
+        function = self.read("function/oficina/totais_os.xs")
+        self.assertIn('if ($item.tipo_item == "SERVICO")', function)
+        self.assertIn("valor_total   : ($valor_pecas + $valor_servicos)|round:2", function)
+        detail = self.read("function/oficina/detalhe_os.xs")
+        self.assertIn('function.run "Oficina/totais_os"', detail)
+        self.assertIn('|set:"valor_total":$totais.valor_total', detail)
+
+    def test_legacy_item_routes_point_to_the_new_routes(self):
+        for relative_path in (
+            "itens_ordem_servico_POST.xs",
+            "itens_ordem_servico/itens_ordem_servico_id_PUT.xs",
+            "itens_ordem_servico/itens_ordem_servico_id_PATCH.xs",
+            "itens_ordem_servico/itens_ordem_servico_id_DELETE.xs",
+        ):
+            with self.subTest(path=relative_path):
+                self.assertIn(
+                    '"Use POST/DELETE ordens_servico/{id}/itens."',
+                    self.read(f"{API}/{relative_path}"),
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

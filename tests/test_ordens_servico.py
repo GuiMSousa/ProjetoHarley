@@ -1,6 +1,7 @@
 import json
 import os
 import unittest
+from decimal import Decimal
 from itertools import product
 from unittest.mock import patch
 
@@ -9,6 +10,8 @@ from pydantic import ValidationError
 
 from Projeto_HarleyStore.services.ordens_servico import (
     TRANSICOES_OS,
+    ItemOrdemServico,
+    ItemOSCreate,
     OrdemServicoCreate,
     OrdemServicoDetalhe,
     OrdemServicoResumo,
@@ -127,7 +130,7 @@ class OrdemServicoDtoTests(unittest.TestCase):
         self.assertIsNone(legacy.id_mecanico)
 
 
-class OrdemServicoClientTests(unittest.TestCase):
+class MockedClientTestCase(unittest.TestCase):
     def setUp(self):
         self.environment = patch.dict(
             os.environ,
@@ -141,6 +144,8 @@ class OrdemServicoClientTests(unittest.TestCase):
     def make_client(self, handler):
         return XanoClient(token="jwt", transport=httpx.MockTransport(handler))
 
+
+class OrdemServicoClientTests(MockedClientTestCase):
     def test_opening_sends_only_opening_fields(self):
         captured = {}
 
@@ -227,6 +232,155 @@ class OrdemServicoClientTests(unittest.TestCase):
                     client.transicionar_ordem_servico(
                         31, TransicaoStatusOS(status_atual="ABERTA", status_novo="EM_ANDAMENTO")
                     )
+
+
+DETAIL_WITH_ITEMS = {
+    **DETAIL_RESPONSE,
+    "valor_pecas": 91.8,
+    "valor_servicos": 380,
+    "valor_total": 471.8,
+    "itens": [
+        {"id": 7, "id_os": 31, "tipo_item": "PECA", "id_produto": 3, "codigo": "OLEO20W50",
+         "nome_produto": "Óleo 20W50", "quantidade": 2, "valor_unitario": 45.9,
+         "valor_total_item": 91.8, "estoque_baixado": True, "created_at": 1790000700000},
+        {"id": 8, "id_os": 31, "tipo_item": "SERVICO", "id_produto": None,
+         "descricao": "Troca do kit de embreagem", "quantidade": 1, "valor_unitario": 380,
+         "valor_total_item": 380, "estoque_baixado": False},
+    ],
+}
+
+
+class ItemOSDtoTests(unittest.TestCase):
+    def test_part_is_priced_by_xano(self):
+        item = ItemOSCreate(
+            tipo_item="PECA", id_produto=3, quantidade=2, valor_unitario="1.00", descricao="x"
+        )
+        self.assertEqual(
+            item.model_dump(mode="json", exclude_none=True),
+            {"tipo_item": "PECA", "id_produto": 3, "quantidade": 2},
+        )
+
+    def test_part_requires_product(self):
+        with self.assertRaises(ValidationError) as context:
+            ItemOSCreate(tipo_item="PECA", quantidade=1)
+        self.assertIn("Selecione o produto.", str(context.exception))
+
+    def test_service_requires_description_and_value(self):
+        cases = {
+            "Informe a descrição do serviço.": {"descricao": "   ", "valor_unitario": "10"},
+            "Informe o valor do serviço.": {"descricao": "Revisão"},
+        }
+        for message, fields in cases.items():
+            with self.subTest(message=message), self.assertRaises(ValidationError) as context:
+                ItemOSCreate(tipo_item="SERVICO", quantidade=1, **fields)
+            self.assertIn(message, str(context.exception))
+
+    def test_service_ignores_product_and_strips_description(self):
+        item = ItemOSCreate(
+            tipo_item="SERVICO",
+            id_produto=3,
+            descricao="  Troca do kit  ",
+            quantidade=1,
+            valor_unitario=Decimal("380.00"),
+        )
+        self.assertIsNone(item.id_produto)
+        self.assertEqual(item.descricao, "Troca do kit")
+
+    def test_rejects_invalid_numbers(self):
+        invalid = (
+            {"tipo_item": "PECA", "id_produto": 3, "quantidade": 0},
+            {"tipo_item": "PECA", "id_produto": 0, "quantidade": 1},
+            {"tipo_item": "SERVICO", "descricao": "x", "quantidade": 1, "valor_unitario": "0"},
+            {"tipo_item": "SERVICO", "descricao": "x", "quantidade": 1, "valor_unitario": "1.234"},
+            {"tipo_item": "BRINDE", "quantidade": 1},
+        )
+        for data in invalid:
+            with self.subTest(data=data), self.assertRaises(ValidationError):
+                ItemOSCreate(**data)
+
+    def test_detail_parses_items_totals_and_legacy_items(self):
+        detalhe = OrdemServicoDetalhe.model_validate(DETAIL_WITH_ITEMS)
+        self.assertEqual(detalhe.valor_total, Decimal("471.8"))
+        self.assertEqual([item.tipo_item for item in detalhe.itens], ["PECA", "SERVICO"])
+        self.assertTrue(detalhe.itens[0].estoque_baixado)
+        self.assertIsNone(detalhe.itens[1].id_produto)
+        legacy = ItemOrdemServico.model_validate(
+            {"id": 1, "tipo_item": None, "id_produto": 2, "quantidade": 1, "valor_total_item": 10}
+        )
+        self.assertEqual(legacy.tipo_item, "PECA")
+        self.assertIsNone(legacy.estoque_baixado)
+        self.assertIsNone(legacy.valor_unitario)
+
+
+class ItemOSClientTests(MockedClientTestCase):
+    def test_add_item_posts_only_item_fields(self):
+        captured = {}
+
+        def handler(request):
+            captured["method"] = request.method
+            captured["path"] = request.url.path
+            captured["body"] = json.loads(request.read())
+            return httpx.Response(200, json=DETAIL_WITH_ITEMS)
+
+        with self.make_client(handler) as client:
+            detalhe = client.adicionar_item_ordem_servico(
+                31, ItemOSCreate(tipo_item="PECA", id_produto=3, quantidade=2)
+            )
+
+        self.assertEqual(
+            (captured["method"], captured["path"]), ("POST", "/api:test/ordens_servico/31/itens")
+        )
+        self.assertEqual(captured["body"], {"tipo_item": "PECA", "id_produto": 3, "quantidade": 2})
+        self.assertEqual(len(detalhe.itens), 2)
+
+    def test_add_service_sends_value_as_text_decimal(self):
+        captured = {}
+
+        def handler(request):
+            captured["body"] = json.loads(request.read())
+            return httpx.Response(200, json=DETAIL_WITH_ITEMS)
+
+        with self.make_client(handler) as client:
+            client.adicionar_item_ordem_servico(
+                31,
+                ItemOSCreate(
+                    tipo_item="SERVICO", descricao="Revisão", quantidade=1, valor_unitario="380"
+                ),
+            )
+
+        self.assertEqual(
+            captured["body"],
+            {"tipo_item": "SERVICO", "descricao": "Revisão", "quantidade": 1, "valor_unitario": "380"},
+        )
+
+    def test_remove_item_deletes_nested_route_and_returns_detail(self):
+        captured = {}
+
+        def handler(request):
+            captured["method"] = request.method
+            captured["path"] = request.url.path
+            return httpx.Response(200, json=DETAIL_RESPONSE)
+
+        with self.make_client(handler) as client:
+            detalhe = client.remover_item_ordem_servico(31, 7)
+
+        self.assertEqual(
+            (captured["method"], captured["path"]),
+            ("DELETE", "/api:test/ordens_servico/31/itens/7"),
+        )
+        self.assertIsInstance(detalhe, OrdemServicoDetalhe)
+
+    def test_insufficient_balance_is_a_validation_error(self):
+        message = "Saldo insuficiente para OLEO20W50: disponível 1, solicitado 2."
+
+        def handler(request):
+            return httpx.Response(400, json={"message": message})
+
+        with self.make_client(handler) as client, self.assertRaises(XanoValidationError) as context:
+            client.adicionar_item_ordem_servico(
+                31, ItemOSCreate(tipo_item="PECA", id_produto=3, quantidade=2)
+            )
+        self.assertEqual(str(context.exception), message)
 
 
 if __name__ == "__main__":

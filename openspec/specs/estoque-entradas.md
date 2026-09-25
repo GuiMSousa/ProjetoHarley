@@ -55,13 +55,47 @@ Entradas e itens registrados NÃO DEVEM ser alterados ou removidos. `PUT`, `PATC
 
 ## Requisito: saldo alterado só por movimentação
 
-`PUT` e `PATCH produtos/{id}` NÃO DEVEM alterar `estoque_qtd`. O saldo inicial PODE ser informado em `POST produtos`.
+`PUT` e `PATCH produtos/{id}` NÃO DEVEM alterar `estoque_qtd` nem `versao_estoque`. O saldo inicial PODE ser informado em `POST produtos`. Depois disso, o saldo DEVE mudar somente pela função `Estoque/movimentar_estoque`.
 
 ### Cenário: saldo protegido
 
 - **DADO** um produto com estoque 8
 - **QUANDO** um gerente enviar `PATCH produtos/{id}` com `estoque_qtd = 100`
 - **ENTÃO** o estoque DEVE permanecer 8
+
+## Requisito: livro de movimentações
+
+Toda alteração de saldo DEVE gravar uma linha em `movimentacoes_estoque` com tipo (`ENTRADA`, `SAIDA_OS`, `ESTORNO_OS`), quantidade positiva, saldo anterior e posterior, funcionário autenticado e origem (entrada, OS e item), na mesma transação da operação de origem. `saldo_posterior` NÃO PODE ser negativo.
+
+### Cenário: entrada registrada no livro
+
+- **DADO** o produto P1 com estoque 3
+- **QUANDO** uma entrada de P1 × 5 for registrada
+- **ENTÃO** DEVE existir uma movimentação `ENTRADA` de 5 com saldo anterior 3 e posterior 8
+
+### Cenário: saída acima do saldo
+
+- **DADO** o produto P1 com estoque 2
+- **QUANDO** uma OS tentar baixar 3 unidades
+- **ENTÃO** a operação DEVE ser rejeitada com "Saldo insuficiente para P1: disponível 2, solicitado 3."
+- **E** nenhuma movimentação, item ou alteração de saldo DEVE ser persistida
+
+## Requisito: movimentações concorrentes
+
+Cada movimentação DEVE partir da `versao_estoque` lida junto com o saldo e gravar a versão seguinte. O índice único `(id_produto, versao_anterior)` DEVE impedir que duas movimentações concorrentes do mesmo produto sejam gravadas a partir da mesma versão; a transação perdedora DEVE ser desfeita por inteiro. Operações com vários produtos DEVEM processá-los em ordem crescente de `id_produto`.
+
+### Cenário: duas saídas disputando o último saldo
+
+- **DADO** o produto P1 com estoque 1 e duas OS abertas
+- **QUANDO** as duas incluírem P1 × 1 ao mesmo tempo
+- **ENTÃO** exatamente uma inclusão DEVE ser aceita
+- **E** o estoque de P1 DEVE terminar em 0, nunca negativo
+
+### Cenário: entrada simultânea a uma baixa
+
+- **DADO** uma entrada e uma inclusão de peça do mesmo produto processadas ao mesmo tempo
+- **QUANDO** ambas terminarem
+- **ENTÃO** o saldo DEVE refletir as duas operações aceitas, sem sobrescrita
 
 ## Requisito: matriz de acesso
 

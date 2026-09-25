@@ -1,4 +1,5 @@
-// Monta o detalhe de uma OS: dados enriquecidos, linha do tempo de status e itens (leitura).
+// Monta o detalhe de uma OS: dados enriquecidos, linha do tempo de status, itens e totais.
+// Os totais são recalculados a partir dos itens (fonte de verdade), o que cobre OS legadas.
 function "Oficina/detalhe_os" {
   input {
     int os_id
@@ -80,6 +81,10 @@ function "Oficina/detalhe_os" {
       return = {type: "list"}
     } as $itens
 
+    function.run "Oficina/totais_os" {
+      input = {os_id: $input.os_id}
+    } as $totais
+
     var $detalhe {
       value = $os
         |set:"id_cliente":$id_cliente
@@ -90,6 +95,9 @@ function "Oficina/detalhe_os" {
         |set:"nome_mecanico":$mecanico.nome_funcionario
         |set:"historico":$historico
         |set:"itens":$itens
+        |set:"valor_pecas":$totais.valor_pecas
+        |set:"valor_servicos":$totais.valor_servicos
+        |set:"valor_total":$totais.valor_total
     }
   }
 

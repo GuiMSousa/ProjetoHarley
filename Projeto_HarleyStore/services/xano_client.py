@@ -32,6 +32,7 @@ from Projeto_HarleyStore.services.entradas import (
     EntradaMercadoriaResumo,
 )
 from Projeto_HarleyStore.services.ordens_servico import (
+    ItemOSCreate,
     Mecanico,
     OrdemServicoCreate,
     OrdemServicoDetalhe,
@@ -489,6 +490,26 @@ class XanoClient:
         return self.post(
             f"ordens_servico/{os_id}/status",
             json=transicao.model_dump(mode="json"),
+            response_model=OrdemServicoDetalhe,
+        )
+
+    def adicionar_item_ordem_servico(
+        self, os_id: int, item: ItemOSCreate
+    ) -> OrdemServicoDetalhe:
+        """Add a part or service; Xano prices parts and takes them out of stock."""
+        return self.post(
+            f"ordens_servico/{os_id}/itens",
+            json=item.model_dump(mode="json", exclude_none=True),
+            response_model=OrdemServicoDetalhe,
+        )
+
+    def remover_item_ordem_servico(
+        self, os_id: int, item_id: int
+    ) -> OrdemServicoDetalhe:
+        """Remove an item; parts taken out of stock are returned by Xano."""
+        return self.request(
+            "DELETE",
+            f"ordens_servico/{os_id}/itens/{item_id}",
             response_model=OrdemServicoDetalhe,
         )
 

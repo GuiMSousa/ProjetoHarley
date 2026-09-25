@@ -81,21 +81,82 @@ Cada abertura e cada transição aceita DEVE gerar exatamente uma linha em `hist
 
 `GET ordens_servico?id_moto_cliente=` DEVE listar as OS da moto da mais recente para a mais antiga.
 
-## Requisito: imutabilidade e itens
+## Requisito: imutabilidade
 
-`PUT`, `PATCH` e `DELETE ordens_servico/{id}` DEVEM responder `403`. As mutações de `itens_ordem_servico` DEVEM responder `403` até a Change de itens com baixa de estoque; a leitura permanece liberada.
+`PUT`, `PATCH` e `DELETE ordens_servico/{id}` DEVEM responder `403`. As rotas genéricas de mutação de `itens_ordem_servico` (`POST`, `PUT`, `PATCH`, `DELETE`) DEVEM responder `403`; os itens mudam somente pelas rotas aninhadas da OS. A leitura permanece liberada.
+
+## Requisito: itens da OS
+
+`POST ordens_servico/{id}/itens` DEVE incluir uma peça (`PECA`, com produto) ou um serviço (`SERVICO`, com descrição e valor unitário) e `DELETE ordens_servico/{id}/itens/{item_id}` DEVE remover um item, ambos devolvendo o detalhe atualizado. Só OS `ABERTA` ou `EM_ANDAMENTO` DEVEM aceitar mutações de itens.
+
+- A peça DEVE ter `valor_unitario = preco_venda` do produto no momento da inclusão e DEVE sair do estoque na mesma transação (`SAIDA_OS`).
+- O serviço NÃO DEVE movimentar estoque.
+- `valor_total_item` DEVE ser `quantidade × valor_unitario`, calculado pelo Xano; preços, totais, `estoque_baixado` e autoria enviados pelo cliente DEVEM ser ignorados.
+- Um mesmo produto NÃO DEVE aparecer duas vezes na OS.
+- Remover uma peça baixada DEVE devolvê-la ao estoque (`ESTORNO_OS`); serviços e itens legados NÃO DEVEM movimentar estoque.
+
+### Cenário: inclusão de peça
+
+- **DADO** uma OS `EM_ANDAMENTO` e o produto P1 ativo com estoque 5 e preço 45,90
+- **QUANDO** um mecânico incluir P1 × 2
+- **ENTÃO** o item DEVE ter valor unitário 45,90 e total 91,80
+- **E** o estoque de P1 DEVE ficar em 3
+
+### Cenário: saldo insuficiente
+
+- **DADO** o produto P1 com estoque 1
+- **QUANDO** incluir P1 × 2 numa OS aberta
+- **ENTÃO** a resposta DEVE ser `400` com a mensagem de saldo insuficiente
+- **E** a OS e o estoque NÃO DEVEM mudar
+
+### Cenário: OS encerrada
+
+- **DADO** uma OS `CONCLUIDA` ou `CANCELADA`
+- **QUANDO** incluir ou remover um item
+- **ENTÃO** a resposta DEVE ser `400` "OS encerrada não permite alterar itens."
+
+## Requisito: estoque no ciclo da OS
+
+Cancelar a OS DEVE devolver ao estoque todas as peças baixadas na mesma transação da transição; se alguma devolução falhar, o status NÃO DEVE mudar. Concluir ou iniciar a OS NÃO DEVE movimentar estoque. A OS cancelada DEVE manter itens e totais como registro.
+
+### Cenário: cancelamento com peças
+
+- **DADO** uma OS `EM_ANDAMENTO` com P1 × 2 baixado
+- **QUANDO** for cancelada com motivo
+- **ENTÃO** o estoque de P1 DEVE voltar ao valor anterior à inclusão
+- **E** o item DEVE continuar listado na OS
+
+## Requisito: totais da OS
+
+A cada inclusão ou remoção, o Xano DEVE gravar na OS `valor_pecas`, `valor_servicos` e `valor_total = valor_pecas + valor_servicos`, somados a partir dos itens. O detalhe DEVE recalcular os totais a partir dos itens (itens legados sem tipo contam como peça).
+
+## Requisito: serialização das mutações da OS
+
+Inclusão, remoção e transição DEVEM começar atualizando `ordens_servico.atualizado_em`, travando a linha da OS, e só então reler status e itens. No cancelamento, os itens a devolver DEVEM ser consultados depois da atualização da OS.
+
+### Cenário: inclusão durante o cancelamento
+
+- **DADO** uma OS `ABERTA`
+- **QUANDO** um usuário a cancelar enquanto outro inclui uma peça
+- **ENTÃO** ou a inclusão é rejeitada, ou a peça incluída é devolvida pelo cancelamento
+- **E** o estoque final DEVE ser igual ao anterior às duas operações
 
 ## Requisito: matriz de acesso
 
 | Operação | GERENTE | MECANICO | VENDEDOR |
 | --- | --- | --- | --- |
-| Consultar OS, detalhe e histórico por moto | sim | sim | sim |
+| Consultar OS, detalhe, itens, totais e histórico por moto | sim | sim | sim |
 | Abrir OS e transicionar status | sim | sim | não |
+| Incluir e remover peças e serviços | sim | sim | não |
 | Listar mecânicos (`GET oficina/mecanicos`, apenas id e nome) | sim | sim | não |
 
 ### Cenário: vendedor
 
 - **DADO** um vendedor autenticado
 - **QUANDO** acessar `/workshop`
-- **ENTÃO** DEVE ver a lista e o detalhe, sem "Nova OS" e sem ações de transição
-- **E** chamadas forjadas de abertura ou transição DEVEM receber `403`
+- **ENTÃO** DEVE ver a lista, o detalhe, os itens e os totais, sem "Nova OS", sem ações de transição e sem edição de itens
+- **E** chamadas forjadas de abertura, transição, inclusão ou remoção de itens DEVEM receber `403`
+
+## Requisito: itens na interface
+
+Em `/workshop`, o detalhe de uma OS editável DEVE oferecer busca de peças com saldo e preço (produtos sem saldo desabilitados), inclusão de serviço, confirmação de remoção e o resumo "Peças + Mão de obra = Total OS", com prévia do item em edição. A quantidade DEVE ser validada contra o saldo antes do envio. Depois de uma rejeição do Xano, a interface DEVE recarregar detalhe e saldos.

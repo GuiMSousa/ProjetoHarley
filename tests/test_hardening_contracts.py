@@ -19,6 +19,8 @@ class HardeningContractTests(unittest.TestCase):
         operation_files = [
             "xano/api/harley/ordens_servico_POST.xs",
             "xano/api/harley/ordens_servico/ordens_servico_id_status_POST.xs",
+            "xano/api/harley/ordens_servico/ordens_servico_id_itens_POST.xs",
+            "xano/api/harley/ordens_servico/ordens_servico_id_itens_item_id_DELETE.xs",
             "xano/api/harley/transacoes_POST.xs",
             "xano/api/harley/transacoes/transacoes_id_PUT.xs",
         ]

@@ -22,7 +22,7 @@ query "produtos/{produtos_id}" verb=PATCH {
     db.patch produtos {
       field_name = "id"
       field_value = $input.produtos_id
-      data = `$input|pick:($raw_input|keys)`|unset:"estoque_qtd"|filter_null|filter_empty_text
+      data = `$input|pick:($raw_input|keys)`|unset:"estoque_qtd"|unset:"versao_estoque"|filter_null|filter_empty_text
     } as $model
   }
 

@@ -2,6 +2,9 @@
 // Concorrência: o índice único (id_os, status_anterior) de historico_status_os garante que
 // cada OS saia de cada status uma única vez; uma segunda transição simultânea a partir do
 // mesmo status viola o índice e desfaz a transação inteira.
+// O patch da OS também atualiza atualizado_em, travando a linha: inclusões e remoções de itens
+// concorrentes esperam o commit. No cancelamento, as peças baixadas voltam ao estoque na mesma
+// transação, consultadas depois do patch (Change 7).
 query "ordens_servico/{ordens_servico_id}/status" verb=POST {
   api_group = "HARLEY"
   auth = "user"
@@ -66,7 +69,7 @@ query "ordens_servico/{ordens_servico_id}/status" verb=POST {
     }
 
     var $dados {
-      value = {status: $input.status_novo}
+      value = {status: $input.status_novo, atualizado_em: $agora}
     }
 
     conditional {
@@ -110,6 +113,32 @@ query "ordens_servico/{ordens_servico_id}/status" verb=POST {
               field_value = $input.ordens_servico_id
               data = $dados
             } as $os_atualizada
+
+            // Cancelamento devolve as peças baixadas, em ordem de produto (evita deadlock).
+            conditional {
+              if ($input.status_novo == "CANCELADA") {
+                db.query itens_ordem_servico {
+                  where = $db.itens_ordem_servico.id_os == $input.ordens_servico_id && $db.itens_ordem_servico.estoque_baixado == true
+                  sort = {id_produto: "asc"}
+                  return = {type: "list"}
+                } as $pecas_baixadas
+
+                foreach ($pecas_baixadas) {
+                  each as $peca {
+                    function.run "Estoque/movimentar_estoque" {
+                      input = {
+                        id_produto    : $peca.id_produto
+                        tipo          : "ESTORNO_OS"
+                        quantidade    : $peca.quantidade
+                        id_funcionario: $auth_user.id_funcionario
+                        id_os         : $input.ordens_servico_id
+                        id_item_os    : $peca.id
+                      }
+                    } as $estorno
+                  }
+                }
+              }
+            }
           }
         }
       }

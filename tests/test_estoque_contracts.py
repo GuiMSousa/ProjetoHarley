@@ -20,17 +20,60 @@ class EstoqueContractTests(unittest.TestCase):
         for operation in (
             "db.add entrada_mercadoria",
             "db.add itens_compra_estoque",
-            "db.edit produtos",
+            'function.run "Estoque/movimentar_estoque"',
         ):
             with self.subTest(operation=operation):
                 self.assertIn(operation, transaction)
 
-    def test_receipt_post_increments_stock_by_item_quantity(self):
+    def test_receipt_post_moves_stock_through_the_ledger(self):
         content = self.read(f"{API}/entrada_mercadoria_POST.xs")
+        self.assertNotIn("db.edit produtos", content)
+        for fragment in (
+            'tipo          : "ENTRADA"',
+            "quantidade    : $item.quantidade",
+            "id_funcionario: $auth_user.id_funcionario",
+            "id_entrada    : $entrada.id",
+            # Same lock order as the cancellation, to avoid deadlocks.
+            'foreach ($input.itens|sort:"id_produto":"int":false)',
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, content)
+
+    def test_stock_function_writes_ledger_before_product(self):
+        content = self.read("xano/function/estoque/movimentar_estoque.xs")
+        self.assertIn('function "Estoque/movimentar_estoque"', content)
+        self.assertIn('output = ["id", "codigo", "estoque_qtd", "versao_estoque", "ativo"]', content)
+        self.assertLess(
+            content.index("db.add movimentacoes_estoque"), content.index("db.edit produtos")
+        )
+        self.assertIn("precondition ($saldo_posterior >= 0)", content)
+        self.assertIn('"Saldo insuficiente para "', content)
+        self.assertIn("versao_anterior: $versao", content)
+        self.assertIn("versao_estoque: $versao + 1", content)
+        self.assertIn('$input.tipo != "SAIDA_OS" || $produto.ativo != false', content)
+
+    def test_ledger_serializes_movements_per_product(self):
+        content = self.read("xano/table/movimentacoes_estoque.xs")
+        self.assertIn('values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS"]', content)
+        self.assertIn("int saldo_posterior filters=min:0", content)
         self.assertRegex(
             content,
-            r"estoque_qtd:\s*\(\$produto\.estoque_qtd \?\? 0\) \+ \$item\.quantidade",
+            r'type : "btree\|unique"\s*field: \[\{name: "id_produto"\}, \{name: "versao_anterior"\}\]',
         )
+        self.assertIn("int? versao_estoque? filters=min:0", self.read("xano/table/produtos.xs"))
+
+    def test_only_the_stock_function_writes_the_balance(self):
+        allowed = {
+            Path("xano/function/estoque/movimentar_estoque.xs"),
+            # Initial balance, set only when the product is created.
+            Path("xano/api/harley/produtos_POST.xs"),
+        }
+        for path in (ROOT / "xano").rglob("*.xs"):
+            relative = path.relative_to(ROOT)
+            content = path.read_text(encoding="utf-8")
+            if re.search(r"estoque_qtd\s*:", content):
+                with self.subTest(path=str(relative)):
+                    self.assertIn(relative, allowed)
 
     def test_receipt_post_validates_supplier_products_and_items(self):
         content = self.read(f"{API}/entrada_mercadoria_POST.xs")
@@ -105,11 +148,12 @@ class EstoqueContractTests(unittest.TestCase):
             "estoque_qtd",
             self.read(f"{API}/produtos/produtos_id_PUT.xs"),
         )
-        self.assertIn(
-            '|unset:"estoque_qtd"',
-            self.read(f"{API}/produtos/produtos_id_PATCH.xs"),
-        )
+        patch = self.read(f"{API}/produtos/produtos_id_PATCH.xs")
+        self.assertIn('|unset:"estoque_qtd"', patch)
+        self.assertIn('|unset:"versao_estoque"', patch)
+        self.assertNotIn("versao_estoque", self.read(f"{API}/produtos/produtos_id_PUT.xs"))
         self.assertIn("estoque_qtd", self.read(f"{API}/produtos_POST.xs"))
+        self.assertNotIn("versao_estoque", self.read(f"{API}/produtos_POST.xs"))
 
     def test_supplier_reads_are_manager_only(self):
         for relative_path in (

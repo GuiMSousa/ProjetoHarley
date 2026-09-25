@@ -1,4 +1,4 @@
-"""Display formatting shared by page states."""
+"""Display formatting and numeric input parsing shared by page states."""
 
 from __future__ import annotations
 
@@ -19,3 +19,8 @@ def format_datetime(value: datetime | None) -> str:
     if value is None:
         return EMPTY_VALUE
     return value.astimezone().strftime("%d/%m/%Y %H:%M")
+
+
+def parse_decimal(value: str) -> Decimal:
+    """Parse a decimal typed with comma or dot as the decimal separator."""
+    return Decimal(value.strip().replace(",", "."))

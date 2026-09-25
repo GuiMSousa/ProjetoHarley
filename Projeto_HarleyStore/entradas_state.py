@@ -14,6 +14,7 @@ from Projeto_HarleyStore.formatting import (
     EMPTY_VALUE,
     format_currency,
     format_datetime,
+    parse_decimal,
 )
 from Projeto_HarleyStore.listing import (
     filter_rows,
@@ -44,11 +45,6 @@ class EntradaFormError(ValueError):
 
 def can_register_entrada(role: str) -> bool:
     return role == "GERENTE"
-
-
-def parse_decimal(value: str) -> Decimal:
-    """Parse a decimal typed with comma or dot as the decimal separator."""
-    return Decimal(value.strip().replace(",", "."))
 
 
 def empty_item() -> dict[str, str]:

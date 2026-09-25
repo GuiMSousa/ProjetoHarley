@@ -1,12 +1,14 @@
 import unittest
 from datetime import datetime, timezone
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 from reflex.state import State
 
-from Projeto_HarleyStore.services.cadastros import Cliente, MotoCliente
+from Projeto_HarleyStore.services.cadastros import Cliente, MotoCliente, Produto
 from Projeto_HarleyStore.services.ordens_servico import (
     HistoricoStatusOS,
+    ItemOrdemServico,
     Mecanico,
     OrdemServicoDetalhe,
     OrdemServicoResumo,
@@ -21,14 +23,21 @@ from Projeto_HarleyStore.workshop_state import (
     WorkshopState,
     allowed_transitions,
     build_abertura_payload,
+    build_item_payload,
     build_transicao_payload,
+    can_edit_items,
     can_operate_os,
     detalhe_row,
     filter_by_status,
+    filtrar_produtos,
     historico_row,
+    item_row,
     motos_do_cliente,
     os_row,
+    preview_item_total,
+    produto_row,
     status_counts,
+    totais_row,
 )
 
 
@@ -51,7 +60,7 @@ def resumo(os_id=31, status="ABERTA", **extra):
 
 
 def detalhe(os_id=31, status="ABERTA", **extra):
-    return OrdemServicoDetalhe(**resumo(os_id, status).model_dump(), **extra)
+    return OrdemServicoDetalhe(**{**resumo(os_id, status).model_dump(), **extra})
 
 
 class WorkshopRulesTests(unittest.TestCase):
@@ -149,7 +158,7 @@ class WorkshopRulesTests(unittest.TestCase):
         self.assertEqual((opening["de"], opening["para"]), ("Abertura", "Aberta"))
 
 
-class WorkshopStateEventTests(unittest.TestCase):
+class WorkshopStateTestCase(unittest.TestCase):
     def make_state(self, role="MECANICO", authenticated=True):
         root = State(_reflex_internal_init=True)
         state = root.get_substate(WorkshopState.get_full_name().split("."))
@@ -167,6 +176,8 @@ class WorkshopStateEventTests(unittest.TestCase):
         client_class.return_value.__enter__.return_value = client
         return client_class, client
 
+
+class WorkshopStateEventTests(WorkshopStateTestCase):
     def test_load_without_session_does_not_call_xano(self):
         state = self.make_state(authenticated=False)
         client_class, _ = self.patched_client()
@@ -317,6 +328,240 @@ class WorkshopStateEventTests(unittest.TestCase):
         self.assertEqual(state.auth_token, "")
         self.assertFalse(state.is_authenticated)
         self.assertEqual(state.ordens, [])
+
+
+def produto(produto_id=3, codigo="OLEO20W50", nome="Óleo 20W50", saldo=5, preco="45.90", ativo=True):
+    return Produto(
+        id=produto_id,
+        codigo=codigo,
+        nome_produto=nome,
+        categoria="Lubrificantes",
+        estoque_qtd=saldo,
+        preco_venda=Decimal(preco),
+        ativo=ativo,
+    )
+
+
+def item(item_id=7, **extra):
+    data = {
+        "id": item_id,
+        "tipo_item": "PECA",
+        "id_produto": 3,
+        "codigo": "OLEO20W50",
+        "nome_produto": "Óleo 20W50",
+        "quantidade": 2,
+        "valor_unitario": Decimal("45.90"),
+        "valor_total_item": Decimal("91.80"),
+        "estoque_baixado": True,
+    }
+    data.update(extra)
+    return ItemOrdemServico(**data)
+
+
+CATALOGO = [
+    produto_row(produto()),
+    produto_row(produto(4, "PASTILHA01", "Pastilha de freio", saldo=0, preco="120.00")),
+    produto_row(produto(5, "FILTROAR", "Filtro de ar", saldo=2, preco="80.00")),
+]
+
+
+class WorkshopItemRulesTests(unittest.TestCase):
+    def test_items_are_editable_only_in_open_orders_by_operators(self):
+        for status in ("ABERTA", "EM_ANDAMENTO"):
+            self.assertTrue(can_edit_items(status, "MECANICO"))
+            self.assertTrue(can_edit_items(status, "GERENTE"))
+            self.assertFalse(can_edit_items(status, "VENDEDOR"))
+        for status in ("CONCLUIDA", "CANCELADA"):
+            self.assertFalse(can_edit_items(status, "GERENTE"))
+
+    def test_product_rows_expose_balance_price_and_availability(self):
+        row = CATALOGO[0]
+        self.assertEqual(
+            (row["saldo"], row["preco"], row["preco_valor"], row["disponivel"]),
+            ("5", "R$ 45,90", "45.90", "true"),
+        )
+        self.assertEqual((CATALOGO[1]["saldo"], CATALOGO[1]["disponivel"]), ("0", "false"))
+
+    def test_product_search_ignores_case_accents_and_limits_results(self):
+        self.assertEqual([row["id"] for row in filtrar_produtos(CATALOGO, "oleo")], ["3"])
+        self.assertEqual([row["id"] for row in filtrar_produtos(CATALOGO, "FILTRO")], ["5"])
+        self.assertEqual(len(filtrar_produtos(CATALOGO, "")), 3)
+        self.assertEqual(len(filtrar_produtos(CATALOGO, "", limite=2)), 2)
+
+    def test_part_payload_checks_selection_quantity_and_balance(self):
+        payload = build_item_payload("PECA", "3", CATALOGO, "2", "", "")
+        self.assertEqual(
+            payload.model_dump(exclude_none=True),
+            {"tipo_item": "PECA", "id_produto": 3, "quantidade": 2},
+        )
+        cases = {
+            "Selecione o produto.": ("", "1"),
+            "A quantidade deve ser um número inteiro maior que zero.": ("3", "0"),
+            "Saldo insuficiente para OLEO20W50: disponível 5.": ("3", "6"),
+        }
+        for message, (produto_id, quantidade) in cases.items():
+            with self.subTest(message=message), self.assertRaises(WorkshopFormError) as context:
+                build_item_payload("PECA", produto_id, CATALOGO, quantidade, "", "")
+            self.assertEqual(str(context.exception), message)
+
+    def test_service_payload_parses_comma_decimal(self):
+        payload = build_item_payload("SERVICO", "", CATALOGO, "1", " Revisão ", "380,50")
+        self.assertEqual(payload.valor_unitario, Decimal("380.50"))
+        self.assertEqual(payload.descricao, "Revisão")
+        cases = {
+            "Informe a descrição do serviço.": ("", "10"),
+            "Informe o valor do serviço.": ("Revisão", ""),
+            "Informe um valor numérico válido para o serviço.": ("Revisão", "abc"),
+            "O valor do serviço deve ser positivo, com até duas casas decimais.": ("Revisão", "-1"),
+        }
+        for message, (descricao, valor) in cases.items():
+            with self.subTest(message=message), self.assertRaises(WorkshopFormError) as context:
+                build_item_payload("SERVICO", "", CATALOGO, "1", descricao, valor)
+            self.assertEqual(str(context.exception), message)
+
+    def test_preview_only_for_complete_forms(self):
+        self.assertEqual(preview_item_total("PECA", CATALOGO[0], "2", ""), Decimal("91.80"))
+        self.assertEqual(preview_item_total("SERVICO", None, "2", "10,5"), Decimal("21.0"))
+        for args in (("PECA", None, "2", ""), ("PECA", CATALOGO[0], "x", ""), ("SERVICO", None, "1", "")):
+            with self.subTest(args=args):
+                self.assertIsNone(preview_item_total(*args))
+
+    def test_item_rows_and_totals(self):
+        peca = item_row(item())
+        self.assertEqual(
+            (peca["tipo_label"], peca["descricao"], peca["unitario"], peca["total"], peca["baixado"]),
+            ("Peça", "OLEO20W50 · Óleo 20W50", "R$ 45,90", "R$ 91,80", "true"),
+        )
+        servico = item_row(
+            item(8, tipo_item="SERVICO", id_produto=None, codigo=None, nome_produto=None,
+                 descricao="Troca do kit", estoque_baixado=False)
+        )
+        self.assertEqual((servico["tipo_label"], servico["descricao"]), ("Serviço", "Troca do kit"))
+        legado = item_row(
+            ItemOrdemServico(id=1, tipo_item=None, id_produto=2, quantidade=1, valor_total_item=10)
+        )
+        self.assertEqual((legado["tipo"], legado["unitario"], legado["baixado"]), ("PECA", "—", "false"))
+        totais = totais_row(
+            detalhe(valor_pecas=Decimal("91.8"), valor_servicos=Decimal("380"), valor_total=Decimal("471.8"))
+        )
+        self.assertEqual(
+            (totais["pecas"], totais["servicos"], totais["total"]),
+            ("R$ 91,80", "R$ 380,00", "R$ 471,80"),
+        )
+        self.assertEqual(totais_row(detalhe())["total"], "R$ 0,00")
+        self.assertEqual(os_row(resumo(valor_total=Decimal("471.8")))["total"], "R$ 471,80")
+
+
+class WorkshopItemEventTests(WorkshopStateTestCase):
+    def open_state(self, role="MECANICO", status="EM_ANDAMENTO"):
+        state = self.make_state(role)
+        client_class, client = self.patched_client()
+        client.get_ordem_servico.return_value = detalhe(31, status, itens=[item()])
+        client.list_ordens_servico.return_value = [resumo(31, status)]
+        client.list_produtos.return_value = [produto(), produto(9, "INATIVO", "x", ativo=False)]
+        WorkshopState.open_detail.fn(state, "31")
+        return state, client_class, client
+
+    def test_open_order_loads_active_catalog_for_operators(self):
+        state, _, client = self.open_state()
+        self.assertTrue(state.can_edit_items)
+        self.assertEqual([row["id"] for row in state.catalogo_produtos], ["3"])
+        state, _, client = self.open_state(role="VENDEDOR")
+        self.assertFalse(state.can_edit_items)
+        client.list_produtos.assert_not_called()
+
+    def test_closed_order_hides_editing_and_rejects_forged_events(self):
+        state, client_class, client = self.open_state(status="CONCLUIDA")
+        self.assertFalse(state.can_edit_items)
+        client.list_produtos.assert_not_called()
+        WorkshopState.ask_remove_item.fn(state, "7")
+        self.assertEqual(state.item_to_remove, "")
+        client_class.reset_mock()
+        WorkshopState.save_item.fn(state)
+        client_class.assert_not_called()
+        self.assertIn("aberta ou em andamento", state.item_error)
+
+    def test_selecting_product_without_balance_is_ignored(self):
+        state, _, _ = self.open_state()
+        state.catalogo_produtos = CATALOGO
+        WorkshopState.select_produto.fn(state, "4")
+        self.assertEqual(state.item_produto_id, "")
+        WorkshopState.select_produto.fn(state, "3")
+        self.assertEqual(state.produto_selecionado["codigo"], "OLEO20W50")
+
+    def test_segmented_control_value_is_normalized(self):
+        state = self.make_state()
+        WorkshopState.set_item_tipo.fn(state, ["SERVICO"])
+        self.assertEqual(state.item_tipo, "SERVICO")
+        WorkshopState.set_item_tipo.fn(state, "OUTRO")
+        self.assertEqual(state.item_tipo, "SERVICO")
+
+    def test_local_balance_check_does_not_call_xano(self):
+        state, client_class, client = self.open_state()
+        state.item_produto_id = "3"
+        state.item_quantidade = "9"
+        WorkshopState.save_item.fn(state)
+        client.adicionar_item_ordem_servico.assert_not_called()
+        self.assertEqual(state.item_error, "Saldo insuficiente para OLEO20W50: disponível 5.")
+
+    def test_successful_add_applies_detail_totals_and_resets_form(self):
+        state, _, client = self.open_state()
+        state.item_produto_id = "3"
+        state.item_quantidade = "2"
+        self.assertEqual(state.item_preview, "R$ 91,80")
+        client.adicionar_item_ordem_servico.return_value = detalhe(
+            31,
+            "EM_ANDAMENTO",
+            itens=[item(), item(8, id_produto=5, codigo="FILTROAR")],
+            valor_pecas=Decimal("183.6"),
+            valor_total=Decimal("183.6"),
+        )
+        client.list_produtos.return_value = [produto(saldo=3)]
+        WorkshopState.save_item.fn(state)
+        os_id, payload = client.adicionar_item_ordem_servico.call_args.args
+        self.assertEqual((os_id, payload.id_produto, payload.quantidade), (31, 3, 2))
+        self.assertEqual(len(state.detalhe_itens), 2)
+        self.assertEqual(state.detalhe_totais["total"], "R$ 183,60")
+        self.assertEqual(state.catalogo_produtos[0]["saldo"], "3")
+        self.assertEqual((state.item_produto_id, state.item_quantidade, state.item_error), ("", "1", ""))
+        self.assertFalse(state.is_saving_item)
+
+    def test_rejected_add_keeps_form_and_reloads_real_balance(self):
+        state, _, client = self.open_state()
+        state.item_produto_id = "3"
+        state.item_quantidade = "2"
+        message = "Saldo insuficiente para OLEO20W50: disponível 1, solicitado 2."
+        client.adicionar_item_ordem_servico.side_effect = XanoValidationError(message, status_code=400)
+        client.list_produtos.return_value = [produto(saldo=1)]
+        WorkshopState.save_item.fn(state)
+        self.assertEqual(state.item_error, message)
+        self.assertEqual(state.item_produto_id, "3")
+        self.assertEqual(state.catalogo_produtos[0]["saldo"], "1")
+        self.assertEqual(client.get_ordem_servico.call_count, 2)
+
+    def test_remove_requires_confirmation_and_reports_stock_return(self):
+        state, _, client = self.open_state()
+        WorkshopState.ask_remove_item.fn(state, "7")
+        self.assertIn("A peça volta ao estoque.", state.remove_message)
+        WorkshopState.cancel_remove_item.fn(state)
+        client.remover_item_ordem_servico.assert_not_called()
+        WorkshopState.ask_remove_item.fn(state, "7")
+        client.remover_item_ordem_servico.return_value = detalhe(31, "EM_ANDAMENTO")
+        response = WorkshopState.confirm_remove_item.fn(state)
+        client.remover_item_ordem_servico.assert_called_once_with(31, 7)
+        self.assertEqual(state.detalhe_itens, [])
+        self.assertEqual(state.item_to_remove, "")
+        self.assertIn("voltou ao estoque", str(response))
+
+    def test_item_events_are_blocked_while_another_operation_runs(self):
+        state, _, client = self.open_state()
+        state.item_produto_id = "3"
+        state.is_transitioning = True
+        WorkshopState.save_item.fn(state)
+        state.item_to_remove = "7"
+        WorkshopState.confirm_remove_item.fn(state)
+        client.adicionar_item_ordem_servico.assert_not_called()
+        client.remover_item_ordem_servico.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -10,6 +10,9 @@ table produtos {
     int estoque_qtd? filters=min:0
     decimal preco_venda filters=min:0.01
     bool ativo?=true
+
+    // Incrementado por Estoque/movimentar_estoque a cada movimentação; nulo equivale a 0.
+    int? versao_estoque? filters=min:0
   }
 
   index = [

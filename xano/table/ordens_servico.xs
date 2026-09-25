@@ -39,6 +39,15 @@ table ordens_servico {
     timestamp? data_inicio?
     timestamp? data_encerramento?
     text? motivo_cancelamento? filters=trim
+
+    // Campos da Change 7: totais recalculados a partir dos itens a cada mutação.
+    decimal? valor_pecas?
+    decimal? valor_servicos?
+    decimal? valor_total?
+
+    // Atualizado no início de toda mutação da OS para travar a linha e serializar
+    // inclusões, remoções e transições concorrentes.
+    timestamp? atualizado_em?
   }
 
   index = [

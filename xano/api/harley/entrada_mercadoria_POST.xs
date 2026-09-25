@@ -1,4 +1,6 @@
 // Registra uma entrada de mercadoria com seus itens e incrementa o estoque atomicamente.
+// O saldo muda somente por Estoque/movimentar_estoque (ENTRADA), que grava o livro de
+// movimentações e serializa movimentações concorrentes do mesmo produto (Change 7).
 query entrada_mercadoria verb=POST {
   api_group = "HARLEY"
   auth = "user"
@@ -95,12 +97,13 @@ query entrada_mercadoria verb=POST {
           }
         } as $entrada
 
-        foreach ($input.itens) {
+        // Itens em ordem de produto: transações com vários produtos travam na mesma ordem.
+        foreach ($input.itens|sort:"id_produto":"int":false) {
           each as $item {
             db.get produtos {
               field_name = "id"
               field_value = $item.id_produto
-              output = ["id", "codigo", "estoque_qtd", "ativo"]
+              output = ["id", "codigo", "ativo"]
             } as $produto
 
             precondition ($produto != null && $produto.ativo != false) {
@@ -117,13 +120,15 @@ query entrada_mercadoria verb=POST {
               }
             } as $item_compra
 
-            db.edit produtos {
-              field_name = "id"
-              field_value = $produto.id
-              data = {
-                estoque_qtd: ($produto.estoque_qtd ?? 0) + $item.quantidade
+            function.run "Estoque/movimentar_estoque" {
+              input = {
+                id_produto    : $item.id_produto
+                tipo          : "ENTRADA"
+                quantidade    : $item.quantidade
+                id_funcionario: $auth_user.id_funcionario
+                id_entrada    : $entrada.id
               }
-            } as $produto_atualizado
+            } as $movimento
           }
         }
       }

@@ -1,4 +1,4 @@
-"""Workshop page: service orders, opening form and status machine actions."""
+"""Workshop page: service orders, opening form, items and status machine actions."""
 
 from __future__ import annotations
 
@@ -76,6 +76,7 @@ def ordem_row(row: rx.Var) -> rx.Component:
         rx.table.cell(row["moto"]),
         rx.table.cell(row["tipo"]),
         rx.table.cell(row["mecanico"], color=COLORS["muted"]),
+        rx.table.cell(row["total"], text_align="right"),
         rx.table.cell(status_badge(row["status"], row["status_label"])),
         rx.table.cell(
             rx.button(
@@ -107,6 +108,7 @@ def ordens_table() -> rx.Component:
                             rx.table.column_header_cell("Moto"),
                             rx.table.column_header_cell("Tipo"),
                             rx.table.column_header_cell("Mecânico"),
+                            rx.table.column_header_cell("Total", text_align="right"),
                             rx.table.column_header_cell("Status"),
                             rx.table.column_header_cell(""),
                         ),
@@ -222,12 +224,277 @@ def timeline_row(evento: rx.Var) -> rx.Component:
     )
 
 
+# ----- items -----
+
+
 def item_row(item: rx.Var) -> rx.Component:
     return rx.table.row(
-        rx.table.cell(item["codigo"]),
-        rx.table.cell(item["produto"]),
+        rx.table.cell(
+            rx.badge(
+                item["tipo_label"],
+                color_scheme=rx.cond(item["tipo"] == "SERVICO", "blue", "orange"),
+                variant="soft",
+            )
+        ),
+        rx.table.cell(item["descricao"]),
         rx.table.cell(item["quantidade"], text_align="right"),
+        rx.table.cell(item["unitario"], text_align="right"),
         rx.table.cell(item["total"], text_align="right"),
+        rx.cond(
+            WorkshopState.can_edit_items,
+            rx.table.cell(
+                rx.button(
+                    "Remover",
+                    on_click=WorkshopState.ask_remove_item(item["id"]),
+                    color_scheme="red",
+                    variant="ghost",
+                    size="1",
+                    disabled=WorkshopState.is_busy,
+                ),
+                text_align="right",
+            ),
+        ),
+        align="center",
+    )
+
+
+def itens_table() -> rx.Component:
+    return rx.cond(
+        WorkshopState.detalhe_itens.length() > 0,
+        rx.table.root(
+            rx.table.header(
+                rx.table.row(
+                    rx.table.column_header_cell("Tipo"),
+                    rx.table.column_header_cell("Item"),
+                    rx.table.column_header_cell("Qtd.", text_align="right"),
+                    rx.table.column_header_cell("Unitário", text_align="right"),
+                    rx.table.column_header_cell("Total", text_align="right"),
+                    rx.cond(WorkshopState.can_edit_items, rx.table.column_header_cell("")),
+                ),
+            ),
+            rx.table.body(rx.foreach(WorkshopState.detalhe_itens, item_row)),
+            width="100%",
+        ),
+        rx.text("Nenhum item registrado.", size="2", color=COLORS["muted"]),
+    )
+
+
+def remove_confirm() -> rx.Component:
+    return rx.cond(
+        WorkshopState.item_to_remove != "",
+        rx.hstack(
+            rx.text(WorkshopState.remove_message, size="2", flex="1"),
+            rx.button(
+                rx.cond(WorkshopState.is_removing_item, "Removendo...", "Remover"),
+                on_click=WorkshopState.confirm_remove_item,
+                color_scheme="red",
+                size="1",
+                disabled=WorkshopState.is_busy,
+            ),
+            rx.button(
+                "Voltar",
+                on_click=WorkshopState.cancel_remove_item,
+                variant="outline",
+                size="1",
+            ),
+            width="100%",
+            align="center",
+            padding="0.75rem",
+            border=f"1px solid {COLORS['border']}",
+            border_radius="8px",
+        ),
+    )
+
+
+def custo(label: str, value: rx.Var, **props) -> rx.Component:
+    return rx.vstack(
+        rx.text(label, size="1", color=COLORS["muted"]),
+        rx.text(value, font_weight="700", **props),
+        spacing="0",
+        align="start",
+    )
+
+
+def custos_resumo() -> rx.Component:
+    totais = WorkshopState.detalhe_totais
+    return rx.vstack(
+        rx.hstack(
+            custo("Peças", totais["pecas"]),
+            rx.text("+", color=COLORS["muted"]),
+            custo("Mão de obra", totais["servicos"]),
+            rx.text("=", color=COLORS["muted"]),
+            custo("Total OS", totais["total"], color=COLORS["orange"], size="5"),
+            spacing="4",
+            align="center",
+            wrap="wrap",
+        ),
+        rx.cond(
+            WorkshopState.total_previsto != "",
+            rx.text(
+                f"Item em edição: {WorkshopState.item_preview} · "
+                f"total após inclusão: {WorkshopState.total_previsto}",
+                size="1",
+                color=COLORS["muted"],
+            ),
+        ),
+        spacing="1",
+        width="100%",
+        padding="0.75rem 1rem",
+        border=f"1px solid {COLORS['border']}",
+        border_radius="8px",
+    )
+
+
+def produto_option(produto: rx.Var) -> rx.Component:
+    return rx.button(
+        rx.hstack(
+            rx.text(produto["codigo"], font_weight="700", min_width="6rem"),
+            rx.text(produto["nome"], flex="1", trim="end", text_align="left"),
+            rx.text(
+                rx.cond(
+                    produto["disponivel"] == "true",
+                    f"saldo {produto['saldo']}",
+                    "sem saldo",
+                ),
+                size="1",
+                color=COLORS["muted"],
+            ),
+            rx.text(produto["preco"], size="2"),
+            width="100%",
+            align="center",
+            spacing="3",
+        ),
+        on_click=WorkshopState.select_produto(produto["id"]),
+        disabled=produto["disponivel"] != "true",
+        variant="ghost",
+        width="100%",
+        justify="start",
+    )
+
+
+def peca_fields() -> rx.Component:
+    selecionado = WorkshopState.produto_selecionado
+    return rx.cond(
+        WorkshopState.item_produto_id == "",
+        rx.vstack(
+            rx.input(
+                placeholder="Buscar peça por código ou nome...",
+                value=WorkshopState.produto_busca,
+                on_change=WorkshopState.set_produto_busca,
+                width="100%",
+            ),
+            rx.cond(
+                WorkshopState.produtos_filtrados.length() > 0,
+                rx.vstack(
+                    rx.foreach(WorkshopState.produtos_filtrados, produto_option),
+                    spacing="1",
+                    width="100%",
+                ),
+                rx.text("Nenhum produto ativo encontrado.", size="2", color=COLORS["muted"]),
+            ),
+            spacing="2",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.vstack(
+                rx.text(selecionado["codigo"], " · ", selecionado["nome"], font_weight="700"),
+                rx.text(
+                    "Saldo disponível: ", selecionado["saldo"], " · preço ", selecionado["preco"],
+                    size="1",
+                    color=COLORS["muted"],
+                ),
+                spacing="0",
+                align="start",
+                flex="1",
+            ),
+            labeled(
+                "Quantidade",
+                rx.input(
+                    value=WorkshopState.item_quantidade,
+                    on_change=WorkshopState.set_item_quantidade,
+                    type="number",
+                    min=1,
+                    max=selecionado["saldo"],
+                    width="7rem",
+                ),
+            ),
+            rx.button("Trocar", on_click=WorkshopState.clear_produto, variant="ghost", size="1"),
+            width="100%",
+            align="end",
+        ),
+    )
+
+
+def servico_fields() -> rx.Component:
+    return rx.hstack(
+        labeled(
+            "Descrição do serviço",
+            rx.input(
+                value=WorkshopState.item_descricao,
+                on_change=WorkshopState.set_item_descricao,
+                placeholder="Ex.: troca do kit de embreagem",
+                max_length=200,
+                width="100%",
+            ),
+            flex="1",
+        ),
+        labeled(
+            "Quantidade",
+            rx.input(
+                value=WorkshopState.item_quantidade,
+                on_change=WorkshopState.set_item_quantidade,
+                type="number",
+                min=1,
+                width="6rem",
+            ),
+        ),
+        labeled(
+            "Valor unitário (R$)",
+            rx.input(
+                value=WorkshopState.item_valor_unitario,
+                on_change=WorkshopState.set_item_valor_unitario,
+                placeholder="0,00",
+                width="9rem",
+            ),
+        ),
+        width="100%",
+        align="end",
+    )
+
+
+def item_form() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+            rx.text("Adicionar item", font_weight="700"),
+            rx.spacer(),
+            rx.segmented_control.root(
+                rx.segmented_control.item("Peça", value="PECA"),
+                rx.segmented_control.item("Serviço", value="SERVICO"),
+                value=WorkshopState.item_tipo,
+                on_change=WorkshopState.set_item_tipo,
+                size="1",
+            ),
+            width="100%",
+            align="center",
+        ),
+        error_callout(WorkshopState.catalogo_error),
+        rx.cond(WorkshopState.item_tipo == "PECA", peca_fields(), servico_fields()),
+        error_callout(WorkshopState.item_error),
+        rx.hstack(
+            rx.spacer(),
+            rx.button(
+                rx.cond(WorkshopState.is_saving_item, "Adicionando...", "Adicionar"),
+                on_click=WorkshopState.save_item,
+                disabled=WorkshopState.is_busy,
+                **PRIMARY_BUTTON,
+            ),
+            width="100%",
+        ),
+        spacing="3",
+        width="100%",
+        padding="1rem",
+        border=f"1px solid {COLORS['border']}",
+        border_radius="8px",
     )
 
 
@@ -303,26 +570,14 @@ def detail_modal() -> rx.Component:
             rx.foreach(WorkshopState.detalhe_historico, timeline_row),
         ),
         section(
-            "Itens",
+            "Peças e serviços",
+            custos_resumo(),
+            itens_table(),
+            remove_confirm(),
             rx.cond(
-                WorkshopState.detalhe_itens.length() > 0,
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Código"),
-                            rx.table.column_header_cell("Produto"),
-                            rx.table.column_header_cell("Qtd.", text_align="right"),
-                            rx.table.column_header_cell("Total", text_align="right"),
-                        ),
-                    ),
-                    rx.table.body(rx.foreach(WorkshopState.detalhe_itens, item_row)),
-                    width="100%",
-                ),
-                rx.text(
-                    "Nenhum item registrado. A inclusão de peças chega na próxima etapa.",
-                    size="2",
-                    color=COLORS["muted"],
-                ),
+                WorkshopState.can_edit_items,
+                item_form(),
+                error_callout(WorkshopState.item_error),
             ),
         ),
         section(
