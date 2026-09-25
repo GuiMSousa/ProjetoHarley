@@ -9,7 +9,7 @@ query "fornecedores/{fornecedores_id}" verb=GET {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "ALL"}
+      input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
       db.get fornecedores {
       field_name = "id"

@@ -65,11 +65,12 @@ class ProdutoCreate(BaseModel):
 
 
 class ProdutoUpdate(BaseModel):
+    """Stock balance is changed only by stock movements, never by edition."""
+
     codigo: str | None = Field(default=None, min_length=1, pattern=r"^[A-Za-z0-9]+$")
     nome_produto: str | None = Field(default=None, min_length=1)
     descricao: str | None = None
     categoria: str | None = Field(default=None, min_length=1)
-    estoque_qtd: int | None = Field(default=None, ge=0)
     preco_venda: Decimal | None = Field(default=None, gt=0)
     ativo: bool | None = None
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import reflex as rx
 
-from Projeto_HarleyStore.cadastros_state import CadastrosState
-from Projeto_HarleyStore.components import app_shell
+from Projeto_HarleyStore.cadastros_state import SECTION_ROUTES, CadastrosState
+from Projeto_HarleyStore.components import guarded_page, modal_panel
 from Projeto_HarleyStore.styles.theme import COLORS, PANEL, PRIMARY_BUTTON
 
 
@@ -75,7 +75,15 @@ def cadastro_form() -> rx.Component:
                     field("Descrição", "descricao"),
                     field("Categoria", "categoria"),
                     field("Preço de venda", "preco_venda"),
-                    field("Saldo de estoque", "estoque_qtd"),
+                    rx.cond(
+                        CadastrosState.editing_id == "",
+                        field("Saldo inicial de estoque", "estoque_qtd"),
+                        rx.text(
+                            "O saldo de estoque é alterado somente por entradas de mercadoria.",
+                            size="2",
+                            color=COLORS["muted"],
+                        ),
+                    ),
                     align="stretch",
                     spacing="3",
                 ),
@@ -103,54 +111,34 @@ def cadastro_form() -> rx.Component:
 
 
 def cadastro_modal() -> rx.Component:
-    return rx.box(
-        rx.box(
-            rx.vstack(
-                rx.hstack(
-                    rx.heading("Cadastro", size="5"),
-                    rx.spacer(),
-                    rx.button("Fechar", on_click=CadastrosState.close_form, variant="ghost"),
-                    width="100%",
-                ),
-                rx.cond(
-                    CadastrosState.form_error != "",
-                    rx.callout(
-                        CadastrosState.form_error,
-                        icon="triangle_alert",
-                        color_scheme="red",
-                        width="100%",
-                    ),
-                ),
-                cadastro_form(),
-                rx.hstack(
-                    rx.spacer(),
-                    rx.button("Cancelar", on_click=CadastrosState.close_form, variant="outline"),
-                    rx.button(
-                        rx.cond(CadastrosState.is_saving, "Salvando...", "Salvar"),
-                        on_click=CadastrosState.save_form,
-                        disabled=CadastrosState.is_busy,
-                        **PRIMARY_BUTTON,
-                    ),
-                    width="100%",
-                ),
-                align="stretch",
-                spacing="4",
-                width="min(100%, 34rem)",
-                max_height="90vh",
-                overflow_y="auto",
-                padding="1.5rem",
-                **PANEL,
-            ),
-            position="relative",
+    return modal_panel(
+        rx.hstack(
+            rx.heading("Cadastro", size="5"),
+            rx.spacer(),
+            rx.button("Fechar", on_click=CadastrosState.close_form, variant="ghost"),
+            width="100%",
         ),
-        position="fixed",
-        inset="0",
-        z_index="20",
-        display="flex",
-        align_items="center",
-        justify_content="center",
-        padding="1rem",
-        background="rgba(0, 0, 0, 0.78)",
+        rx.cond(
+            CadastrosState.form_error != "",
+            rx.callout(
+                CadastrosState.form_error,
+                icon="triangle_alert",
+                color_scheme="red",
+                width="100%",
+            ),
+        ),
+        cadastro_form(),
+        rx.hstack(
+            rx.spacer(),
+            rx.button("Cancelar", on_click=CadastrosState.close_form, variant="outline"),
+            rx.button(
+                rx.cond(CadastrosState.is_saving, "Salvando...", "Salvar"),
+                on_click=CadastrosState.save_form,
+                disabled=CadastrosState.is_busy,
+                **PRIMARY_BUTTON,
+            ),
+            width="100%",
+        ),
     )
 
 
@@ -195,7 +183,7 @@ def cadastro_row(row: rx.Var, section: str) -> rx.Component:
 
 def cadastro_page(section: str) -> rx.Component:
     title, description = SECTIONS[section]
-    return app_shell(
+    return guarded_page(
         rx.vstack(
             rx.hstack(
                 rx.vstack(
@@ -237,6 +225,15 @@ def cadastro_page(section: str) -> rx.Component:
                 ),
                 width="100%",
             ),
+            rx.cond(
+                CadastrosState.list_error != "",
+                rx.callout(
+                    CadastrosState.list_error,
+                    icon="triangle_alert",
+                    color_scheme="red",
+                    width="100%",
+                ),
+            ),
             rx.box(
                 rx.cond(
                     CadastrosState.is_loading_list,
@@ -268,5 +265,6 @@ def cadastro_page(section: str) -> rx.Component:
             spacing="5",
             padding="2rem",
             width="100%",
-        )
+        ),
+        SECTION_ROUTES[section],
     )

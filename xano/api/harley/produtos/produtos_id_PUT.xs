@@ -22,7 +22,6 @@ query "produtos/{produtos_id}" verb=PUT {
         nome_produto: $input.nome_produto
         descricao   : $input.descricao
         categoria   : $input.categoria
-        estoque_qtd : $input.estoque_qtd
         preco_venda : $input.preco_venda
       }
     } as $model

@@ -26,10 +26,32 @@ from Projeto_HarleyStore.services.cadastros import (
     ProdutoCreate,
     ProdutoUpdate,
 )
+from Projeto_HarleyStore.services.entradas import (
+    EntradaMercadoriaCreate,
+    EntradaMercadoriaDetalhe,
+    EntradaMercadoriaResumo,
+)
 from Projeto_HarleyStore.xano_config import xano_api_base_url
 
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
+
+MAX_VALIDATION_MESSAGE_LENGTH = 200
+
+
+def validation_message(response: httpx.Response) -> str | None:
+    """Return Xano's business validation message when it is short plain text."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    message = payload.get("message") if isinstance(payload, dict) else None
+    if not isinstance(message, str):
+        return None
+    message = message.strip()
+    if not message or len(message) > MAX_VALIDATION_MESSAGE_LENGTH:
+        return None
+    return message
 
 
 class XanoError(RuntimeError):
@@ -153,9 +175,9 @@ class XanoClient:
                 "The authenticated user is not allowed to perform this action.",
                 status_code=response.status_code,
             )
-        if response.status_code == 422:
+        if response.status_code in {400, 422}:
             raise XanoValidationError(
-                "Xano rejected the request data.",
+                validation_message(response) or "Xano rejected the request data.",
                 status_code=response.status_code,
             )
         if response.is_error:
@@ -371,3 +393,20 @@ class XanoClient:
 
     def deactivate_funcionario(self, funcionario_id: int) -> Funcionario:
         return self._deactivate_resource(f"funcionarios/{funcionario_id}", Funcionario)
+
+    def list_entradas(self) -> list[EntradaMercadoriaResumo]:
+        return self._list_resource("entrada_mercadoria", EntradaMercadoriaResumo)
+
+    def get_entrada(self, entrada_id: int) -> EntradaMercadoriaDetalhe:
+        return self.get(
+            f"entrada_mercadoria/{entrada_id}",
+            response_model=EntradaMercadoriaDetalhe,
+        )
+
+    def registrar_entrada(
+        self, entrada: EntradaMercadoriaCreate
+    ) -> EntradaMercadoriaDetalhe:
+        """Register a goods receipt; Xano updates stock atomically."""
+        return self._create_resource(
+            "entrada_mercadoria", entrada, EntradaMercadoriaDetalhe
+        )

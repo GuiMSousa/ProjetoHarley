@@ -5,7 +5,9 @@ import reflex as rx
 from Projeto_HarleyStore.auth import AuthState
 from Projeto_HarleyStore.cadastros_pages import cadastro_page
 from Projeto_HarleyStore.cadastros_state import CadastrosState
-from Projeto_HarleyStore.components import app_shell, login_page
+from Projeto_HarleyStore.components import app_shell, guarded_page, login_page
+from Projeto_HarleyStore.entradas_pages import entradas_page
+from Projeto_HarleyStore.entradas_state import ENTRADAS_ROUTE, EntradasState
 
 
 def dashboard() -> rx.Component:
@@ -32,35 +34,8 @@ def login() -> rx.Component:
     return login_page()
 
 
-def access_denied_page() -> rx.Component:
-    return rx.center(
-        rx.vstack(
-            rx.heading("Acesso negado", size="7"),
-            rx.callout(
-                "Seu perfil não possui permissão para acessar esta área.",
-                icon="lock",
-                color_scheme="red",
-            ),
-            rx.link("Voltar para a visão geral", href="/"),
-            align="center",
-            spacing="4",
-        ),
-        min_height="70vh",
-        padding="2rem",
-    )
-
-
 def protected_page(title: str, route: str) -> rx.Component:
-    allowed = AuthState.can_manage if route == "/admin" else AuthState.can_workshop
-    return rx.cond(
-        AuthState.is_authenticated,
-        rx.cond(
-            allowed,
-            app_shell(rx.heading(title, size="8", padding="2rem")),
-            app_shell(access_denied_page()),
-        ),
-        login_page(),
-    )
+    return guarded_page(rx.heading(title, size="8", padding="2rem"), route)
 
 
 app = rx.App()
@@ -79,25 +54,30 @@ app.add_page(
 app.add_page(
     lambda: cadastro_page("clientes"),
     route="/cadastros/clientes",
-    on_load=CadastrosState.load_clientes,
+    on_load=[AuthState.restore_session, CadastrosState.load_clientes],
 )
 app.add_page(
     lambda: cadastro_page("motos_clientes"),
     route="/cadastros/motos-clientes",
-    on_load=CadastrosState.load_motos_clientes,
+    on_load=[AuthState.restore_session, CadastrosState.load_motos_clientes],
 )
 app.add_page(
     lambda: cadastro_page("produtos"),
     route="/cadastros/produtos",
-    on_load=CadastrosState.load_produtos,
+    on_load=[AuthState.restore_session, CadastrosState.load_produtos],
 )
 app.add_page(
     lambda: cadastro_page("fornecedores"),
     route="/cadastros/fornecedores",
-    on_load=CadastrosState.load_fornecedores,
+    on_load=[AuthState.restore_session, CadastrosState.load_fornecedores],
 )
 app.add_page(
     lambda: cadastro_page("funcionarios"),
     route="/cadastros/funcionarios",
-    on_load=CadastrosState.load_funcionarios,
+    on_load=[AuthState.restore_session, CadastrosState.load_funcionarios],
+)
+app.add_page(
+    entradas_page,
+    route=ENTRADAS_ROUTE,
+    on_load=[AuthState.restore_session, EntradasState.load_entradas],
 )

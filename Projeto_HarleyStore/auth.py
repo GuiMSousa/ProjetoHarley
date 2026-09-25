@@ -16,13 +16,24 @@ from Projeto_HarleyStore.services.xano_client import (
 from Projeto_HarleyStore.xano_config import xano_auth_cookie_secure
 
 
+ALL_ROLES = frozenset({"GERENTE", "VENDEDOR", "MECANICO"})
+
+# Single source of the frontend route matrix; Xano remains the final authority.
+ROUTE_ROLES: dict[str, frozenset[str]] = {
+    "/admin": frozenset({"GERENTE"}),
+    "/workshop": frozenset({"GERENTE", "MECANICO"}),
+    "/cadastros/clientes": ALL_ROLES,
+    "/cadastros/motos-clientes": ALL_ROLES,
+    "/cadastros/produtos": ALL_ROLES,
+    "/cadastros/fornecedores": frozenset({"GERENTE"}),
+    "/cadastros/funcionarios": frozenset({"GERENTE"}),
+    "/estoque/entradas": ALL_ROLES,
+}
+
+
 def role_allows_route(role: str, route: str) -> bool:
     """Return whether a domain employee role may enter a protected route."""
-    allowed_roles = {
-        "/admin": {"GERENTE"},
-        "/workshop": {"GERENTE", "MECANICO"},
-    }
-    return role in allowed_roles.get(route, set())
+    return role in ROUTE_ROLES.get(route, frozenset())
 
 
 class AuthState(rx.State):
@@ -52,6 +63,16 @@ class AuthState(rx.State):
     @rx.var
     def can_workshop(self) -> bool:
         return self.employee_role in {"GERENTE", "MECANICO"}
+
+    @rx.var
+    def allowed_routes(self) -> list[str]:
+        if not self.is_authenticated:
+            return []
+        return [
+            route
+            for route in ROUTE_ROLES
+            if role_allows_route(self.employee_role, route)
+        ]
 
     @rx.event
     def set_email(self, value: str) -> None:
@@ -142,8 +163,10 @@ class AuthState(rx.State):
             self.is_loading = False
 
     @rx.event
-    def load_user(self) -> None:
-        if not self._load_user() and not self.auth_token:
+    def load_user(self):
+        if self._load_user():
+            return None
+        if not self.auth_token:
             return rx.redirect("/login")
         return rx.toast(
             self.error_message,

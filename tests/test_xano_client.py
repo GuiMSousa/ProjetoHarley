@@ -52,7 +52,7 @@ class XanoClientTests(unittest.TestCase):
         error_types = {
             401: XanoAuthenticationError,
             403: XanoPermissionError,
-            422: XanoValidationError,
+            500: XanoError,
         }
         for status_code, error_type in error_types.items():
             with self.subTest(status_code=status_code):
@@ -64,6 +64,37 @@ class XanoClientTests(unittest.TestCase):
                         client.get("motos")
                     self.assertNotIn("secret", str(context.exception))
                     self.assertNotIn("token", str(context.exception))
+
+    def test_validation_errors_expose_only_short_business_message(self):
+        for status_code in (400, 422):
+            with self.subTest(status_code=status_code):
+                def handler(request, status_code=status_code):
+                    return httpx.Response(
+                        status_code,
+                        json={"code": "ERROR_CODE_INPUT_ERROR", "message": "Fornecedor inativo."},
+                    )
+
+                with self.make_client(handler) as client:
+                    with self.assertRaises(XanoValidationError) as context:
+                        client.get("motos")
+                self.assertEqual(str(context.exception), "Fornecedor inativo.")
+                self.assertEqual(context.exception.status_code, status_code)
+
+    def test_validation_error_without_readable_message_stays_generic(self):
+        payloads = [
+            {"message": "x" * 201},
+            {"message": {"nested": "value"}},
+            ["not", "an", "object"],
+        ]
+        for payload in payloads:
+            with self.subTest(payload=str(payload)[:20]):
+                def handler(request, payload=payload):
+                    return httpx.Response(400, json=payload)
+
+                with self.make_client(handler) as client:
+                    with self.assertRaises(XanoValidationError) as context:
+                        client.get("motos")
+                self.assertEqual(str(context.exception), "Xano rejected the request data.")
 
     def test_transport_error_is_typed_without_secret(self):
         def handler(request):

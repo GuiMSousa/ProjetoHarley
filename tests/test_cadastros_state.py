@@ -1,6 +1,11 @@
 import unittest
+from unittest.mock import patch
+
+from reflex.state import State
 
 from Projeto_HarleyStore.cadastros_state import CadastrosState, operation_is_blocked
+from Projeto_HarleyStore.services.cadastros import ProdutoCreate, ProdutoUpdate
+from Projeto_HarleyStore.services.xano_client import XanoError
 
 
 class CadastrosStateTests(unittest.TestCase):
@@ -38,6 +43,68 @@ class CadastrosStateTests(unittest.TestCase):
         }:
             with self.subTest(section=section):
                 self.assertFalse(CadastrosState._can_write(state, section))
+
+    def make_real_state(self, role="GERENTE", authenticated=True):
+        root = State(_reflex_internal_init=True)
+        state = root.get_substate(CadastrosState.get_full_name().split("."))
+        state.auth_token = "token"
+        state.is_authenticated = authenticated
+        state.employee_role = role
+        return state
+
+    def test_list_load_waits_for_session_and_allowed_role(self):
+        cases = [
+            ("GERENTE", False, "load_clientes"),
+            ("VENDEDOR", True, "load_fornecedores"),
+            ("MECANICO", True, "load_funcionarios"),
+        ]
+        for role, authenticated, handler in cases:
+            with self.subTest(role=role, handler=handler):
+                state = self.make_real_state(role, authenticated)
+                with patch("Projeto_HarleyStore.cadastros_state.XanoClient") as client_class:
+                    getattr(CadastrosState, handler).fn(state)
+                client_class.assert_not_called()
+                self.assertFalse(state.is_loading_list)
+
+    def test_list_load_error_is_visible_and_clears_flag(self):
+        state = self.make_real_state("VENDEDOR")
+        with patch("Projeto_HarleyStore.cadastros_state.XanoClient") as client_class:
+            client_class.return_value.__enter__.return_value.list_produtos.side_effect = (
+                XanoError("Unable to reach the Xano API.")
+            )
+            CadastrosState.load_produtos.fn(state)
+        self.assertEqual(state.list_error, "Unable to reach the Xano API.")
+        self.assertFalse(state.is_loading_list)
+
+    def test_product_edit_payload_never_carries_stock_balance(self):
+        state = self.make_real_state("GERENTE")
+        state.active_section = "produtos"
+        state.editing_id = "4"
+        state.form_data = {
+            "codigo": "SKU4",
+            "nome_produto": "Filtro",
+            "categoria": "Motor",
+            "preco_venda": "45.50",
+            "estoque_qtd": "999",
+        }
+        payload, model = state._payload()
+        self.assertIs(model, ProdutoUpdate)
+        self.assertNotIn("estoque_qtd", payload.model_dump(exclude_unset=True))
+
+    def test_product_create_payload_keeps_initial_stock(self):
+        state = self.make_real_state("GERENTE")
+        state.active_section = "produtos"
+        state.editing_id = ""
+        state.form_data = {
+            "codigo": "SKU4",
+            "nome_produto": "Filtro",
+            "categoria": "Motor",
+            "preco_venda": "45.50",
+            "estoque_qtd": "3",
+        }
+        payload, model = state._payload()
+        self.assertIs(model, ProdutoCreate)
+        self.assertEqual(payload.estoque_qtd, 3)
 
     def test_loading_and_mutation_flags_block_reentrant_operations(self):
         self.assertTrue(operation_is_blocked(True, False, False))

@@ -9,7 +9,7 @@ query "itens_compra_estoque/{itens_compra_estoque_id}" verb=GET {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+      input = {user_id: $auth.id, required_role: "ALL"}
     } as $role_check
       db.get itens_compra_estoque {
       field_name = "id"

@@ -1,4 +1,4 @@
-// Delete entrada_mercadoria record
+// Bloqueado na Change 5: a movimentação de estoque ocorre somente em POST entrada_mercadoria.
 query "entrada_mercadoria/{entrada_mercadoria_id}" verb=DELETE {
   api_group = "HARLEY"
   auth = "user"
@@ -11,9 +11,10 @@ query "entrada_mercadoria/{entrada_mercadoria_id}" verb=DELETE {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
-      db.del entrada_mercadoria {
-      field_name = "id"
-      field_value = $input.entrada_mercadoria_id
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Entradas de mercadoria são imutáveis. Registre uma nova entrada."
     }
   }
 

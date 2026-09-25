@@ -110,6 +110,49 @@ class AuthenticationTests(unittest.TestCase):
         self.assertTrue(role_allows_route("MECANICO", "/workshop"))
         self.assertFalse(role_allows_route("VENDEDOR", "/workshop"))
 
+    def test_route_matrix_covers_registrations_and_stock(self):
+        expected = {
+            "/cadastros/clientes": {"GERENTE", "VENDEDOR", "MECANICO"},
+            "/cadastros/motos-clientes": {"GERENTE", "VENDEDOR", "MECANICO"},
+            "/cadastros/produtos": {"GERENTE", "VENDEDOR", "MECANICO"},
+            "/cadastros/fornecedores": {"GERENTE"},
+            "/cadastros/funcionarios": {"GERENTE"},
+            "/estoque/entradas": {"GERENTE", "VENDEDOR", "MECANICO"},
+        }
+        for route, roles in expected.items():
+            for role in ("GERENTE", "VENDEDOR", "MECANICO"):
+                with self.subTest(route=route, role=role):
+                    self.assertEqual(role_allows_route(role, route), role in roles)
+
+    def test_unknown_route_or_role_is_denied(self):
+        self.assertFalse(role_allows_route("GERENTE", "/desconhecida"))
+        self.assertFalse(role_allows_route("", "/cadastros/clientes"))
+
+    def test_allowed_routes_follow_session_and_role(self):
+        vendor = type(
+            "Fixture", (), {"is_authenticated": True, "employee_role": "VENDEDOR"}
+        )()
+        routes = AuthState.allowed_routes.fget(vendor)
+        self.assertIn("/cadastros/produtos", routes)
+        self.assertIn("/estoque/entradas", routes)
+        self.assertNotIn("/cadastros/fornecedores", routes)
+        anonymous = type(
+            "Fixture", (), {"is_authenticated": False, "employee_role": "GERENTE"}
+        )()
+        self.assertEqual(AuthState.allowed_routes.fget(anonymous), [])
+
+    def test_successful_session_restore_emits_no_toast(self):
+        state = self.make_state()
+        client = MagicMock()
+        client.current_user.return_value = self.make_user_response()
+        with patch("Projeto_HarleyStore.auth.XanoClient") as client_class, patch.object(
+            AuthState, "_mark_dirty", lambda instance: None
+        ):
+            client_class.return_value.__enter__.return_value = client
+            result = AuthState.load_user.fn(state)
+        self.assertIsNone(result)
+        self.assertTrue(state.is_authenticated)
+
 
 if __name__ == "__main__":
     unittest.main()

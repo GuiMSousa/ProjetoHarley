@@ -41,17 +41,25 @@ def login_page() -> rx.Component:
     )
 
 
+def nav_link(label: str, route: str) -> rx.Component:
+    return rx.cond(
+        AuthState.allowed_routes.contains(route),
+        rx.link(label, href=route, color=COLORS["text"]),
+    )
+
+
 def sidebar() -> rx.Component:
     return rx.vstack(
         rx.text("HD / OPERATIONS", color=COLORS["orange"], font_weight="800"),
         rx.link("Visão geral", href="/", color=COLORS["text"]),
-        rx.cond(AuthState.is_authenticated, rx.link("Clientes", href="/cadastros/clientes", color=COLORS["text"])),
-        rx.cond(AuthState.is_authenticated, rx.link("Motos de clientes", href="/cadastros/motos-clientes", color=COLORS["text"])),
-        rx.cond(AuthState.can_workshop, rx.link("Produtos e peças", href="/cadastros/produtos", color=COLORS["text"])),
-        rx.cond(AuthState.can_manage, rx.link("Administração", href="/admin", color=COLORS["text"])),
-        rx.cond(AuthState.can_manage, rx.link("Fornecedores", href="/cadastros/fornecedores", color=COLORS["text"])),
-        rx.cond(AuthState.can_manage, rx.link("Funcionários", href="/cadastros/funcionarios", color=COLORS["text"])),
-        rx.cond(AuthState.can_workshop, rx.link("Oficina", href="/workshop", color=COLORS["text"])),
+        nav_link("Clientes", "/cadastros/clientes"),
+        nav_link("Motos de clientes", "/cadastros/motos-clientes"),
+        nav_link("Produtos e peças", "/cadastros/produtos"),
+        nav_link("Entradas de mercadoria", "/estoque/entradas"),
+        nav_link("Administração", "/admin"),
+        nav_link("Fornecedores", "/cadastros/fornecedores"),
+        nav_link("Funcionários", "/cadastros/funcionarios"),
+        nav_link("Oficina", "/workshop"),
         spacing="4",
         align="stretch",
         padding="1.5rem",
@@ -91,4 +99,62 @@ def app_shell(content: rx.Component) -> rx.Component:
         width="100%",
         min_height="100vh",
         background=COLORS["black"],
+    )
+
+
+def access_denied_page() -> rx.Component:
+    return rx.center(
+        rx.vstack(
+            rx.heading("Acesso negado", size="7"),
+            rx.callout(
+                "Seu perfil não possui permissão para acessar esta área.",
+                icon="lock",
+                color_scheme="red",
+            ),
+            rx.link("Voltar para a visão geral", href="/"),
+            align="center",
+            spacing="4",
+        ),
+        min_height="70vh",
+        padding="2rem",
+    )
+
+
+def guarded_page(content: rx.Component, route: str) -> rx.Component:
+    """Render content only for an authenticated role allowed on the route."""
+    return rx.cond(
+        AuthState.is_authenticated,
+        rx.cond(
+            AuthState.allowed_routes.contains(route),
+            app_shell(content),
+            app_shell(access_denied_page()),
+        ),
+        login_page(),
+    )
+
+
+def modal_panel(*children: rx.Component, width: str = "min(100%, 34rem)") -> rx.Component:
+    """Centered overlay panel shared by forms and detail views."""
+    return rx.box(
+        rx.box(
+            rx.vstack(
+                *children,
+                align="stretch",
+                spacing="4",
+                width=width,
+                max_height="90vh",
+                overflow_y="auto",
+                padding="1.5rem",
+                **PANEL,
+            ),
+            position="relative",
+        ),
+        position="fixed",
+        inset="0",
+        z_index="20",
+        display="flex",
+        align_items="center",
+        justify_content="center",
+        padding="1rem",
+        background="rgba(0, 0, 0, 0.78)",
     )

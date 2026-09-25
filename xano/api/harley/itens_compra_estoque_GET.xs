@@ -8,7 +8,7 @@ query itens_compra_estoque verb=GET {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+      input = {user_id: $auth.id, required_role: "ALL"}
     } as $role_check
       db.query itens_compra_estoque {
       return = {type: "list"}

@@ -17,6 +17,7 @@ Representa os itens físicos comercializados pela concessionária ou utilizados 
 - **Atributos:** Identificador (`id_produto`), Código (`codigo`), Nome (`nome_produto`), Descrição (`descricao`), Categoria (`categoria`), Quantidade em Estoque (`estoque_qtd`), Preço de Venda (`preco_venda`), Ativo (`ativo`).
 - **Regras:** O saldo em estoque deve ser maior ou igual a zero (`estoque_qtd >= 0`) e o preço de venda deve ser estritamente positivo (`preco_venda > 0`).
 - **Regras:** `codigo` deve ser alfanumérico e único; desativação usa soft delete.
+- **Saldo:** `estoque_qtd` é informado apenas na criação (saldo inicial de implantação). Depois disso, só muda por movimentações de estoque; `PUT`/`PATCH produtos/{id}` ignoram o campo.
 
 ### Funcionarios
 Representa os colaboradores da concessionária/oficina.
@@ -44,11 +45,16 @@ Representa as motocicletas mantidas no estoque da loja e destinadas à venda. Es
 
 ### Entrada_Mercadoria & Itens_Compra_Estoque
 Representa a nota/registro de compra efetuada junto a um fornecedor para abastecimento de estoque.
-- **Atributos Entrada:** Identificador (`id_entrada`), Fornecedor (`id_fornecedor`), Data da Entrada (`data_entrada`), Valor Total (`valor_total`).
-- **Atributos Itens da Compra:** Identificador (`id_item_compra`), Entrada (`id_entrada`), Produto (`id_produto`), Quantidade (`quantidade`), Valor Unitário (`valor_unitario`).
-- **Relacionamentos:** Uma entrada possui um ou mais **Itens de Compra** e pertence a um **Fornecedor**.
+- **Atributos Entrada:** Identificador (`id_entrada`), Fornecedor (`id_fornecedor`), Número do Documento (`numero_documento`), Funcionário Responsável (`id_funcionario`), Data da Entrada (`data_entrada`), Valor Total (`valor_total`).
+- **Atributos Itens da Compra:** Identificador (`id_item_compra`), Entrada (`id_entrada`), Produto (`id_produto`), Quantidade (`quantidade`), Valor Unitário (`valor_unitario`, exibido como "preço de custo").
+- **Relacionamentos:** Uma entrada possui um ou mais **Itens de Compra**, pertence a um **Fornecedor** e é registrada por um **Funcionário**.
 - **Regras:** A quantidade deve ser estritamente positiva (`quantidade > 0`) e o valor unitário deve ser estritamente positivo (`valor_unitario > 0`).
-- **Regras financeiras:** Totais e valores unitários persistidos devem ser estritamente positivos (`> 0`); entradas sem valor positivo são inválidas.
+- **Regras:** O fornecedor e todos os produtos devem existir e estar ativos; um mesmo produto não pode se repetir na entrada; `(id_fornecedor, numero_documento)` é único.
+- **Regras financeiras:** `valor_total = Σ (quantidade × valor_unitario)`, calculado pelo Xano; valores enviados pelo cliente são ignorados.
+- **Atomicidade:** cabeçalho, itens e incremento de `produtos.estoque_qtd` são gravados em uma única `db.transaction` por `POST entrada_mercadoria`. Qualquer rejeição desfaz a operação inteira.
+- **Autoria:** `id_funcionario` e `data_entrada` são definidos pelo servidor a partir do usuário autenticado.
+- **Ciclo de vida:** Entradas e itens são imutáveis após o registro; os endpoints de edição e exclusão respondem `403`. Estornos serão tratados em Change futura com movimentação inversa.
+- **Concorrência:** o incremento lê e grava o saldo dentro da transação. Entradas simultâneas do mesmo produto podem, em teoria, sobrescrever uma à outra; o risco foi aceito dado o volume de operações.
 
 ### Ordens_Servico & Itens_Ordem_Servico
 Representa o atendimento técnico prestado na oficina mecânica para a moto de um cliente.

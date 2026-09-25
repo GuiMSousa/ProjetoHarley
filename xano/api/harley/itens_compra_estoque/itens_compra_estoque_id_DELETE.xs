@@ -1,4 +1,4 @@
-// Delete itens_compra_estoque record
+// Bloqueado na Change 5: a movimentação de estoque ocorre somente em POST entrada_mercadoria.
 query "itens_compra_estoque/{itens_compra_estoque_id}" verb=DELETE {
   api_group = "HARLEY"
   auth = "user"
@@ -11,9 +11,10 @@ query "itens_compra_estoque/{itens_compra_estoque_id}" verb=DELETE {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
-      db.del itens_compra_estoque {
-      field_name = "id"
-      field_value = $input.itens_compra_estoque_id
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Itens de compra são imutáveis após o registro da entrada."
     }
   }
 

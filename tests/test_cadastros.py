@@ -12,6 +12,7 @@ from Projeto_HarleyStore.services.cadastros import (
     FuncionarioCreate,
     MotoClienteCreate,
     ProdutoCreate,
+    ProdutoUpdate,
 )
 from Projeto_HarleyStore.services.xano_client import XanoClient
 
@@ -97,6 +98,11 @@ class CadastrosTests(unittest.TestCase):
         self.assertEqual(requests[0][0:2], ("GET", "/api:test/clientes"))
         self.assertEqual(requests[1][0:2], ("PATCH", "/api:test/clientes/1"))
         self.assertIn(b'"ativo":false', requests[1][2])
+
+    def test_product_update_does_not_accept_stock_balance(self):
+        update = ProdutoUpdate(nome_produto="Filtro", estoque_qtd=999)
+        self.assertNotIn("estoque_qtd", update.model_dump(exclude_unset=True))
+        self.assertNotIn("estoque_qtd", ProdutoUpdate.model_fields)
 
     def test_product_create_serializes_decimal_payload(self):
         captured = {}

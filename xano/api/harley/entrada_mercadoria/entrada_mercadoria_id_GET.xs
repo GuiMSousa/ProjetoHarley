@@ -1,4 +1,4 @@
-// Get entrada_mercadoria record
+// Get entrada_mercadoria record with its items
 query "entrada_mercadoria/{entrada_mercadoria_id}" verb=GET {
   api_group = "HARLEY"
   auth = "user"
@@ -9,17 +9,12 @@ query "entrada_mercadoria/{entrada_mercadoria_id}" verb=GET {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+      input = {user_id: $auth.id, required_role: "ALL"}
     } as $role_check
-      db.get entrada_mercadoria {
-      field_name = "id"
-      field_value = $input.entrada_mercadoria_id
+
+    function.run "Estoque/detalhe_entrada" {
+      input = {entrada_id: $input.entrada_mercadoria_id}
     } as $model
-  
-    precondition ($model != null) {
-      error_type = "notfound"
-      error = "Not Found"
-    }
   }
 
   response = $model

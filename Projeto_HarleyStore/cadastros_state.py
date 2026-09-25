@@ -8,7 +8,14 @@ from typing import Any
 import reflex as rx
 from pydantic import ValidationError
 
-from Projeto_HarleyStore.auth import AuthState
+from Projeto_HarleyStore.auth import AuthState, role_allows_route
+from Projeto_HarleyStore.listing import (
+    filter_rows,
+    option_id,
+    option_label,
+    page_count,
+    paginate,
+)
 from Projeto_HarleyStore.services.cadastros import (
     ClienteCreate,
     ClienteUpdate,
@@ -22,6 +29,15 @@ from Projeto_HarleyStore.services.cadastros import (
     ProdutoUpdate,
 )
 from Projeto_HarleyStore.services.xano_client import XanoClient, XanoError
+
+
+SECTION_ROUTES = {
+    "clientes": "/cadastros/clientes",
+    "motos_clientes": "/cadastros/motos-clientes",
+    "produtos": "/cadastros/produtos",
+    "fornecedores": "/cadastros/fornecedores",
+    "funcionarios": "/cadastros/funcionarios",
+}
 
 
 def operation_is_blocked(
@@ -44,6 +60,7 @@ class CadastrosState(AuthState):
     editing_id: str = ""
     form_error: str = ""
     form_data: dict[str, str] = {}
+    list_error: str = ""
     is_loading_list: bool = False
     is_saving: bool = False
     is_deactivating: bool = False
@@ -57,7 +74,7 @@ class CadastrosState(AuthState):
     @rx.var
     def client_options(self) -> list[str]:
         return [
-            f"{row['id']} - {row['primary']}"
+            option_label(row["id"], row["primary"])
             for row in self.clientes
             if row.get("ativo") == "Ativo"
         ]
@@ -68,42 +85,24 @@ class CadastrosState(AuthState):
             return self.employee_role in {"GERENTE", "VENDEDOR"}
         return self.employee_role == "GERENTE"
 
-    @rx.var
-    def visible_rows(self) -> list[dict[str, str]]:
-        rows = {
+    def _section_rows(self, section: str) -> list[dict[str, str]]:
+        return {
             "clientes": self.clientes,
             "motos_clientes": self.motos_clientes,
             "produtos": self.produtos,
             "fornecedores": self.fornecedores,
             "funcionarios": self.funcionarios,
-        }.get(self.active_section, [])
-        query = self.search_text.strip().lower()
-        if query:
-            rows = [
-                row
-                for row in rows
-                if query in " ".join(row.values()).lower()
-            ]
-        start = (self.current_page - 1) * self.page_size
-        return rows[start : start + self.page_size]
+        }.get(section, [])
+
+    @rx.var
+    def visible_rows(self) -> list[dict[str, str]]:
+        rows = filter_rows(self._section_rows(self.active_section), self.search_text)
+        return paginate(rows, self.current_page, self.page_size)
 
     @rx.var
     def total_pages(self) -> int:
-        rows = {
-            "clientes": self.clientes,
-            "motos_clientes": self.motos_clientes,
-            "produtos": self.produtos,
-            "fornecedores": self.fornecedores,
-            "funcionarios": self.funcionarios,
-        }.get(self.active_section, [])
-        query = self.search_text.strip().lower()
-        if query:
-            rows = [
-                row
-                for row in rows
-                if query in " ".join(row.values()).lower()
-            ]
-        return max(1, (len(rows) + self.page_size - 1) // self.page_size)
+        rows = filter_rows(self._section_rows(self.active_section), self.search_text)
+        return page_count(len(rows), self.page_size)
 
     @rx.event
     def set_section(self, section: str) -> None:
@@ -173,70 +172,42 @@ class CadastrosState(AuthState):
             elif section == "funcionarios":
                 self.funcionarios = self._rows(client.list_funcionarios(), "nome_funcionario", "tipo", "cargo")
 
-    @rx.event
-    def load_clientes(self) -> None:
+    def _load(self, section: str) -> None:
         if self.is_loading_list:
             return
-        self.set_section("clientes")
+        self.set_section(section)
+        self.list_error = ""
+        if not self.is_authenticated or not role_allows_route(
+            self.employee_role, SECTION_ROUTES[section]
+        ):
+            return
         self.is_loading_list = True
         try:
-            self._load_section("clientes")
+            self._load_section(section)
         except XanoError as error:
-            self.error_message = str(error)
+            self.list_error = str(error)
         finally:
             self.is_loading_list = False
+
+    @rx.event
+    def load_clientes(self) -> None:
+        self._load("clientes")
 
     @rx.event
     def load_motos_clientes(self) -> None:
-        if self.is_loading_list:
-            return
-        self.set_section("motos_clientes")
-        self.is_loading_list = True
-        try:
-            self._load_section("motos_clientes")
-        except XanoError as error:
-            self.error_message = str(error)
-        finally:
-            self.is_loading_list = False
+        self._load("motos_clientes")
 
     @rx.event
     def load_produtos(self) -> None:
-        if self.is_loading_list:
-            return
-        self.set_section("produtos")
-        self.is_loading_list = True
-        try:
-            self._load_section("produtos")
-        except XanoError as error:
-            self.error_message = str(error)
-        finally:
-            self.is_loading_list = False
+        self._load("produtos")
 
     @rx.event
     def load_fornecedores(self) -> None:
-        if self.is_loading_list:
-            return
-        self.set_section("fornecedores")
-        self.is_loading_list = True
-        try:
-            self._load_section("fornecedores")
-        except XanoError as error:
-            self.error_message = str(error)
-        finally:
-            self.is_loading_list = False
+        self._load("fornecedores")
 
     @rx.event
     def load_funcionarios(self) -> None:
-        if self.is_loading_list:
-            return
-        self.set_section("funcionarios")
-        self.is_loading_list = True
-        try:
-            self._load_section("funcionarios")
-        except XanoError as error:
-            self.error_message = str(error)
-        finally:
-            self.is_loading_list = False
+        self._load("funcionarios")
 
     def _new_form(self, section: str) -> None:
         self.set_section(section)
@@ -283,13 +254,7 @@ class CadastrosState(AuthState):
         self.set_section(section)
         self.editing_id = record_id
         self.form_error = ""
-        rows = {
-            "clientes": self.clientes,
-            "motos_clientes": self.motos_clientes,
-            "produtos": self.produtos,
-            "fornecedores": self.fornecedores,
-            "funcionarios": self.funcionarios,
-        }.get(section, [])
+        rows = self._section_rows(section)
         selected = next((row for row in rows if row.get("id") == record_id), {})
         self.form_data = {
             key: value
@@ -306,7 +271,7 @@ class CadastrosState(AuthState):
                     if row.get("id") == client_id
                 ),
             )
-            self.form_data["id_cliente"] = f"{client_id} - {client_name}"
+            self.form_data["id_cliente"] = option_label(client_id, client_name)
         self.form_open = True
 
     @rx.event
@@ -328,12 +293,15 @@ class CadastrosState(AuthState):
             return model(**data), model
         if self.active_section == "motos_clientes":
             payload = dict(data)
-            payload["id_cliente"] = int(payload["id_cliente"].split(" - ")[0])
+            payload["id_cliente"] = option_id(payload["id_cliente"])
             model = MotoClienteUpdate if self.editing_id else MotoClienteCreate
             return model(**payload), model
         if self.active_section == "produtos":
             payload = dict(data)
-            if "estoque_qtd" in payload:
+            if self.editing_id:
+                # Stock balance changes only through stock movements.
+                payload.pop("estoque_qtd", None)
+            elif "estoque_qtd" in payload:
                 payload["estoque_qtd"] = int(payload["estoque_qtd"])
             if "preco_venda" in payload:
                 payload["preco_venda"] = Decimal(payload["preco_venda"])
