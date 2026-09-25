@@ -48,4 +48,5 @@ function "Oficina/totais_os" {
   }
 
   response = $totais
+  guid = "si4Wb2ELhkVmI2WQnmjKgXiLYmU"
 }

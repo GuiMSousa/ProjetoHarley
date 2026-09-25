@@ -89,4 +89,5 @@ function "Estoque/movimentar_estoque" {
   }
 
   response = $movimento
+  guid = "oG9CcPIaJLCCQC8Vx_6JxnYGRSo"
 }

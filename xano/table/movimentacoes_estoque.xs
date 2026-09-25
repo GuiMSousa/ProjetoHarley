@@ -58,4 +58,5 @@ table movimentacoes_estoque {
       field: [{name: "created_at", op: "desc"}]
     }
   ]
+  guid = "-HIUfJ8l9JBMfE0fC7_-V7LnIVU"
 }

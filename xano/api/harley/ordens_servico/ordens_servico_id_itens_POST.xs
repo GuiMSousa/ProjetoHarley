@@ -225,4 +225,5 @@ query "ordens_servico/{ordens_servico_id}/itens" verb=POST {
   }
 
   response = $detalhe
+  guid = "x0DaBntl8Z4brnkhqROQdo1ptsk"
 }

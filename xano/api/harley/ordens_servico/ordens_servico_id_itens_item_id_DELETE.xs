@@ -137,4 +137,5 @@ query "ordens_servico/{ordens_servico_id}/itens/{item_id}" verb=DELETE {
   }
 
   response = $detalhe
+  guid = "hAnjCagPhKR8D5HdgYrdNm4Uo2g"
 }
