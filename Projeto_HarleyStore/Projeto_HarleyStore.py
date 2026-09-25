@@ -8,6 +8,8 @@ from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.components import app_shell, guarded_page, login_page
 from Projeto_HarleyStore.entradas_pages import entradas_page
 from Projeto_HarleyStore.entradas_state import ENTRADAS_ROUTE, EntradasState
+from Projeto_HarleyStore.workshop_pages import workshop_page
+from Projeto_HarleyStore.workshop_state import WORKSHOP_ROUTE, WorkshopState
 
 
 def dashboard() -> rx.Component:
@@ -47,9 +49,9 @@ app.add_page(
     on_load=AuthState.restore_session,
 )
 app.add_page(
-    lambda: protected_page("Oficina", "/workshop"),
-    route="/workshop",
-    on_load=AuthState.restore_session,
+    workshop_page,
+    route=WORKSHOP_ROUTE,
+    on_load=[AuthState.restore_session, WorkshopState.load_ordens],
 )
 app.add_page(
     lambda: cadastro_page("clientes"),

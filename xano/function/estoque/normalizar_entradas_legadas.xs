@@ -25,4 +25,5 @@ function "Estoque/normalizar_entradas_legadas" {
   }
 
   response = {normalizadas: $legadas|count}
+  guid = "u29UQsgDQkzH6PqdBKoRM70ha6M"
 }

@@ -22,7 +22,7 @@ ALL_ROLES = frozenset({"GERENTE", "VENDEDOR", "MECANICO"})
 # Single source of the frontend route matrix; Xano remains the final authority.
 ROUTE_ROLES: dict[str, frozenset[str]] = {
     "/admin": frozenset({"GERENTE"}),
-    "/workshop": frozenset({"GERENTE", "MECANICO"}),
+    "/workshop": ALL_ROLES,
     "/cadastros/clientes": ALL_ROLES,
     "/cadastros/motos-clientes": ALL_ROLES,
     "/cadastros/produtos": ALL_ROLES,
@@ -52,6 +52,7 @@ class AuthState(rx.State):
     user_name: str = ""
     employee_name: str = ""
     employee_role: str = ""
+    employee_id: int = 0
 
     @rx.var
     def display_name(self) -> str:
@@ -60,10 +61,6 @@ class AuthState(rx.State):
     @rx.var
     def can_manage(self) -> bool:
         return self.employee_role == "GERENTE"
-
-    @rx.var
-    def can_workshop(self) -> bool:
-        return self.employee_role in {"GERENTE", "MECANICO"}
 
     @rx.var
     def allowed_routes(self) -> list[str]:
@@ -97,6 +94,7 @@ class AuthState(rx.State):
         self.user_name = ""
         self.employee_name = ""
         self.employee_role = ""
+        self.employee_id = 0
         # Drop lists and forms loaded by the previous session in page states.
         for substate in self._session_root().substates.values():
             substate.reset()
@@ -131,6 +129,7 @@ class AuthState(rx.State):
                 return False
             self.user_name = response.user.name or ""
             self.employee_name = employee.nome_funcionario
+            self.employee_id = employee.id
             self.employee_role = employee.tipo
             self.is_authenticated = employee.tipo in {
                 "GERENTE",

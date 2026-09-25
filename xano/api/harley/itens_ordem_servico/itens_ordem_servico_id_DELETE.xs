@@ -1,4 +1,5 @@
-// Delete itens_ordem_servico record
+// Bloqueado na Change 6: OS mudam somente por abertura e transição de status;
+// itens de OS aguardam a Change de itens com baixa de estoque.
 query "itens_ordem_servico/{itens_ordem_servico_id}" verb=DELETE {
   api_group = "HARLEY"
   auth = "user"
@@ -9,11 +10,12 @@ query "itens_ordem_servico/{itens_ordem_servico_id}" verb=DELETE {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "GERENTE"}
+      input = {user_id: $auth.id, required_role: "MECANICO"}
     } as $role_check
-      db.del itens_ordem_servico {
-      field_name = "id"
-      field_value = $input.itens_ordem_servico_id
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Itens de OS estarão disponíveis na etapa de itens com baixa de estoque."
     }
   }
 

@@ -143,7 +143,8 @@ class AuthenticationTests(unittest.TestCase):
         self.assertFalse(role_allows_route("MECANICO", "/admin"))
         self.assertTrue(role_allows_route("GERENTE", "/workshop"))
         self.assertTrue(role_allows_route("MECANICO", "/workshop"))
-        self.assertFalse(role_allows_route("VENDEDOR", "/workshop"))
+        # Change 6: the salesperson reads the workshop but cannot operate orders.
+        self.assertTrue(role_allows_route("VENDEDOR", "/workshop"))
 
     def test_route_matrix_covers_registrations_and_stock(self):
         expected = {

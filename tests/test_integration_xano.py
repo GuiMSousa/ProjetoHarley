@@ -23,6 +23,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
+from Projeto_HarleyStore.services.ordens_servico import (
+    OrdemServicoCreate,
+    TransicaoStatusOS,
+)
 from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoClient,
@@ -164,6 +168,135 @@ class XanoLiveReadTests(XanoLiveTestCase):
             ):
                 with self.subTest(path=path), self.assertRaises(XanoPermissionError):
                     client.request(method, path, authenticated=False, base_url=auth_url)
+
+
+class XanoLiveServiceOrderReadTests(XanoLiveTestCase):
+    def test_every_profile_reads_the_workshop(self):
+        for role in ROLES:
+            with self.subTest(role=role), self.client_for(role) as client:
+                ordens = client.list_ordens_servico()
+                if ordens:
+                    client.get_ordem_servico(ordens[0].id)
+                client.list_ordens_servico(status="ABERTA")
+
+    def test_salesperson_cannot_operate_orders(self):
+        with self.client_for("VENDEDOR") as client:
+            with self.assertRaises(XanoPermissionError):
+                client.list_mecanicos()
+            with self.assertRaises(XanoPermissionError):
+                client.post(
+                    "ordens_servico",
+                    json={
+                        "id_moto_cliente": 1,
+                        "tipo_servico": "CORRETIVA",
+                        "descricao_problema": "Teste de permissão",
+                    },
+                )
+            with self.assertRaises(XanoPermissionError):
+                client.post(
+                    "ordens_servico/1/status",
+                    json={"status_atual": "ABERTA", "status_novo": "EM_ANDAMENTO"},
+                )
+
+    def test_generic_order_mutations_are_blocked(self):
+        with self.client_for("GERENTE") as client:
+            with self.assertRaises(XanoPermissionError):
+                client.patch("ordens_servico/1", json={"status": "CONCLUIDA"})
+            with self.assertRaises(XanoPermissionError):
+                client.delete("ordens_servico/1")
+            with self.assertRaises(XanoPermissionError):
+                client.post("itens_ordem_servico", json={})
+
+
+@unittest.skipUnless(ALLOW_WRITES, "XANO_TEST_ALLOW_WRITES desativado: cenários de escrita ignorados.")
+class XanoLiveServiceOrderWriteTests(XanoLiveTestCase):
+    def free_bike(self, client: XanoClient):
+        clientes_ativos = {cliente.id for cliente in client.list_clientes() if cliente.ativo}
+        em_aberto = {
+            ordem.id_moto_cliente
+            for status in ("ABERTA", "EM_ANDAMENTO")
+            for ordem in client.list_ordens_servico(status=status)
+        }
+        moto = next(
+            (
+                moto
+                for moto in client.list_motos_clientes()
+                if moto.ativo and moto.id_cliente in clientes_ativos and moto.id not in em_aberto
+            ),
+            None,
+        )
+        if moto is None:
+            self.skipTest("É necessária uma moto ativa de cliente ativo sem OS em aberto.")
+        return moto
+
+    def test_full_lifecycle_with_rejections(self):
+        with self.client_for("GERENTE") as client:
+            moto = self.free_bike(client)
+            mecanicos = client.list_mecanicos()
+            if not mecanicos:
+                self.skipTest("É necessário ao menos um mecânico ativo.")
+            me = client.current_user().funcionario
+
+            ordem = client.abrir_ordem_servico(
+                OrdemServicoCreate(
+                    id_moto_cliente=moto.id,
+                    id_mecanico=mecanicos[0].id,
+                    tipo_servico="PREVENTIVA",
+                    descricao_problema=f"Teste de integração {uuid.uuid4().hex[:6]}",
+                    quilometragem=100,
+                )
+            )
+            self.assertEqual(ordem.status, "ABERTA")
+            self.assertEqual(ordem.id_funcionario, me.id)
+            self.assertEqual(ordem.id_cliente, moto.id_cliente)
+            self.assertEqual(len(ordem.historico), 1)
+
+            with self.assertRaises(XanoValidationError):
+                client.abrir_ordem_servico(
+                    OrdemServicoCreate(
+                        id_moto_cliente=moto.id,
+                        id_mecanico=mecanicos[0].id,
+                        tipo_servico="CORRETIVA",
+                        descricao_problema="Segunda OS para a mesma moto",
+                    )
+                )
+            with self.assertRaises(XanoValidationError):
+                client.post(
+                    f"ordens_servico/{ordem.id}/status",
+                    json={"status_atual": "ABERTA", "status_novo": "CONCLUIDA"},
+                )
+
+            iniciada = client.transicionar_ordem_servico(
+                ordem.id, TransicaoStatusOS(status_atual="ABERTA", status_novo="EM_ANDAMENTO")
+            )
+            self.assertEqual(iniciada.status, "EM_ANDAMENTO")
+            self.assertIsNotNone(iniciada.data_inicio)
+
+            with self.assertRaises(XanoValidationError):
+                client.post(
+                    f"ordens_servico/{ordem.id}/status",
+                    json={"status_atual": "ABERTA", "status_novo": "CANCELADA", "observacao": "conflito"},
+                )
+            with self.assertRaises(XanoValidationError):
+                client.post(
+                    f"ordens_servico/{ordem.id}/status",
+                    json={"status_atual": "EM_ANDAMENTO", "status_novo": "CANCELADA"},
+                )
+
+            concluida = client.transicionar_ordem_servico(
+                ordem.id, TransicaoStatusOS(status_atual="EM_ANDAMENTO", status_novo="CONCLUIDA")
+            )
+            self.assertEqual(concluida.status, "CONCLUIDA")
+            self.assertIsNotNone(concluida.data_encerramento)
+            self.assertEqual(
+                [evento.status_novo for evento in concluida.historico],
+                ["ABERTA", "EM_ANDAMENTO", "CONCLUIDA"],
+            )
+            with self.assertRaises(XanoValidationError):
+                client.post(
+                    f"ordens_servico/{ordem.id}/status",
+                    json={"status_atual": "CONCLUIDA", "status_novo": "ABERTA"},
+                )
 
 
 @unittest.skipUnless(ALLOW_WRITES, "XANO_TEST_ALLOW_WRITES desativado: cenários de escrita ignorados.")

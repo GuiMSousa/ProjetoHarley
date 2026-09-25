@@ -1,31 +1,24 @@
-// Edit itens_ordem_servico record
+// Bloqueado na Change 6: OS mudam somente por abertura e transição de status;
+// itens de OS aguardam a Change de itens com baixa de estoque.
 query "itens_ordem_servico/{itens_ordem_servico_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
 
   input {
     int itens_ordem_servico_id? filters=min:1
-    dblink {
-      table = "itens_ordem_servico"
-    }
   }
 
   stack {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "MECANICO"}
     } as $role_check
-      util.get_raw_input {
-      encoding = "json"
-      exclude_middleware = false
-    } as $raw_input
-  
-    db.patch itens_ordem_servico {
-      field_name = "id"
-      field_value = $input.itens_ordem_servico_id
-      data = `$input|pick:($raw_input|keys)`|filter_null|filter_empty_text
-    } as $model
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Itens de OS estarão disponíveis na etapa de itens com baixa de estoque."
+    }
   }
 
-  response = $model
+  response = null
   guid = "gJJEEwg4eczxw7EVVyHk4_us0cI"
 }

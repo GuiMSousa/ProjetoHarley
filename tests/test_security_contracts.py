@@ -12,12 +12,15 @@ class SecurityContractTests(unittest.TestCase):
         return (XANO / relative_path).read_text(encoding="utf-8")
 
     def test_patch_endpoints_never_accept_authorship(self):
-        for relative_path in (
-            "api/harley/transacoes/transacoes_id_PATCH.xs",
-            "api/harley/ordens_servico/ordens_servico_id_PATCH.xs",
-        ):
-            with self.subTest(path=relative_path):
-                self.assertIn('|unset:"id_funcionario"', self.read(relative_path))
+        self.assertIn(
+            '|unset:"id_funcionario"',
+            self.read("api/harley/transacoes/transacoes_id_PATCH.xs"),
+        )
+        # Since Change 6 the generic OS PATCH is blocked: status changes go through
+        # POST ordens_servico/{id}/status and nothing is written from the payload.
+        content = self.read("api/harley/ordens_servico/ordens_servico_id_PATCH.xs")
+        self.assertIn("precondition (false)", content)
+        self.assertNotIn("db.patch", content)
 
     def test_every_write_that_sets_authorship_uses_the_authenticated_user(self):
         for path in (XANO / "api").rglob("*.xs"):

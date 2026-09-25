@@ -31,6 +31,13 @@ from Projeto_HarleyStore.services.entradas import (
     EntradaMercadoriaDetalhe,
     EntradaMercadoriaResumo,
 )
+from Projeto_HarleyStore.services.ordens_servico import (
+    Mecanico,
+    OrdemServicoCreate,
+    OrdemServicoDetalhe,
+    OrdemServicoResumo,
+    TransicaoStatusOS,
+)
 from Projeto_HarleyStore.xano_config import (
     xano_api_base_url,
     xano_auth_api_base_url,
@@ -442,3 +449,48 @@ class XanoClient:
         return self._create_resource(
             "entrada_mercadoria", entrada, EntradaMercadoriaDetalhe
         )
+
+    def list_ordens_servico(
+        self,
+        *,
+        status: str | None = None,
+        id_moto_cliente: int | None = None,
+    ) -> list[OrdemServicoResumo]:
+        """List service orders, optionally filtered by status or customer bike."""
+        params = {
+            key: value
+            for key, value in {"status": status, "id_moto_cliente": id_moto_cliente}.items()
+            if value is not None
+        }
+        return self.get(
+            "ordens_servico",
+            params=params or None,
+            response_model=TypeAdapter(list[OrdemServicoResumo]),
+        )
+
+    def get_ordem_servico(self, os_id: int) -> OrdemServicoDetalhe:
+        return self.get(
+            f"ordens_servico/{os_id}",
+            response_model=OrdemServicoDetalhe,
+        )
+
+    def abrir_ordem_servico(self, ordem: OrdemServicoCreate) -> OrdemServicoDetalhe:
+        """Open a service order; Xano sets status, author, customer and date."""
+        return self.post(
+            "ordens_servico",
+            json=ordem.model_dump(mode="json", exclude_none=True),
+            response_model=OrdemServicoDetalhe,
+        )
+
+    def transicionar_ordem_servico(
+        self, os_id: int, transicao: TransicaoStatusOS
+    ) -> OrdemServicoDetalhe:
+        """Move a service order through the status machine enforced by Xano."""
+        return self.post(
+            f"ordens_servico/{os_id}/status",
+            json=transicao.model_dump(mode="json"),
+            response_model=OrdemServicoDetalhe,
+        )
+
+    def list_mecanicos(self) -> list[Mecanico]:
+        return self.get("oficina/mecanicos", response_model=TypeAdapter(list[Mecanico]))

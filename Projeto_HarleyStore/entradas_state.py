@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 import reflex as rx
@@ -11,6 +10,11 @@ from pydantic import ValidationError
 from Projeto_HarleyStore.auth import AuthState, role_allows_route
 from Projeto_HarleyStore.cadastros_state import operation_is_blocked
 from Projeto_HarleyStore.feedback import error_feedback
+from Projeto_HarleyStore.formatting import (
+    EMPTY_VALUE,
+    format_currency,
+    format_datetime,
+)
 from Projeto_HarleyStore.listing import (
     filter_rows,
     option_id,
@@ -32,7 +36,6 @@ from Projeto_HarleyStore.services.xano_client import (
 
 
 ENTRADAS_ROUTE = "/estoque/entradas"
-EMPTY_VALUE = "—"
 
 
 class EntradaFormError(ValueError):
@@ -41,19 +44,6 @@ class EntradaFormError(ValueError):
 
 def can_register_entrada(role: str) -> bool:
     return role == "GERENTE"
-
-
-def format_currency(value: Decimal | None) -> str:
-    if value is None:
-        return EMPTY_VALUE
-    formatted = f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {formatted}"
-
-
-def format_datetime(value: datetime | None) -> str:
-    if value is None:
-        return EMPTY_VALUE
-    return value.astimezone().strftime("%d/%m/%Y %H:%M")
 
 
 def parse_decimal(value: str) -> Decimal:

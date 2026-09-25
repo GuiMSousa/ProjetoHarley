@@ -1,4 +1,5 @@
-// Delete ordens_servico record
+// Bloqueado na Change 6: OS mudam somente por abertura e transição de status;
+// itens de OS aguardam a Change de itens com baixa de estoque.
 query "ordens_servico/{ordens_servico_id}" verb=DELETE {
   api_group = "HARLEY"
   auth = "user"
@@ -9,11 +10,12 @@ query "ordens_servico/{ordens_servico_id}" verb=DELETE {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "GERENTE"}
+      input = {user_id: $auth.id, required_role: "MECANICO"}
     } as $role_check
-      db.del ordens_servico {
-      field_name = "id"
-      field_value = $input.ordens_servico_id
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Ordens de serviço não são editadas nem excluídas diretamente. Use a transição de status."
     }
   }
 

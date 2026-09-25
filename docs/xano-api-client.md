@@ -90,6 +90,30 @@ Métodos:
 
 `registrar_entrada` envia somente cabeçalho e itens. `id_funcionario`, `valor_total` e `data_entrada` são definidos pelo Xano, que grava cabeçalho, itens e incremento de estoque na mesma transação. Não existem métodos de edição ou exclusão de entradas: elas são imutáveis.
 
+## Ordens de serviço
+
+Os DTOs ficam em `Projeto_HarleyStore.services.ordens_servico`:
+
+- `OrdemServicoCreate` — `id_moto_cliente`, `id_mecanico` (opcional), `tipo_servico` (`PREVENTIVA` | `CORRETIVA`), `descricao_problema` e `quilometragem` (opcional, `>= 0`);
+- `TransicaoStatusOS` — `status_atual` (o status que o usuário está vendo), `status_novo` e `observacao` (obrigatória para `CANCELADA`); valida a tabela `TRANSICOES_OS`, espelho da função Xano `Oficina/validar_transicao_os`;
+- `OrdemServicoResumo` — linha da lista com `nome_cliente`, `placa`, `modelo`, `nome_funcionario` (autor) e `nome_mecanico`; os campos da Change 6 são opcionais para OS antigas;
+- `OrdemServicoDetalhe` — resumo com `quilometragem`, `motivo_cancelamento`, `historico` (`HistoricoStatusOS`) e `itens` (`ItemOrdemServico`, somente leitura);
+- `Mecanico` — `id` e `nome_funcionario`.
+
+Métodos:
+
+| Método | Endpoint | Perfil |
+| --- | --- | --- |
+| `list_ordens_servico(status=None, id_moto_cliente=None)` | `GET ordens_servico` | todos |
+| `get_ordem_servico(id)` | `GET ordens_servico/{id}` | todos |
+| `abrir_ordem_servico(ordem)` | `POST ordens_servico` | `GERENTE`, `MECANICO` |
+| `transicionar_ordem_servico(id, transicao)` | `POST ordens_servico/{id}/status` | `GERENTE`, `MECANICO` |
+| `list_mecanicos()` | `GET oficina/mecanicos` | `GERENTE`, `MECANICO` |
+
+`abrir_ordem_servico` omite campos nulos e nunca envia `status`, `data_abertura`, `id_funcionario` ou `id_cliente`: o Xano define a OS como `ABERTA`, grava o autor a partir do JWT e o cliente a partir da moto. Os filtros de `list_ordens_servico` vão como query string e também servem para o histórico da moto. `PUT`, `PATCH` e `DELETE ordens_servico/{id}` e as mutações de `itens_ordem_servico` respondem `403`.
+
+Uma transição recusada porque a OS mudou (`status_atual` desatualizado) chega como `XanoValidationError`; o Reflex recarrega o detalhe e exibe o status real.
+
 ## Erros
 
 | Status HTTP | Exceção | Mensagem da exceção | Mensagem exibida (`feedback.error_feedback`) | Efeito no Reflex |
@@ -123,6 +147,9 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Entradas de mercadoria (histórico e detalhe) | leitura | leitura | leitura |
 | Registrar entrada de mercadoria | sim | não | não |
 | Criar usuários e enviar email de boas-vindas | sim | não | não |
+| Oficina: consultar OS, detalhe e histórico por moto | sim | sim | sim |
+| Oficina: abrir OS e transicionar status | sim | não | sim |
+| Oficina: listar mecânicos | sim | não | sim |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
 
@@ -135,4 +162,5 @@ python -m unittest discover -s tests
 - Os testes offline usam `httpx.MockTransport` e contratos estáticos sobre `xano/`; não precisam de rede.
 - `tests/test_integration_xano.py` executa chamadas HTTP reais quando `XANO_API_BASE_URL` está configurada (ambiente ou `.env`); caso contrário, é ignorado.
 - Credenciais por perfil: `XANO_TEST_GERENTE_EMAIL`/`_PASSWORD`, `XANO_TEST_VENDEDOR_*` e `XANO_TEST_MECANICO_*`. Perfis sem credenciais são ignorados individualmente.
-- Os cenários que gravam dados (registro de entrada, documento duplicado e rollback) exigem `XANO_TEST_ALLOW_WRITES=true`. Como as entradas são imutáveis, rode-os em um branch ou workspace de testes.
+- Os cenários que gravam dados (registro de entrada, documento duplicado, rollback e ciclo completo de OS com as rejeições da máquina de estados) exigem `XANO_TEST_ALLOW_WRITES=true`. Como entradas e OS encerradas são imutáveis, rode-os em um branch ou workspace de testes.
+- Os testes de OS exigem a Change 6 publicada; antes do push, os endpoints novos respondem `404`.

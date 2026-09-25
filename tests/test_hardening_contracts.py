@@ -18,7 +18,7 @@ class HardeningContractTests(unittest.TestCase):
     def test_operational_authority_comes_from_authenticated_user(self):
         operation_files = [
             "xano/api/harley/ordens_servico_POST.xs",
-            "xano/api/harley/ordens_servico/ordens_servico_id_PUT.xs",
+            "xano/api/harley/ordens_servico/ordens_servico_id_status_POST.xs",
             "xano/api/harley/transacoes_POST.xs",
             "xano/api/harley/transacoes/transacoes_id_PUT.xs",
         ]

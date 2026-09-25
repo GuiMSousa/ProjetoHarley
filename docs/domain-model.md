@@ -68,12 +68,18 @@ Representa a nota/registro de compra efetuada junto a um fornecedor para abastec
 
 ### Ordens_Servico & Itens_Ordem_Servico
 Representa o atendimento técnico prestado na oficina mecânica para a moto de um cliente.
-- **Atributos OS:** Identificador (`id_os`), Moto do Cliente (`id_moto_cliente`), Funcionario Responsável (`id_funcionario`), Data de Abertura (`data_abertura`), Status (`status`).
+- **Atributos OS:** Identificador (`id_os`), Moto do Cliente (`id_moto_cliente`), Cliente (`id_cliente`), Autor da abertura (`id_funcionario`), Mecânico Responsável (`id_mecanico`), Tipo de Serviço (`tipo_servico`: `PREVENTIVA` ou `CORRETIVA`), Descrição do Problema (`descricao_problema`), Quilometragem (`quilometragem`), Data de Abertura (`data_abertura`), Data de Início (`data_inicio`), Data de Encerramento (`data_encerramento`), Motivo do Cancelamento (`motivo_cancelamento`), Status (`status`).
 - **Atributos Itens OS:** Identificador (`id_item_os`), Ordem de Serviço (`id_os`), Produto (`id_produto`), Quantidade (`quantidade`), Valor Total do Item (`valor_total_item`).
-- **Relacionamentos:** Pertence a uma **Moto_Cliente**, é aberta por um **Funcionario** e é composta por vários **Produtos/Peças**.
-- **Regras:** O status deve obrigatoriamente trafegar entre: `ABERTA`, `EM_ANDAMENTO`, `CONCLUIDA`, `CANCELADA`; `quantidade` e `valor_total_item` devem ser positivos.
-- **Autoria:** `id_funcionario` deve ser derivado do funcionário vinculado ao usuário autenticado no Xano, nunca aceito como autoria arbitrária do cliente. `POST`/`PUT` gravam o funcionário do JWT e o `PATCH` descarta `id_funcionario` do payload.
-- **Situação atual:** os endpoints ainda são CRUD genérico: o status é aceito do payload sem regra de transição e os itens não movimentam estoque. Essas regras pertencem às Changes de ordens de serviço.
+- **Relacionamentos:** Pertence a uma **Moto_Cliente** e ao **Cliente** dono da moto na abertura; é aberta por um **Funcionario** (autor) e executada por um **Funcionario** do tipo `MECANICO`; é composta por vários **Produtos/Peças**.
+- **Abertura:** a OS nasce sempre `ABERTA`, com `data_abertura` do servidor. A moto e o cliente devem estar ativos; o mecânico responsável deve ser um funcionário ativo do tipo `MECANICO` (quando o autor é mecânico e não informa outro, ele próprio é o responsável). `tipo_servico` e `descricao_problema` são obrigatórios; `quilometragem`, opcional e `>= 0`.
+- **Cliente:** `id_cliente` é uma fotografia do dono da moto no momento da abertura e preserva o histórico se a moto mudar de dono.
+- **Uma OS em aberto por moto:** não é possível abrir uma OS para uma moto que já tenha outra `ABERTA` ou `EM_ANDAMENTO`.
+- **Máquina de estados:** `ABERTA → EM_ANDAMENTO | CANCELADA`; `EM_ANDAMENTO → CONCLUIDA | CANCELADA`. `CONCLUIDA` e `CANCELADA` são finais; não há reabertura nem `ABERTA → CONCLUIDA`. O cancelamento exige motivo. As transições ocorrem somente por `POST ordens_servico/{id}/status`, que preenche `data_inicio` ao iniciar e `data_encerramento` ao concluir ou cancelar.
+- **Histórico de status (`historico_status_os`):** cada abertura e cada transição grava status anterior, novo status, funcionário autenticado, data e observação. O índice único `(id_os, status_anterior)` garante que cada OS saia de cada status uma única vez e serializa transições concorrentes.
+- **Controle otimista:** a transição informa o status visto pelo usuário (`status_atual`); se a OS tiver mudado, a operação é rejeitada sem efeito.
+- **Autoria:** `id_funcionario` e o funcionário do histórico vêm do usuário autenticado (`$auth.id → user.id_funcionario`), nunca do payload. Edição e exclusão diretas de OS (`PUT`/`PATCH`/`DELETE`) respondem `403`.
+- **Itens:** somente leitura nesta etapa; inclusão, edição e remoção respondem `403` até a Change de itens com baixa de estoque. `quantidade` e `valor_total_item` devem ser positivos.
+- **Registros legados:** os campos da Change 6 são anuláveis; OS anteriores continuam legíveis e podem seguir a máquina de estados a partir do status gravado.
 
 ### Transacoes
 Registra o fluxo financeiro de vendas e movimentações comerciais do estabelecimento.
