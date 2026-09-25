@@ -42,4 +42,5 @@ table historico_status_os {
       field: [{name: "created_at", op: "desc"}]
     }
   ]
+  guid = "k2NRShlrMyvKtFmsmjkC03NrtQs"
 }

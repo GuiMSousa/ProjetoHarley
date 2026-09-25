@@ -36,4 +36,5 @@ function "Oficina/validar_transicao_os" {
   }
 
   response = true
+  guid = "GbYyIPNttSPOJXUKKfffaNLyf20"
 }

@@ -128,4 +128,5 @@ query "ordens_servico/{ordens_servico_id}/status" verb=POST {
   }
 
   response = $detalhe
+  guid = "0cWSv_D3GkaltcMefpJFe701Khg"
 }

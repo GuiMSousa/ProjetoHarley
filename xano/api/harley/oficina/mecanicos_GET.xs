@@ -23,4 +23,5 @@ query "oficina/mecanicos" verb=GET {
   }
 
   response = $model
+  guid = "vOPffmmGIqHgBa0XpCPd7-4ipDk"
 }

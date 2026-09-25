@@ -94,4 +94,5 @@ function "Oficina/detalhe_os" {
   }
 
   response = $detalhe
+  guid = "dndP0NUct7g4h2FCmDNAdtHRWqI"
 }
