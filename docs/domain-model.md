@@ -49,11 +49,24 @@ Representa os veículos pertencentes a clientes e utilizados no fluxo da oficina
 - **Regras:** Placa e Chassi devem ser únicos no sistema.
 - **Ciclo de vida:** A desativação é lógica e não remove o veículo do histórico.
 
-### Motos
-Representa as motocicletas mantidas no estoque da loja e destinadas à venda. Esta entidade é independente de `motos_clientes` e não representa o veículo usado no histórico de oficina.
-- **Atributos:** Identificador (`id`), Cliente opcional (`clientes_id`), Marca (`marca`), Modelo (`modelo`), Data de Cadastro (`created_at`).
-- **Relacionamento:** Pode possuir um cliente associado quando a venda for registrada.
-- **Situação atual:** o schema ainda não possui preço, chassi, status de disponibilidade nem `ativo`. O `DELETE` físico está bloqueado (`403`) até que a Change de catálogo defina o ciclo de vida das motos da loja.
+### Modelos_Moto (catálogo)
+Representa o modelo comercial exibido na vitrine (Change 8): o que o cliente escolhe antes de haver uma unidade específica.
+- **Atributos:** Identificador (`id`), Nome (`nome_modelo`, único), Família (`familia`: `TOURING`, `CRUISER`, `ADVENTURE` ou `SPORT`), Descrição (`descricao`), Preço Base (`preco_base`), Imagem Principal (`imagem_principal`), Variações de Cor (`variacoes_cor`: lista de `{nome, hex, imagem_url}`, até 12), Destaque (`destaque`), Ativo (`ativo`), Data de Cadastro (`created_at`).
+- **Regras:** imagens em URL `https://`, próprias ou licenciadas pela loja; cor no formato `#RRGGBB`; preço base `> 0`. Somente o `GERENTE` cria e edita modelos; `ativo = false` retira o modelo da vitrine (soft delete).
+- **Vitrine pública:** `GET catalogo` e `GET catalogo/{id}` expõem apenas campos de vitrine de modelos ativos. "A partir de" é o menor `preco_venda` entre as unidades `DISPONIVEL` do modelo; sem unidades disponíveis, vale o `preco_base` e a vitrine mostra "Sob consulta".
+
+### Motos (unidades em estoque)
+Representa cada motocicleta física no estoque da loja, destinada à venda. É independente de `motos_clientes`, que representa o veículo atendido pela oficina.
+- **Atributos:** Identificador (`id`), Modelo (`id_modelo`), Chassi (`chassi`, VIN de 17 caracteres, em caixa alta e único), Cor (`cor`, uma das variações do modelo), Ano do Modelo (`ano_modelo`), Preço de Venda (`preco_venda`), Status (`status`: `DISPONIVEL`, `RESERVADA` ou `VENDIDA`), Cliente da Reserva (`clientes_id`), Vendedor da Reserva (`id_vendedor_reserva`), Validade da Reserva (`reservada_ate`), Versão do Status (`versao_status`), Última Alteração (`atualizado_em`), Marca e Modelo legados (`marca`, `modelo`).
+- **Cadastro:** somente o `GERENTE`, com modelo ativo, cor do modelo, ano entre 1990 e o ano seguinte e chassi único também contra `motos_clientes`. A unidade nasce `DISPONIVEL`, com uma linha de histórico.
+- **Status:** muda somente pelos endpoints de reserva (função `Vendas/transicionar_moto`); cadastro e edição nunca aceitam status, cliente ou vendedor. `PUT` e `DELETE motos/{id}` respondem `403`.
+- **Reserva:** `VENDEDOR` ou `GERENTE` reserva uma unidade `DISPONIVEL` para um cliente ativo, com validade de 1 a 30 dias (padrão 7). Vendedor e validade são definidos pelo servidor. Pode cancelar quem reservou, um `GERENTE` ou, depois do vencimento, qualquer vendedor; o motivo é obrigatório. Não há expiração automática.
+- **Concorrência:** cada transição grava o histórico com `versao_anterior` antes de atualizar a unidade; o índice único `(id_moto, versao_anterior)` garante que duas reservas simultâneas da mesma unidade não sejam ambas aceitas.
+- **Venda:** a conclusão (`VENDIDA`, transação `MOTO` e criação da moto do cliente) será definida na Change 9, junto com o redesenho de `transacoes`.
+- **Legado:** unidades anteriores à Change 8 (sem modelo) ficam fora da vitrine, aparecem como "Sem modelo" em `/vendas` e não podem ser reservadas.
+
+### Historico_Status_Moto
+Trilha somente de inserção das transições de status das unidades: status anterior (nulo no cadastro), novo status, versão anterior, funcionário autenticado, cliente, observação (motivo do cancelamento) e data.
 
 ### Entrada_Mercadoria & Itens_Compra_Estoque
 Representa a nota/registro de compra efetuada junto a um fornecedor para abastecimento de estoque.

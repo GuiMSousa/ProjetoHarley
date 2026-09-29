@@ -3,8 +3,10 @@ from unittest.mock import patch
 
 from reflex.state import State
 
-from Projeto_HarleyStore.cadastros_state import CadastrosState
-from Projeto_HarleyStore.services.cadastros import ProdutoCreate, ProdutoUpdate
+from decimal import Decimal
+
+from Projeto_HarleyStore.cadastros_state import CadastrosState, produto_resumo
+from Projeto_HarleyStore.services.cadastros import Produto, ProdutoCreate, ProdutoUpdate
 from Projeto_HarleyStore.services.xano_client import XanoAuthenticationError, XanoError
 
 
@@ -147,6 +149,19 @@ class CadastrosStateTests(unittest.TestCase):
         payload, model = state._payload()
         self.assertIs(model, ProdutoCreate)
         self.assertEqual(payload.estoque_qtd, 3)
+
+
+    def test_product_rows_show_formatted_price_and_balance(self):
+        produto = Produto(
+            id=4, codigo="SKU4", nome_produto="Filtro", categoria="Motor",
+            estoque_qtd=3, preco_venda=Decimal("45.5"), ativo=False,
+        )
+        self.assertEqual(produto_resumo(produto), "R$ 45,50 · 3 em estoque")
+        state = State(_reflex_internal_init=True).get_substate(CadastrosState.get_full_name().split("."))
+        (row,) = state._rows([produto], "codigo", "nome_produto", produto_resumo)
+        self.assertEqual(row["tertiary"], "R$ 45,50 · 3 em estoque")
+        self.assertEqual(row["preco_venda"], "45.5")  # raw value still feeds the edit form
+        self.assertEqual((row["status"], row["ativo"]), ("INATIVO", "Inativo"))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,41 @@
+/* Harley-Davidson industrial theme: global overrides of Radix Themes.
+   Colors mirror Projeto_HarleyStore/styles/theme.py (the single source of tokens).
+   The "html" prefix outranks Radix's own selectors without !important. */
+
+html .radix-themes,
+html [data-accent-color='orange'] {
+  /* Brand orange replaces Radix's orange in focus rings, tabs, badges and selections. */
+  --accent-8: #E65C00;
+  --accent-9: #FF6600;
+  --accent-10: #FF7A1F;
+  --accent-11: #FF7A1F;
+  --accent-contrast: #000000;
+}
+
+html .radix-themes {
+  --color-background: #000000;
+  --color-panel-solid: #1A1A1A;
+  --default-font-family: 'Inter', Arial, sans-serif;
+  --heading-font-family: 'Oswald', 'Arial Narrow', Arial, sans-serif;
+}
+
+body {
+  background: #000000;
+}
+
+/* Module titles: robust uppercase; the text itself keeps its case for screen readers. */
+.rt-Heading {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Visible keyboard focus in the brand color. */
+:focus-visible {
+  outline: 2px solid #FF6600;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #FF6600;
+  color: #000000;
+}

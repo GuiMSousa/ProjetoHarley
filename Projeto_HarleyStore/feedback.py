@@ -1,8 +1,9 @@
-"""User-facing messages and notifications for Xano errors, shared by every page state."""
+"""User-facing messages and notifications for Xano and form errors, shared by every page state."""
 
 from __future__ import annotations
 
 import reflex as rx
+from pydantic import ValidationError
 from reflex.event import EventSpec
 
 from Projeto_HarleyStore.services.xano_client import (
@@ -10,6 +11,7 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoError,
     XanoNotFoundError,
     XanoPermissionError,
+    XanoRateLimitError,
     XanoValidationError,
 )
 
@@ -27,7 +29,18 @@ def error_feedback(error: XanoError) -> str:
         return "O registro solicitado não foi encontrado."
     if isinstance(error, XanoValidationError):
         return str(error)
+    if isinstance(error, XanoRateLimitError):
+        return "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente."
     return "Não foi possível comunicar com o Xano. Tente novamente."
+
+
+def validation_feedback(error: ValidationError, field_messages: dict[str, str]) -> str:
+    """First readable message of a DTO validation error: a field message or the validator text."""
+    detail = error.errors()[0]
+    location = detail.get("loc") or ("",)
+    if location[0] in field_messages:
+        return field_messages[location[0]]
+    return str(detail.get("msg", "")).removeprefix("Value error, ")
 
 
 def toast_error(message: str) -> EventSpec:

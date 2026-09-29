@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-import unicodedata
 from decimal import Decimal, InvalidOperation
 
 import reflex as rx
 from pydantic import ValidationError
 
 from Projeto_HarleyStore.auth import AuthState, role_allows_route
-from Projeto_HarleyStore.feedback import error_feedback, toast_error, toast_success
+from Projeto_HarleyStore.feedback import (
+    error_feedback,
+    toast_error,
+    toast_success,
+    validation_feedback,
+)
 from Projeto_HarleyStore.formatting import (
     EMPTY_VALUE,
     format_currency,
@@ -18,6 +22,7 @@ from Projeto_HarleyStore.formatting import (
 )
 from Projeto_HarleyStore.listing import (
     filter_rows,
+    normalize_text,
     option_id,
     option_label,
     page_count,
@@ -113,22 +118,20 @@ def motos_do_cliente(motos: list[dict[str, str]], cliente: str) -> list[str]:
     ]
 
 
+FIELD_MESSAGES = {
+    "descricao_problema": "Descreva o problema ou o serviço solicitado.",
+    "quilometragem": "A quilometragem deve ser um número inteiro não negativo.",
+    "tipo_servico": "Selecione o tipo de serviço.",
+    "id_moto_cliente": "Selecione a moto do cliente.",
+    "id_mecanico": "Selecione o mecânico responsável.",
+    "quantidade": "A quantidade deve ser um número inteiro maior que zero.",
+    "valor_unitario": "O valor do serviço deve ser positivo, com até duas casas decimais.",
+    "descricao": "A descrição do serviço deve ter até 200 caracteres.",
+}
+
+
 def _first_error(error: ValidationError) -> str:
-    detail = error.errors()[0]
-    field = detail.get("loc", ("",))[0] if detail.get("loc") else ""
-    messages = {
-        "descricao_problema": "Descreva o problema ou o serviço solicitado.",
-        "quilometragem": "A quilometragem deve ser um número inteiro não negativo.",
-        "tipo_servico": "Selecione o tipo de serviço.",
-        "id_moto_cliente": "Selecione a moto do cliente.",
-        "id_mecanico": "Selecione o mecânico responsável.",
-        "quantidade": "A quantidade deve ser um número inteiro maior que zero.",
-        "valor_unitario": "O valor do serviço deve ser positivo, com até duas casas decimais.",
-        "descricao": "A descrição do serviço deve ter até 200 caracteres.",
-    }
-    if field in messages:
-        return messages[field]
-    return str(detail.get("msg", "")).removeprefix("Value error, ")
+    return validation_feedback(error, FIELD_MESSAGES)
 
 
 def build_abertura_payload(
@@ -182,12 +185,6 @@ def build_transicao_payload(
         raise WorkshopFormError(_first_error(error)) from error
 
 
-def _normalize(text: str) -> str:
-    """Lowercase text without accents, for tolerant searches."""
-    decomposed = unicodedata.normalize("NFKD", text.lower())
-    return "".join(char for char in decomposed if not unicodedata.combining(char))
-
-
 def produto_row(produto: Produto) -> dict[str, str]:
     saldo = produto.estoque_qtd
     return {
@@ -205,11 +202,11 @@ def filtrar_produtos(
     rows: list[dict[str, str]], busca: str, limite: int = PRODUTO_SEARCH_LIMIT
 ) -> list[dict[str, str]]:
     """Products whose code or name contain the search text, ignoring case and accents."""
-    termo = _normalize(busca.strip())
+    termo = normalize_text(busca.strip())
     matches = [
         row
         for row in rows
-        if not termo or termo in _normalize(f"{row['codigo']} {row['nome']}")
+        if not termo or termo in normalize_text(f"{row['codigo']} {row['nome']}")
     ]
     return matches[:limite]
 

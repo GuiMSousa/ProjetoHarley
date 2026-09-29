@@ -1,10 +1,24 @@
-"""UI building blocks shared by every page, and the reentrancy guard of page events."""
+"""Design-system building blocks shared by every page, and the reentrancy guard of page events."""
 
 from __future__ import annotations
 
+from typing import Callable
+
 import reflex as rx
 
-from Projeto_HarleyStore.styles.theme import COLORS
+from Projeto_HarleyStore.styles.theme import (
+    CARD,
+    COLORS,
+    DANGER_BUTTON,
+    METAL_BUTTON,
+    PRIMARY_BUTTON,
+    RADII,
+    STATUS_COLORS,
+    STATUS_FALLBACK,
+)
+
+
+# ----- form and feedback -----
 
 
 def labeled(label: str, control: rx.Component, **props) -> rx.Component:
@@ -33,3 +47,225 @@ def operation_is_blocked(
 ) -> bool:
     """Return whether a page operation must be rejected as reentrant."""
     return is_loading_list or is_saving or is_deactivating
+
+
+# ----- buttons -----
+
+
+def _button(style: dict, *children, **props) -> rx.Component:
+    return rx.button(*children, **{**style, **props})
+
+
+def primary_button(*children, **props) -> rx.Component:
+    """Main action: Harley orange with black text."""
+    return _button(PRIMARY_BUTTON, *children, **props)
+
+
+def metal_button(*children, **props) -> rx.Component:
+    """Secondary action: brushed metal with an orange glow on hover."""
+    return _button(METAL_BUTTON, *children, **props)
+
+
+def danger_button(*children, **props) -> rx.Component:
+    """Destructive action outlined in red."""
+    return _button(DANGER_BUTTON, *children, **props)
+
+
+# ----- layout -----
+
+
+def page_header(title: str, subtitle: str = "", *actions: rx.Component) -> rx.Component:
+    """Module title in uppercase with an optional subtitle and right-aligned actions."""
+    return rx.hstack(
+        rx.vstack(
+            rx.hstack(
+                rx.box(width="4px", height="1.75rem", background=COLORS["orange"]),
+                rx.heading(title, size="7"),
+                align="center",
+                spacing="3",
+            ),
+            rx.text(subtitle, color=COLORS["muted"]) if subtitle else rx.fragment(),
+            align="start",
+            spacing="1",
+        ),
+        rx.spacer(),
+        *actions,
+        width="100%",
+        align="center",
+        wrap="wrap",
+        spacing="3",
+    )
+
+
+def section_title(title: str) -> rx.Component:
+    return rx.hstack(
+        rx.box(width="3px", height="1rem", background=COLORS["orange"]),
+        rx.heading(title, size="3", color=COLORS["text"]),
+        align="center",
+        spacing="2",
+    )
+
+
+def card(*children: rx.Component, **props) -> rx.Component:
+    """High-contrast industrial card."""
+    return rx.box(*children, **{**CARD, "padding": "1.25rem", **props})
+
+
+def modal_header(*title: rx.Component | str, on_close) -> rx.Component:
+    return rx.hstack(
+        rx.heading(*title, size="5"),
+        rx.spacer(),
+        metal_button("Fechar", on_click=on_close, size="2"),
+        width="100%",
+        align="center",
+    )
+
+
+def empty_state(message: str, icon: str = "inbox") -> rx.Component:
+    return rx.vstack(
+        rx.icon(icon, size=28, color=COLORS["muted"]),
+        rx.text(message, color=COLORS["muted"]),
+        align="center",
+        spacing="2",
+        padding="2.5rem 1rem",
+        width="100%",
+    )
+
+
+def stat_tile(label: str, value: rx.Var | str, accent: bool = False) -> rx.Component:
+    return rx.vstack(
+        rx.text(label, size="1", color=COLORS["muted"], text_transform="uppercase", letter_spacing="0.08em"),
+        rx.text(
+            value,
+            font_weight="700",
+            size="5" if accent else "4",
+            color=COLORS["orange"] if accent else COLORS["text"],
+        ),
+        spacing="0",
+        align="start",
+    )
+
+
+# ----- lists -----
+
+
+def toolbar(
+    search_value: rx.Var,
+    on_search,
+    placeholder: str,
+    *,
+    disabled: rx.Var | bool = False,
+    current_page: rx.Var | None = None,
+    total_pages: rx.Var | None = None,
+) -> rx.Component:
+    """Search box with the page indicator of paginated lists."""
+    page_label = rx.fragment()
+    if current_page is not None and total_pages is not None:
+        page_label = rx.text(
+            rx.cond(total_pages > 1, f"Página {current_page} de {total_pages}", ""),
+            size="2",
+            color=COLORS["muted"],
+        )
+    return rx.hstack(
+        rx.input(
+            rx.input.slot(rx.icon("search", size=16)),
+            placeholder=placeholder,
+            value=search_value,
+            on_change=on_search,
+            disabled=disabled,
+            width="min(100%, 30rem)",
+        ),
+        rx.spacer(),
+        page_label,
+        width="100%",
+        align="center",
+    )
+
+
+def pager(on_previous, on_next, disabled: rx.Var | bool = False) -> rx.Component:
+    return rx.hstack(
+        metal_button(rx.icon("chevron-left", size=16), "Anterior", on_click=on_previous, disabled=disabled, size="2"),
+        metal_button("Próxima", rx.icon("chevron-right", size=16), on_click=on_next, disabled=disabled, size="2"),
+        spacing="2",
+    )
+
+
+def _header_cell(header: str | tuple[str, str]) -> rx.Component:
+    label, align = header if isinstance(header, tuple) else (header, "left")
+    return rx.table.column_header_cell(
+        label,
+        text_align=align,
+        color=COLORS["muted"],
+        font_size="0.75rem",
+        text_transform="uppercase",
+        letter_spacing="0.08em",
+    )
+
+
+def data_table(
+    headers: list[str | tuple[str, str]],
+    rows: rx.Var,
+    render_row: Callable[[rx.Var], rx.Component],
+    *,
+    empty_text: str,
+    loading: rx.Var | None = None,
+    loading_text: str = "Carregando...",
+) -> rx.Component:
+    """Table inside a card, with loading and empty states."""
+    table = rx.table.root(
+        rx.table.header(rx.table.row(*[_header_cell(header) for header in headers])),
+        rx.table.body(rx.foreach(rows, render_row)),
+        width="100%",
+    )
+    content = rx.cond(rows.length() > 0, table, empty_state(empty_text))
+    if loading is not None:
+        content = rx.cond(
+            loading,
+            rx.text(loading_text, color=COLORS["muted"], padding="2rem"),
+            content,
+        )
+    return rx.box(content, width="100%", overflow_x="auto", padding="0 1rem", **CARD)
+
+
+# ----- status -----
+
+
+def _badge(label: rx.Var | str, background: str, color: str) -> rx.Component:
+    return rx.badge(
+        label,
+        background=background,
+        color=color,
+        variant="solid",
+        radius="small",
+        font_weight="700",
+        text_transform="uppercase",
+        letter_spacing="0.04em",
+    )
+
+
+def status_badge(status: rx.Var, label: rx.Var | str) -> rx.Component:
+    """Single badge for every status (service orders and stock motorcycles)."""
+    return rx.match(
+        status,
+        *[(name, _badge(label, background, color)) for name, (background, color) in STATUS_COLORS.items()],
+        _badge(label, *STATUS_FALLBACK),
+    )
+
+
+def swatch(hex_color: rx.Var | str, name: rx.Var | str, *, selected: rx.Var | bool = False, on_click=None, size: str = "1.5rem") -> rx.Component:
+    """Round color sample; a button when clickable, with the color name for screen readers."""
+    style = {
+        "width": size,
+        "height": size,
+        "min_width": size,
+        "border_radius": RADII["pill"],
+        "background": hex_color,
+        "border": rx.cond(selected, f"2px solid {COLORS['orange']}", f"2px solid {COLORS['metal_edge']}"),
+        "box_shadow": rx.cond(selected, f"0 0 0 2px {COLORS['black']} inset", "none"),
+        "padding": "0",
+        "aria_label": name,
+        "custom_attrs": {"title": name},
+    }
+    if on_click is None:
+        return rx.box(**style)
+    return rx.button(on_click=on_click, cursor="pointer", **style)

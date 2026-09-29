@@ -29,6 +29,7 @@ ROUTE_ROLES: dict[str, frozenset[str]] = {
     "/cadastros/fornecedores": frozenset({"GERENTE"}),
     "/cadastros/funcionarios": frozenset({"GERENTE"}),
     "/estoque/entradas": ALL_ROLES,
+    "/vendas": frozenset({"GERENTE", "VENDEDOR"}),
 }
 
 

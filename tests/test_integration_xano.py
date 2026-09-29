@@ -27,7 +27,13 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
+from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCor
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
+from Projeto_HarleyStore.services.motos import (
+    CancelamentoReservaMoto,
+    MotoEstoqueCreate,
+    ReservaMotoCreate,
+)
 from Projeto_HarleyStore.services.ordens_servico import (
     ItemOSCreate,
     OrdemServicoCreate,
@@ -36,6 +42,7 @@ from Projeto_HarleyStore.services.ordens_servico import (
 from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoClient,
+    XanoNotFoundError,
     XanoPermissionError,
     XanoValidationError,
 )
@@ -334,6 +341,22 @@ class XanoLiveWriteTestCase(XanoLiveTestCase):
             )
         )
 
+    def race(self, *calls):
+        """Run the calls at the same time, each with its own client; return results or errors."""
+        token = self.token_for("GERENTE")
+        barrier = threading.Barrier(len(calls))
+
+        def run(call):
+            with XanoClient(token=token) as client:
+                barrier.wait()
+                try:
+                    return call(client)
+                except XanoValidationError as error:
+                    return error
+
+        with ThreadPoolExecutor(max_workers=len(calls)) as pool:
+            return list(pool.map(run, calls))
+
     def cancel_quietly(self, client: XanoClient, os_id: int) -> None:
         """Free the bike and return the parts; ignores orders already closed."""
         ordem = client.get_ordem_servico(os_id)
@@ -593,22 +616,6 @@ class XanoLiveServiceOrderItemWriteTests(XanoLiveWriteTestCase):
 class XanoLiveStockConcurrencyTests(XanoLiveWriteTestCase):
     """Race conditions of D6 (stock version) and D7 (order row lock)."""
 
-    def race(self, *calls):
-        """Run the calls at the same time, each with its own client; return results or errors."""
-        token = self.token_for("GERENTE")
-        barrier = threading.Barrier(len(calls))
-
-        def run(call):
-            with XanoClient(token=token) as client:
-                barrier.wait()
-                try:
-                    return call(client)
-                except XanoValidationError as error:
-                    return error
-
-        with ThreadPoolExecutor(max_workers=len(calls)) as pool:
-            return list(pool.map(run, calls))
-
     def test_two_orders_competing_for_the_whole_balance(self):
         with self.client_for("GERENTE") as client:
             (product,) = self.restocked_products(client, 1, 1)
@@ -656,6 +663,157 @@ class XanoLiveStockConcurrencyTests(XanoLiveWriteTestCase):
                 self.assertEqual(self.stock_of(client, product.id), before)
             finally:
                 self.cancel_quietly(client, ordem.id)
+
+
+SHOWROOM_FIELDS = {
+    "id",
+    "nome_modelo",
+    "familia",
+    "descricao",
+    "imagem_principal",
+    "variacoes_cor",
+    "destaque",
+    "preco_a_partir",
+    "disponiveis",
+}
+VIN_ALPHABET = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789"
+
+
+def random_vin() -> str:
+    digits = uuid.uuid4().int
+    return "".join(VIN_ALPHABET[(digits >> (5 * index)) % len(VIN_ALPHABET)] for index in range(17))
+
+
+class XanoLiveCatalogReadTests(XanoLiveTestCase):
+    def test_public_catalog_exposes_only_showroom_fields(self):
+        """Runs without credentials; skipped while Change 8 is not published."""
+        with XanoClient() as client:
+            try:
+                vitrine = client.request("GET", "catalogo", authenticated=False)
+            except XanoNotFoundError:
+                self.skipTest("Catálogo ainda não publicado no Xano (Change 8).")
+            for modelo in vitrine:
+                with self.subTest(modelo=modelo.get("nome_modelo")):
+                    self.assertLessEqual(set(modelo), SHOWROOM_FIELDS)
+            client.list_catalogo(familia="TOURING")
+
+    def test_sales_are_for_sellers_and_managers_only(self):
+        with self.client_for("MECANICO") as client, self.assertRaises(XanoPermissionError):
+            client.list_motos_estoque()
+        with self.client_for("VENDEDOR") as client:
+            client.list_motos_estoque(status="DISPONIVEL")
+            with self.assertRaises(XanoPermissionError):
+                client.list_modelos_moto()
+
+
+class XanoLiveSalesWriteTestCase(XanoLiveWriteTestCase):
+    """Creates a model and a unit of its own; they stay in the database (no deletion)."""
+
+    def create_unit(self, client: XanoClient):
+        cor = VariacaoCor(
+            nome="Teste", hex="#FF6600", imagem_url="https://placehold.co/800x500/FF6600/000000/png"
+        )
+        modelo = client.criar_modelo_moto(
+            ModeloMotoCreate(
+                nome_modelo=f"Teste integração {uuid.uuid4().hex[:8]}",
+                familia="SPORT",
+                preco_base=Decimal("50000"),
+                imagem_principal=cor.imagem_url,
+                variacoes_cor=[cor],
+            )
+        )
+        self.addCleanup(self.retire_model, modelo.id)
+        unidade = client.cadastrar_moto_estoque(
+            MotoEstoqueCreate(
+                id_modelo=modelo.id,
+                chassi=random_vin(),
+                cor="Teste",
+                ano_modelo=2025,
+                preco_venda=Decimal("48000"),
+            )
+        )
+        return modelo, unidade
+
+    def retire_model(self, modelo_id: int) -> None:
+        with self.client_for("GERENTE") as client:
+            client.atualizar_modelo_moto(modelo_id, ModeloMotoUpdate(ativo=False))
+
+    def active_client_id(self, client: XanoClient) -> int:
+        cliente = next((item for item in client.list_clientes() if item.ativo), None)
+        if cliente is None:
+            self.skipTest("É necessário ao menos um cliente ativo.")
+        return cliente.id
+
+
+class XanoLiveSalesWriteTests(XanoLiveSalesWriteTestCase):
+    def test_reservation_cycle(self):
+        with self.client_for("GERENTE") as gerente:
+            modelo, unidade = self.create_unit(gerente)
+            self.assertEqual((unidade.status, len(unidade.historico)), ("DISPONIVEL", 1))
+            vitrine = next(item for item in gerente.list_catalogo() if item.id == modelo.id)
+            self.assertEqual((vitrine.disponiveis, vitrine.preco_a_partir), (1, Decimal("48000")))
+            with self.assertRaises(XanoValidationError):
+                gerente.cadastrar_moto_estoque(
+                    MotoEstoqueCreate(
+                        id_modelo=modelo.id,
+                        chassi=unidade.chassi,
+                        cor="Teste",
+                        ano_modelo=2025,
+                        preco_venda=Decimal("1"),
+                    )
+                )
+            cliente_id = self.active_client_id(gerente)
+
+        with self.client_for("VENDEDOR") as vendedor:
+            me = vendedor.current_user().funcionario
+            reservada = vendedor.reservar_moto(
+                unidade.id, ReservaMotoCreate(id_cliente=cliente_id, dias_validade=2)
+            )
+            self.assertEqual(
+                (reservada.status, reservada.clientes_id, reservada.id_vendedor_reserva),
+                ("RESERVADA", cliente_id, me.id),
+            )
+            self.assertIsNotNone(reservada.reservada_ate)
+            with self.assertRaises(XanoValidationError):
+                vendedor.reservar_moto(unidade.id, ReservaMotoCreate(id_cliente=cliente_id))
+            with self.assertRaises(XanoValidationError):
+                vendedor.request("POST", f"motos/{unidade.id}/reserva/cancelar", json={})
+
+        with self.client_for("GERENTE") as gerente:
+            self.assertEqual(
+                next(item for item in gerente.list_catalogo() if item.id == modelo.id).disponiveis, 0
+            )
+            liberada = gerente.cancelar_reserva_moto(unidade.id, CancelamentoReservaMoto(motivo="Teste"))
+            self.assertEqual((liberada.status, liberada.clientes_id), ("DISPONIVEL", None))
+            self.assertEqual(
+                [evento.status_novo for evento in liberada.historico],
+                ["DISPONIVEL", "RESERVADA", "DISPONIVEL"],
+            )
+            with self.assertRaises(XanoPermissionError):
+                gerente.request("PUT", f"motos/{unidade.id}", json={"status": "VENDIDA"})
+
+
+@unittest.skipUnless(
+    CONCURRENCY, "XANO_TEST_CONCURRENCY desativado: cenários concorrentes ignorados."
+)
+class XanoLiveReservationConcurrencyTests(XanoLiveSalesWriteTestCase):
+    def test_two_reservations_of_the_same_unit(self):
+        with self.client_for("GERENTE") as client:
+            _, unidade = self.create_unit(client)
+            cliente_id = self.active_client_id(client)
+        results = self.race(
+            *[
+                lambda c: c.reservar_moto(unidade.id, ReservaMotoCreate(id_cliente=cliente_id))
+                for _ in range(2)
+            ]
+        )
+        errors = [result for result in results if isinstance(result, XanoValidationError)]
+        self.assertEqual(len(errors), 1, results)
+        with self.client_for("GERENTE") as client:
+            detalhe = client.get_moto_estoque(unidade.id)
+            self.assertEqual(detalhe.status, "RESERVADA")
+            self.assertEqual(len(detalhe.historico), 2)
+            client.cancelar_reserva_moto(unidade.id, CancelamentoReservaMoto(motivo="Limpeza do teste"))
 
 
 if __name__ == "__main__":

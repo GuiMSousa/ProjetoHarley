@@ -91,7 +91,8 @@ class SecurityContractTests(unittest.TestCase):
                 self.assertNotIn("security.create_auth_token", content)
                 self.assertNotIn("util.send_email", content)
 
-    def test_only_login_endpoint_is_public(self):
+    def test_public_surface_is_explicit(self):
+        """Login plus the read-only showroom (Change 8, D3) are the only public endpoints."""
         public = []
         for path in (XANO / "api").rglob("*.xs"):
             content = path.read_text(encoding="utf-8")
@@ -100,7 +101,17 @@ class SecurityContractTests(unittest.TestCase):
             blocked = "precondition (false)" in content
             if not re.search(r'^\s*auth = "user"', content, re.M) and not blocked:
                 public.append(path.relative_to(XANO).as_posix())
-        self.assertEqual(public, ["api/authentication/auth/login_POST.xs"])
+        self.assertEqual(
+            sorted(public),
+            [
+                "api/authentication/auth/login_POST.xs",
+                "api/harley/catalogo/catalogo_id_GET.xs",
+                "api/harley/catalogo_GET.xs",
+            ],
+        )
+        for relative_path in ("api/harley/catalogo_GET.xs", "api/harley/catalogo/catalogo_id_GET.xs"):
+            with self.subTest(path=relative_path):
+                self.assertIn("verb=GET", self.read(relative_path))
 
     def test_event_logs_never_store_whole_records(self):
         for path in (XANO / "api").rglob("*.xs"):

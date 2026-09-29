@@ -73,7 +73,7 @@ Somente usuários vinculados a um funcionário com `ativo != false` PODEM execut
 
 ## Requisito: superfície pública mínima
 
-Somente `auth/login` PODE ser chamado sem JWT. Recursos auxiliares do quick-start sem uso pela aplicação (como o agente e a ferramenta de exemplo de IA) NÃO DEVEM ser mantidos no export. `auth/signup` e `message/send_welcome_email` DEVEM exigir `GERENTE`; `auth/signup` NÃO DEVE devolver token do usuário criado. Fluxos de recuperação de acesso não homologados DEVEM permanecer bloqueados.
+Somente `auth/login` e a vitrine de leitura `GET catalogo` e `GET catalogo/{id}` (Change 8) PODEM ser chamados sem JWT. A vitrine DEVE expor apenas campos de vitrine de modelos ativos, nunca unidades, chassi, cliente, vendedor ou histórico. Qualquer outro endpoint público DEVE ser aprovado por Change e incluído na lista explícita do teste de superfície pública. Recursos auxiliares do quick-start sem uso pela aplicação (como o agente e a ferramenta de exemplo de IA) NÃO DEVEM ser mantidos no export. `auth/signup` e `message/send_welcome_email` DEVEM exigir `GERENTE`; `auth/signup` NÃO DEVE devolver token do usuário criado. Fluxos de recuperação de acesso não homologados DEVEM permanecer bloqueados.
 
 ### Cenário: gerente cria usuário
 

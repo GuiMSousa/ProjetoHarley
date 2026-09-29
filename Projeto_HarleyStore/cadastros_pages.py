@@ -5,17 +5,46 @@ from __future__ import annotations
 import reflex as rx
 
 from Projeto_HarleyStore.cadastros_state import SECTION_ROUTES, CadastrosState
-from Projeto_HarleyStore.components import guarded_page, modal_panel
-from Projeto_HarleyStore.styles.theme import COLORS, PANEL, PRIMARY_BUTTON
-from Projeto_HarleyStore.ui_helpers import error_callout, labeled
+from Projeto_HarleyStore.components import guarded_page, modal_panel, page_body
+from Projeto_HarleyStore.styles.theme import COLORS
+from Projeto_HarleyStore.ui_helpers import (
+    danger_button,
+    data_table,
+    error_callout,
+    labeled,
+    metal_button,
+    modal_header,
+    page_header,
+    pager,
+    primary_button,
+    status_badge,
+    toolbar,
+)
 
 
+# section: (title, description, (primary, secondary, tertiary) column headers)
 SECTIONS = {
-    "clientes": ("Clientes", "Pessoas e compradores cadastrados."),
-    "motos_clientes": ("Motos de clientes", "Veículos vinculados ao histórico da oficina."),
-    "produtos": ("Produtos e peças", "Catálogo, preço de venda e saldo atual."),
-    "fornecedores": ("Fornecedores", "Parceiros de abastecimento da operação."),
-    "funcionarios": ("Funcionários", "Equipe e tipos de acesso operacional."),
+    "clientes": ("Clientes", "Pessoas e compradores cadastrados.", ("Nome", "CPF/CNPJ", "Telefone")),
+    "motos_clientes": (
+        "Motos de clientes",
+        "Veículos vinculados ao histórico da oficina.",
+        ("Modelo", "Placa", "Chassi"),
+    ),
+    "produtos": (
+        "Produtos e peças",
+        "Catálogo, preço de venda e saldo atual.",
+        ("Código", "Produto", "Preço e saldo"),
+    ),
+    "fornecedores": (
+        "Fornecedores",
+        "Parceiros de abastecimento da operação.",
+        ("Razão social", "CNPJ", "Contato"),
+    ),
+    "funcionarios": (
+        "Funcionários",
+        "Equipe e tipos de acesso operacional.",
+        ("Nome", "Tipo", "Cargo"),
+    ),
 }
 
 
@@ -47,8 +76,8 @@ def cadastro_form() -> rx.Component:
         rx.cond(
             CadastrosState.active_section == "motos_clientes",
             rx.vstack(
-                rx.vstack(
-                    rx.text("Cliente existente", size="2", color=COLORS["muted"]),
+                labeled(
+                    "Cliente existente",
                     rx.select(
                         CadastrosState.client_options,
                         value=CadastrosState.form_data["id_cliente"],
@@ -56,8 +85,6 @@ def cadastro_form() -> rx.Component:
                         placeholder="Selecione um cliente",
                         width="100%",
                     ),
-                    align="stretch",
-                    spacing="1",
                     width="100%",
                 ),
                 field("Modelo", "modelo"),
@@ -111,22 +138,16 @@ def cadastro_form() -> rx.Component:
 
 def cadastro_modal() -> rx.Component:
     return modal_panel(
-        rx.hstack(
-            rx.heading("Cadastro", size="5"),
-            rx.spacer(),
-            rx.button("Fechar", on_click=CadastrosState.close_form, variant="ghost"),
-            width="100%",
-        ),
+        modal_header("Cadastro", on_close=CadastrosState.close_form),
         error_callout(CadastrosState.form_error),
         cadastro_form(),
         rx.hstack(
             rx.spacer(),
-            rx.button("Cancelar", on_click=CadastrosState.close_form, variant="outline"),
-            rx.button(
+            metal_button("Cancelar", on_click=CadastrosState.close_form),
+            primary_button(
                 rx.cond(CadastrosState.is_saving, "Salvando...", "Salvar"),
                 on_click=CadastrosState.save_form,
                 disabled=CadastrosState.is_busy,
-                **PRIMARY_BUTTON,
             ),
             width="100%",
         ),
@@ -134,120 +155,73 @@ def cadastro_modal() -> rx.Component:
 
 
 def cadastro_row(row: rx.Var, section: str) -> rx.Component:
-    return rx.hstack(
-        rx.vstack(
-            rx.text(row["primary"], font_weight="700", color=COLORS["text"]),
-            rx.text(row["secondary"], size="2", color=COLORS["muted"]),
-            align="start",
-            spacing="1",
-            min_width="12rem",
-        ),
-        rx.text(row["tertiary"], size="2", color=COLORS["muted"], flex="1"),
-        rx.text(row["ativo"], size="2", color=COLORS["orange"]),
-        rx.cond(
-            CadastrosState.can_write_active,
-            rx.hstack(
-                rx.button(
-                    "Editar",
-                    on_click=CadastrosState.open_edit(section, row["id"]),
-                    variant="outline",
-                    size="2",
-                    disabled=CadastrosState.is_busy,
+    return rx.table.row(
+        rx.table.cell(rx.text(row["primary"], font_weight="700")),
+        rx.table.cell(row["secondary"], color=COLORS["muted"]),
+        rx.table.cell(row["tertiary"]),
+        rx.table.cell(status_badge(row["status"], row["ativo"])),
+        rx.table.cell(
+            rx.cond(
+                CadastrosState.can_write_active,
+                rx.hstack(
+                    metal_button(
+                        "Editar",
+                        on_click=CadastrosState.open_edit(section, row["id"]),
+                        size="1",
+                        disabled=CadastrosState.is_busy,
+                    ),
+                    danger_button(
+                        "Desativar",
+                        on_click=CadastrosState.deactivate(section, row["id"]),
+                        size="1",
+                        disabled=CadastrosState.is_busy,
+                    ),
+                    spacing="2",
+                    justify="end",
                 ),
-                rx.button(
-                    "Desativar",
-                    on_click=CadastrosState.deactivate(section, row["id"]),
-                    variant="ghost",
-                    color=COLORS["danger"],
-                    size="2",
-                    disabled=CadastrosState.is_busy,
-                ),
-                spacing="2",
             ),
+            text_align="right",
         ),
-        width="100%",
-        padding="0.8rem 0",
-        border_bottom=f"1px solid {COLORS['border']}",
         align="center",
     )
 
 
 def cadastro_page(section: str) -> rx.Component:
-    title, description = SECTIONS[section]
+    title, description, (primary, secondary, tertiary) = SECTIONS[section]
     return guarded_page(
-        rx.vstack(
-            rx.hstack(
-                rx.vstack(
-                    rx.heading(title, size="7"),
-                    rx.text(description, color=COLORS["muted"]),
-                    align="start",
-                    spacing="1",
-                ),
-                rx.spacer(),
+        page_body(
+            page_header(
+                title,
+                description,
                 rx.cond(
                     CadastrosState.can_write_active,
-                    rx.button(
+                    primary_button(
+                        rx.icon("plus", size=16),
                         "Novo cadastro",
                         on_click=CadastrosState.open_create(section),
                         disabled=CadastrosState.is_busy,
-                        **PRIMARY_BUTTON,
                     ),
                 ),
-                width="100%",
-                align="center",
             ),
-            rx.hstack(
-                rx.input(
-                    placeholder="Buscar neste cadastro...",
-                    value=CadastrosState.search_text,
-                    on_change=CadastrosState.set_search_text,
-                    disabled=CadastrosState.is_loading_list,
-                    width="min(100%, 28rem)",
-                ),
-                rx.spacer(),
-                rx.text(
-                    rx.cond(
-                        CadastrosState.total_pages > 1,
-                        f"Página {CadastrosState.current_page} de {CadastrosState.total_pages}",
-                        "",
-                    ),
-                    size="2",
-                    color=COLORS["muted"],
-                ),
-                width="100%",
+            toolbar(
+                CadastrosState.search_text,
+                CadastrosState.set_search_text,
+                "Buscar neste cadastro...",
+                disabled=CadastrosState.is_loading_list,
+                current_page=CadastrosState.current_page,
+                total_pages=CadastrosState.total_pages,
             ),
             error_callout(CadastrosState.list_error),
-            rx.box(
-                rx.cond(
-                    CadastrosState.is_loading_list,
-                    rx.text("Carregando registros...", color=COLORS["muted"], padding="2rem"),
-                    rx.cond(
-                        CadastrosState.visible_rows.length() > 0,
-                        rx.vstack(
-                            rx.foreach(
-                                CadastrosState.visible_rows,
-                                lambda row: cadastro_row(row, section),
-                            ),
-                            align="stretch",
-                            width="100%",
-                        ),
-                        rx.text("Nenhum registro encontrado.", color=COLORS["muted"], padding="2rem"),
-                    ),
-                ),
-                width="100%",
-                padding="0 1rem",
-                **PANEL,
+            data_table(
+                [primary, secondary, tertiary, "Situação", ("", "right")],
+                CadastrosState.visible_rows,
+                lambda row: cadastro_row(row, section),
+                empty_text="Nenhum registro encontrado.",
+                loading=CadastrosState.is_loading_list,
+                loading_text="Carregando registros...",
             ),
-            rx.hstack(
-                rx.button("Anterior", on_click=CadastrosState.previous_page, variant="outline", disabled=CadastrosState.is_busy),
-                rx.button("Próxima", on_click=CadastrosState.next_page, variant="outline", disabled=CadastrosState.is_busy),
-                spacing="2",
-            ),
+            pager(CadastrosState.previous_page, CadastrosState.next_page, CadastrosState.is_busy),
             rx.cond(CadastrosState.form_open, cadastro_modal()),
-            align="stretch",
-            spacing="5",
-            padding="2rem",
-            width="100%",
         ),
         SECTION_ROUTES[section],
     )

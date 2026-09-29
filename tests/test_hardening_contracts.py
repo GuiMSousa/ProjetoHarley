@@ -21,6 +21,9 @@ class HardeningContractTests(unittest.TestCase):
             "xano/api/harley/ordens_servico/ordens_servico_id_status_POST.xs",
             "xano/api/harley/ordens_servico/ordens_servico_id_itens_POST.xs",
             "xano/api/harley/ordens_servico/ordens_servico_id_itens_item_id_DELETE.xs",
+            "xano/api/harley/motos_POST.xs",
+            "xano/api/harley/motos/motos_id_reserva_POST.xs",
+            "xano/api/harley/motos/motos_id_reserva_cancelar_POST.xs",
             "xano/api/harley/transacoes_POST.xs",
             "xano/api/harley/transacoes/transacoes_id_PUT.xs",
         ]

@@ -3,9 +3,8 @@ import unittest
 from unittest.mock import patch
 
 import httpx
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
-from Projeto_HarleyStore.services.motos import Moto
 from Projeto_HarleyStore.services.xano_client import (
     AuthTokenResponse,
     CurrentUserResponse,
@@ -17,6 +16,13 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoResponseError,
     XanoValidationError,
 )
+
+
+class Item(BaseModel):
+    """Test-local model for the generic response_model support."""
+
+    id: int
+    modelo: str
 
 
 class XanoClientTests(unittest.TestCase):
@@ -218,8 +224,8 @@ class XanoClientTests(unittest.TestCase):
             )
 
         with self.make_client(handler) as client:
-            motos = client.get("motos", response_model=TypeAdapter(list[Moto]))
-        self.assertEqual(motos[0].id, 1)
+            itens = client.get("motos", response_model=TypeAdapter(list[Item]))
+        self.assertEqual((itens[0].id, itens[0].modelo), (1, "Iron"))
 
 
 if __name__ == "__main__":

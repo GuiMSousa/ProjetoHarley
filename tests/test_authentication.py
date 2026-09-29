@@ -146,7 +146,7 @@ class AuthenticationTests(unittest.TestCase):
         # Change 6: the salesperson reads the workshop but cannot operate orders.
         self.assertTrue(role_allows_route("VENDEDOR", "/workshop"))
 
-    def test_route_matrix_covers_registrations_and_stock(self):
+    def test_route_matrix_covers_registrations_stock_and_sales(self):
         expected = {
             "/cadastros/clientes": {"GERENTE", "VENDEDOR", "MECANICO"},
             "/cadastros/motos-clientes": {"GERENTE", "VENDEDOR", "MECANICO"},
@@ -154,6 +154,7 @@ class AuthenticationTests(unittest.TestCase):
             "/cadastros/fornecedores": {"GERENTE"},
             "/cadastros/funcionarios": {"GERENTE"},
             "/estoque/entradas": {"GERENTE", "VENDEDOR", "MECANICO"},
+            "/vendas": {"GERENTE", "VENDEDOR"},
         }
         for route, roles in expected.items():
             for role in ("GERENTE", "VENDEDOR", "MECANICO"):
@@ -172,6 +173,11 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("/cadastros/produtos", routes)
         self.assertIn("/estoque/entradas", routes)
         self.assertNotIn("/cadastros/fornecedores", routes)
+        self.assertIn("/vendas", routes)
+        mechanic = type(
+            "Fixture", (), {"is_authenticated": True, "employee_role": "MECANICO"}
+        )()
+        self.assertNotIn("/vendas", AuthState.allowed_routes.fget(mechanic))
         anonymous = type(
             "Fixture", (), {"is_authenticated": False, "employee_role": "GERENTE"}
         )()

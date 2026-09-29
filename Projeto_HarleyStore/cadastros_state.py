@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Callable
 
 import reflex as rx
 from pydantic import ValidationError
 
 from Projeto_HarleyStore.auth import AuthState, role_allows_route
+from Projeto_HarleyStore.formatting import format_currency
 from Projeto_HarleyStore.listing import (
     filter_rows,
     option_id,
@@ -25,6 +26,7 @@ from Projeto_HarleyStore.services.cadastros import (
     FuncionarioUpdate,
     MotoClienteCreate,
     MotoClienteUpdate,
+    Produto,
     ProdutoCreate,
     ProdutoUpdate,
 )
@@ -45,6 +47,11 @@ SECTION_ROUTES = {
     "fornecedores": "/cadastros/fornecedores",
     "funcionarios": "/cadastros/funcionarios",
 }
+
+
+def produto_resumo(produto: Produto) -> str:
+    """Display column of a product: formatted price and current balance."""
+    return f"{format_currency(produto.preco_venda)} · {produto.estoque_qtd} em estoque"
 
 
 class CadastrosState(AuthState):
@@ -136,7 +143,14 @@ class CadastrosState(AuthState):
         self.form_data = {**self.form_data, field: value}
         self.form_error = ""
 
-    def _rows(self, values: list[Any], primary: str, secondary: str, tertiary: str) -> list[dict[str, str]]:
+    def _rows(
+        self,
+        values: list[Any],
+        primary: str,
+        secondary: str,
+        tertiary: str | Callable[[Any], str],
+    ) -> list[dict[str, str]]:
+        """Raw fields feed the edit form; primary/secondary/tertiary are display columns."""
         rows = []
         for item in values:
             row = {
@@ -148,9 +162,12 @@ class CadastrosState(AuthState):
                     "id": str(item.id),
                     "primary": str(getattr(item, primary, "")),
                     "secondary": str(getattr(item, secondary, "")),
-                    "tertiary": str(getattr(item, tertiary, "")),
+                    "tertiary": (
+                        tertiary(item) if callable(tertiary) else str(getattr(item, tertiary, "") or "")
+                    ),
                     "ativo": "Ativo" if item.ativo else "Inativo",
                     "ativo_value": "true" if item.ativo else "false",
+                    "status": "ATIVO" if item.ativo else "INATIVO",
                 }
             )
             rows.append(row)
@@ -164,7 +181,7 @@ class CadastrosState(AuthState):
                 self.clientes = self._rows(client.list_clientes(), "nome_cliente", "cpf_cnpj", "telefone")
                 self.motos_clientes = self._rows(client.list_motos_clientes(), "modelo", "placa", "chassi")
             elif section == "produtos":
-                self.produtos = self._rows(client.list_produtos(), "codigo", "nome_produto", "preco_venda")
+                self.produtos = self._rows(client.list_produtos(), "codigo", "nome_produto", produto_resumo)
             elif section == "fornecedores":
                 self.fornecedores = self._rows(client.list_fornecedores(), "nome_fornecedor", "cnpj", "contato")
             elif section == "funcionarios":

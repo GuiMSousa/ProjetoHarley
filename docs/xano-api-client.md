@@ -40,6 +40,12 @@ Regras importantes:
 3. Conferir que não há produtos antigos com `codigo` vazio repetido; o índice único de `produtos.codigo` falharia na criação.
 4. Rodar a suíte de integração (seção "Testes de integração").
 
+### Checklist de deploy da Change 8 (catálogo e reservas de motos)
+
+1. Publicar com `xano workspace push -d ./xano` (aditivo: tabelas `modelos_moto` e `historico_status_moto`, campos anuláveis em `motos`, funções `Catalogo/*` e `Vendas/*`, endpoints de catálogo, unidades e reservas).
+2. Executar uma vez a função `Catalogo/seed_exemplo` (Run & Debug), informando o id de um funcionário `GERENTE`, para ter um modelo por família com cores e unidades. As imagens são placeholders neutros (`placehold.co`): troque-as por fotos próprias ou licenciadas antes de divulgar `/catalogo`.
+3. Rodar a integração (seção "Testes").
+
 ### Checklist de deploy da Change 7 (itens de OS e livro de estoque)
 
 1. Publicar com `--sync`: `itens_ordem_servico.id_produto` foi relaxado para anulável (itens do tipo `SERVICO`). Revise antes o `--dry-run`, de preferência num branch.
@@ -58,7 +64,7 @@ O cliente não persiste tokens, não os registra em logs e não os envia em quer
 
 `auth/me` devolve `{user, funcionario}`. `XanoEmployee.ativo` indica se o funcionário vinculado está ativo; o Reflex recusa a sessão de funcionário inativo, e o Xano (`enforce_role`) nega qualquer operação de negócio a ele.
 
-Somente `auth/login` é público. `auth/signup` exige `GERENTE`, cria o usuário vinculado a um funcionário ativo e ainda sem usuário, e **não** devolve token do novo usuário. `message/send_welcome_email` exige `GERENTE`. O fluxo de recuperação por magic link (`reset/request-reset-link` e `reset/magic-link-login`) está bloqueado até ser homologado por uma Change.
+Além de `auth/login`, somente a vitrine é pública: `GET catalogo` e `GET catalogo/{id}` (Change 8), de leitura e com projeção fechada. `auth/signup` exige `GERENTE`, cria o usuário vinculado a um funcionário ativo e ainda sem usuário, e **não** devolve token do novo usuário. `message/send_welcome_email` exige `GERENTE`. O fluxo de recuperação por magic link (`reset/request-reset-link` e `reset/magic-link-login`) está bloqueado até ser homologado por uma Change.
 
 `reset/update_password` troca a senha do próprio usuário autenticado e exige `current_password`, `password` (mínimo de 8 caracteres) e `confirm_password`. O Xano valida o funcionário vinculado ativo (`enforce_role`), confere a senha atual com `security.check_password` e rejeita a nova senha igual à atual, com `400` e mensagem legível. As senhas não passam por `trim`, como em `auth/login` e `auth/signup`, e o log registra apenas o id do usuário. Ainda não há tela nem método no `XanoClient` para essa troca.
 
@@ -112,6 +118,53 @@ Toda alteração de `produtos.estoque_qtd` depois da criação do produto passa 
 
 Cada movimentação grava em `movimentacoes_estoque` o saldo anterior e posterior, o funcionário autenticado e a origem. O índice único `(id_produto, versao_anterior)`, somado a `produtos.versao_estoque`, faz a segunda movimentação concorrente do mesmo produto falhar e desfazer a transação inteira. O livro não tem endpoints nem métodos no cliente nesta etapa.
 
+## Catálogo de motos (vitrine)
+
+Os DTOs ficam em `Projeto_HarleyStore.services.catalogo`:
+
+- `VariacaoCor` — `nome`, `hex` (`#RRGGBB`) e `imagem_url` (`https://`);
+- `ModeloMotoCreate` / `ModeloMotoUpdate` — nome, `familia` (`TOURING` | `CRUISER` | `ADVENTURE` | `SPORT`), descrição, `preco_base > 0`, `imagem_principal` (`https://`), até 12 `variacoes_cor`, `destaque` e, no update, `ativo`;
+- `ModeloMoto` — modelo gerido pelo gerente, inclusive inativo;
+- `ModeloCatalogo` — projeção de vitrine: dados públicos do modelo, `preco_a_partir` e `disponiveis`.
+
+| Método | Endpoint | Perfil |
+| --- | --- | --- |
+| `list_catalogo(familia=None, busca=None)` | `GET catalogo` | público (sem token) |
+| `get_modelo_catalogo(id)` | `GET catalogo/{id}` | público (sem token) |
+| `list_modelos_moto()` | `GET modelos_moto` | `GERENTE` |
+| `criar_modelo_moto(modelo)` | `POST modelos_moto` | `GERENTE` |
+| `atualizar_modelo_moto(id, modelo)` | `PATCH modelos_moto/{id}` | `GERENTE` |
+
+- **Projeção pública:** a função `Catalogo/vitrine` devolve só modelos ativos e só os campos `id`, `nome_modelo`, `familia`, `descricao`, `imagem_principal`, `variacoes_cor`, `destaque`, `preco_a_partir` e `disponiveis`. Nunca expõe unidades, chassi, cliente, vendedor ou histórico. As unidades são lidas numa única consulta (sem N+1).
+- **"A partir de":** menor `preco_venda` entre as unidades `DISPONIVEL` do modelo; sem unidades, vale o `preco_base` ("Sob consulta" na vitrine).
+- **Cache e `429`:** a vitrine passa pelo mesmo backend Reflex para todos os visitantes. `catalogo_cache` (TTL de 60 s, por processo) guarda a lista completa; a tela filtra família e busca localmente e só a recarrega depois do TTL ou de uma escrita do gerente (`invalidate`). Uma resposta `429` vira `XanoRateLimitError`, com a mensagem "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente.".
+
+## Estoque e reservas de motos
+
+Os DTOs ficam em `Projeto_HarleyStore.services.motos`:
+
+- `MotoEstoqueCreate` — `id_modelo`, `chassi` (VIN de 17 caracteres, normalizado em caixa alta), `cor`, `ano_modelo` (de 1990 ao ano seguinte) e `preco_venda > 0`; nunca carrega status, cliente ou vendedor;
+- `MotoEstoqueUpdate` — `chassi`, `cor`, `ano_modelo` e `preco_venda`, opcionais;
+- `MotoEstoque` / `MotoEstoqueDetalhe` — unidade enriquecida (modelo, família, cores, cliente, vendedor, validade) e, no detalhe, `historico` (`HistoricoStatusMoto`); `status` nulo de unidades legadas é lido como `DISPONIVEL`;
+- `ReservaMotoCreate` — `id_cliente`, `dias_validade` (1 a 30, padrão 7) e `observacao`;
+- `CancelamentoReservaMoto` — `motivo` obrigatório.
+
+| Método | Endpoint | Perfil |
+| --- | --- | --- |
+| `list_motos_estoque(status=None, id_modelo=None)` | `GET motos` | `GERENTE`, `VENDEDOR` |
+| `get_moto_estoque(id)` | `GET motos/{id}` | `GERENTE`, `VENDEDOR` |
+| `cadastrar_moto_estoque(moto)` | `POST motos` | `GERENTE` |
+| `atualizar_moto_estoque(id, moto)` | `PATCH motos/{id}` | `GERENTE` |
+| `reservar_moto(id, reserva)` | `POST motos/{id}/reserva` | `GERENTE`, `VENDEDOR` |
+| `cancelar_reserva_moto(id, cancelamento)` | `POST motos/{id}/reserva/cancelar` | `GERENTE`, `VENDEDOR` (regra abaixo) |
+
+- **Status:** muda somente por `Vendas/transicionar_moto`, chamada dentro da transação da reserva e do cancelamento; `PUT` e `DELETE motos/{id}` respondem `403`.
+- **Reserva:** unidade `DISPONIVEL` com modelo, cliente ativo; vendedor (do JWT) e validade (`now + dias`) definidos pelo servidor.
+- **Cancelamento:** quem reservou, um `GERENTE` ou, depois do vencimento, qualquer vendedor; outros recebem `403`.
+- **Concorrência:** cada transição grava `historico_status_moto` com `versao_anterior` antes da unidade; o índice único `(id_moto, versao_anterior)` faz a segunda reserva simultânea falhar (`400`).
+- **Cadastro:** chassi único em `motos` e em `motos_clientes`; cor dentro das variações do modelo; a unidade nasce `DISPONIVEL` com histórico.
+- **Legado:** `list_motos`, `create_moto`, `update_moto` e os DTOs `Moto`/`MotoCreate`/`MotoUpdate` foram removidos.
+
 ## Ordens de serviço
 
 Os DTOs ficam em `Projeto_HarleyStore.services.ordens_servico`:
@@ -159,6 +212,7 @@ As duas rotas de itens devolvem o `OrdemServicoDetalhe` atualizado e só aceitam
 | `401` | `XanoAuthenticationError` | genérica | idem | idem |
 | `403` | `XanoPermissionError` | genérica | "Seu perfil não possui permissão para esta operação." | preserva a sessão; toast |
 | `404` | `XanoNotFoundError` | genérica | "O registro solicitado não foi encontrado." | toast |
+| `429` | `XanoRateLimitError` | genérica | "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente." | toast ou erro da lista; a vitrine usa cache de 60 s |
 | `400` / `422` | `XanoValidationError` | `message` do Xano, se texto com até 200 caracteres; senão genérica | a própria mensagem de negócio | mantém o formulário aberto com a mensagem |
 | demais / transporte | `XanoError` | genérica | "Não foi possível comunicar com o Xano. Tente novamente." | toast ou erro da lista |
 | `2xx` fora do DTO | `XanoResponseError` | genérica | idem `XanoError` | idem |
@@ -188,6 +242,11 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Oficina: abrir OS e transicionar status | sim | não | sim |
 | Oficina: incluir e remover peças e serviços em OS aberta ou em andamento | sim | não | sim |
 | Oficina: listar mecânicos | sim | não | sim |
+| Catálogo de motos (vitrine `/catalogo`) | sim | sim | sim (também visitantes sem login) |
+| Estoque de motos, reservas e histórico (`/vendas`) | sim | sim | não |
+| Reservar unidade disponível | sim | sim | não |
+| Cancelar reserva | qualquer | própria ou vencida | não |
+| Criar e editar modelos e unidades | sim | não | não |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
 
@@ -202,4 +261,6 @@ python -m unittest discover -s tests
 - Credenciais por perfil: `XANO_TEST_GERENTE_EMAIL`/`_PASSWORD`, `XANO_TEST_VENDEDOR_*` e `XANO_TEST_MECANICO_*`. Perfis sem credenciais são ignorados individualmente.
 - Os cenários que gravam dados (registro de entrada, documento duplicado, rollback, ciclo completo de OS com as rejeições da máquina de estados, e ciclo de itens com baixa, devolução, totais e cancelamento) exigem `XANO_TEST_ALLOW_WRITES=true`. Como entradas, OS encerradas e movimentações de estoque são imutáveis, rode-os em um branch ou workspace de testes. As OS abertas pelos testes são canceladas ao final, devolvendo as peças.
 - `XANO_TEST_CONCURRENCY=true` (junto com as escritas) roda as corridas: duas OS disputando todo o saldo de um produto e uma inclusão simultânea ao cancelamento. Exige duas motos de cliente sem OS em aberto.
+- A leitura pública do catálogo roda só com a URL configurada (sem credenciais) e é ignorada, com aviso, enquanto a Change 8 não estiver publicada. O ciclo de reserva (`ALLOW_WRITES`) cria um modelo e uma unidade próprios e retira o modelo do catálogo ao final; a corrida de duas reservas da mesma unidade exige `XANO_TEST_CONCURRENCY`.
+- O workspace do Xano limita a taxa de requisições (`429` após cerca de 6 chamadas seguidas): a suíte completa com credenciais pode falhar de forma intermitente por isso.
 - Os testes de cada Change exigem o respectivo push; antes dele, os endpoints novos respondem `404`.

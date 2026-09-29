@@ -8,7 +8,20 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from Projeto_HarleyStore.services.motos import Moto, MotoCreate, MotoUpdate
+from Projeto_HarleyStore.services.motos import (
+    CancelamentoReservaMoto,
+    MotoEstoque,
+    MotoEstoqueCreate,
+    MotoEstoqueDetalhe,
+    MotoEstoqueUpdate,
+    ReservaMotoCreate,
+)
+from Projeto_HarleyStore.services.catalogo import (
+    ModeloCatalogo,
+    ModeloMoto,
+    ModeloMotoCreate,
+    ModeloMotoUpdate,
+)
 from Projeto_HarleyStore.services.cadastros import (
     Cliente,
     ClienteCreate,
@@ -91,6 +104,10 @@ class XanoNotFoundError(XanoError):
 
 class XanoResponseError(XanoError):
     """Raised when a successful Xano response violates its contract."""
+
+
+class XanoRateLimitError(XanoError):
+    """Raised when Xano throttles the workspace (HTTP 429)."""
 
 
 class AuthTokenResponse(BaseModel):
@@ -204,6 +221,11 @@ class XanoClient:
         if response.status_code == 404:
             raise XanoNotFoundError(
                 "The requested Xano resource was not found.",
+                status_code=response.status_code,
+            )
+        if response.status_code == 429:
+            raise XanoRateLimitError(
+                "The Xano API rate limit was reached.",
                 status_code=response.status_code,
             )
         if response.status_code in {400, 422}:
@@ -342,23 +364,6 @@ class XanoClient:
             response_model=CurrentUserResponse,
             base_url=self._auth_base_url,
         )
-
-    def list_motos(self) -> list[Moto]:
-        """List motos returned by the Xano motos endpoint."""
-        return self.get("motos", response_model=TypeAdapter(list[Moto]))
-
-    def create_moto(self, moto: MotoCreate) -> Moto:
-        """Create a moto in Xano."""
-        return self.post("motos", json=moto.model_dump(), response_model=Moto)
-
-    def update_moto(self, moto_id: int, moto: MotoUpdate) -> Moto:
-        """Update the provided fields of a moto in Xano."""
-        response = self.patch(
-            f"motos/{moto_id}",
-            json=moto.model_dump(exclude_unset=True),
-            response_model=Moto,
-        )
-        return response
 
     def list_clientes(self) -> list[Cliente]:
         return self._list_resource("clientes", Cliente)
@@ -511,3 +516,88 @@ class XanoClient:
 
     def list_mecanicos(self) -> list[Mecanico]:
         return self.get("oficina/mecanicos", response_model=TypeAdapter(list[Mecanico]))
+
+    # ----- motorcycle catalog -----
+
+    def list_catalogo(
+        self, *, familia: str | None = None, busca: str | None = None
+    ) -> list[ModeloCatalogo]:
+        """Public showroom: callable without a session, only showroom fields."""
+        params = {
+            key: value for key, value in {"familia": familia, "busca": busca}.items() if value
+        }
+        return self.get(
+            "catalogo",
+            params=params or None,
+            authenticated=False,
+            response_model=TypeAdapter(list[ModeloCatalogo]),
+        )
+
+    def get_modelo_catalogo(self, modelo_id: int) -> ModeloCatalogo:
+        return self.get(
+            f"catalogo/{modelo_id}", authenticated=False, response_model=ModeloCatalogo
+        )
+
+    def list_modelos_moto(self) -> list[ModeloMoto]:
+        return self.get("modelos_moto", response_model=TypeAdapter(list[ModeloMoto]))
+
+    def criar_modelo_moto(self, modelo: ModeloMotoCreate) -> ModeloMoto:
+        return self.post(
+            "modelos_moto",
+            json=modelo.model_dump(mode="json", exclude_none=True),
+            response_model=ModeloMoto,
+        )
+
+    def atualizar_modelo_moto(self, modelo_id: int, modelo: ModeloMotoUpdate) -> ModeloMoto:
+        """PATCH with only the fields set by the caller."""
+        return self.patch(
+            f"modelos_moto/{modelo_id}",
+            json=modelo.model_dump(mode="json", exclude_unset=True),
+            response_model=ModeloMoto,
+        )
+
+    # ----- stock units and reservations -----
+
+    def list_motos_estoque(
+        self, *, status: str | None = None, id_modelo: int | None = None
+    ) -> list[MotoEstoque]:
+        params = {
+            key: value
+            for key, value in {"status": status, "id_modelo": id_modelo}.items()
+            if value is not None
+        }
+        return self.get(
+            "motos", params=params or None, response_model=TypeAdapter(list[MotoEstoque])
+        )
+
+    def get_moto_estoque(self, moto_id: int) -> MotoEstoqueDetalhe:
+        return self.get(f"motos/{moto_id}", response_model=MotoEstoqueDetalhe)
+
+    def cadastrar_moto_estoque(self, moto: MotoEstoqueCreate) -> MotoEstoqueDetalhe:
+        return self.post(
+            "motos", json=moto.model_dump(mode="json"), response_model=MotoEstoqueDetalhe
+        )
+
+    def atualizar_moto_estoque(self, moto_id: int, moto: MotoEstoqueUpdate) -> MotoEstoqueDetalhe:
+        return self.patch(
+            f"motos/{moto_id}",
+            json=moto.model_dump(mode="json", exclude_unset=True),
+            response_model=MotoEstoqueDetalhe,
+        )
+
+    def reservar_moto(self, moto_id: int, reserva: ReservaMotoCreate) -> MotoEstoqueDetalhe:
+        """Reserve an available unit; seller and expiry are set by Xano."""
+        return self.post(
+            f"motos/{moto_id}/reserva",
+            json=reserva.model_dump(mode="json", exclude_none=True),
+            response_model=MotoEstoqueDetalhe,
+        )
+
+    def cancelar_reserva_moto(
+        self, moto_id: int, cancelamento: CancelamentoReservaMoto
+    ) -> MotoEstoqueDetalhe:
+        return self.post(
+            f"motos/{moto_id}/reserva/cancelar",
+            json=cancelamento.model_dump(mode="json"),
+            response_model=MotoEstoqueDetalhe,
+        )

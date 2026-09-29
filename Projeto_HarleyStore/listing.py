@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import unicodedata
+
 
 def filter_rows(rows: list[dict[str, str]], query: str) -> list[dict[str, str]]:
     """Keep rows whose values contain the case-insensitive search text."""
@@ -30,3 +32,9 @@ def option_label(record_id: int | str, name: str) -> str:
 def option_id(option: str) -> int:
     """Return the record id encoded by ``option_label``."""
     return int(option.split(" - ", 1)[0])
+
+
+def normalize_text(text: str) -> str:
+    """Lowercase text without accents, for tolerant searches."""
+    decomposed = unicodedata.normalize("NFKD", text.lower())
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
