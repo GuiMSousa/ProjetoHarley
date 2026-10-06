@@ -59,4 +59,5 @@ query modelos_moto verb=POST {
   }
 
   response = $modelo
+  guid = "MyycD2-q_5uLc75Gaw9IJxW0AsU"
 }

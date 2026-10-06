@@ -18,4 +18,5 @@ query catalogo verb=GET {
   }
 
   response = $vitrine
+  guid = "5iNPjnzpGC-fR0HGyHyZf48eVoI"
 }

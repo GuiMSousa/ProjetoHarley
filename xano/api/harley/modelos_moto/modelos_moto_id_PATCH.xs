@@ -74,4 +74,5 @@ query "modelos_moto/{modelos_moto_id}" verb=PATCH {
   }
 
   response = $modelo
+  guid = "HHIqQuG5n1iIyvjylVNgAjBJv44"
 }

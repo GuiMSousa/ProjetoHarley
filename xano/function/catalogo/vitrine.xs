@@ -98,4 +98,5 @@ function "Catalogo/vitrine" {
   }
 
   response = $vitrine
+  guid = "V4Zr-kM9kM8R5liNZrhQyicCjd4"
 }

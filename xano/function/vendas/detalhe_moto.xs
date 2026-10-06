@@ -65,4 +65,5 @@ function "Vendas/detalhe_moto" {
   }
 
   response = $detalhe
+  guid = "gLkGCOaybq2Pv1AYt5hAybC8REI"
 }

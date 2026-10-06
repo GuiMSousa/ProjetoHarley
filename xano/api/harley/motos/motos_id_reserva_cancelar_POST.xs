@@ -81,4 +81,5 @@ query "motos/{motos_id}/reserva/cancelar" verb=POST {
   }
 
   response = $detalhe
+  guid = "tSaLhwyHRC1bGQdRRaCX_y3FF9w"
 }

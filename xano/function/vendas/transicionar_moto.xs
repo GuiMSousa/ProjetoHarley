@@ -72,4 +72,5 @@ function "Vendas/transicionar_moto" {
   }
 
   response = $historico
+  guid = "hFTPbVyHtW_SzIcSJBC13CozxHk"
 }

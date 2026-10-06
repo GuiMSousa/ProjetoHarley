@@ -18,4 +18,5 @@ query modelos_moto verb=GET {
   }
 
   response = $modelos
+  guid = "MULLg1IeaIWZrSfvjKDBoXs2vfQ"
 }

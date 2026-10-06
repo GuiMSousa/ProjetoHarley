@@ -35,4 +35,5 @@ table modelos_moto {
     {type: "btree|unique", field: [{name: "nome_modelo"}]}
     {type: "btree", field: [{name: "familia"}]}
   ]
+  guid = "XXSaEWAsIQ795KUs3dmi7lEeEG8"
 }

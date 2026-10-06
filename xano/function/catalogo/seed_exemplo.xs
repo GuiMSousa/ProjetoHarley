@@ -140,4 +140,5 @@ function "Catalogo/seed_exemplo" {
   }
 
   response = {modelos_criados: $criados}
+  guid = "g16iLP7c6hAJcDdHXSdu30RfOew"
 }

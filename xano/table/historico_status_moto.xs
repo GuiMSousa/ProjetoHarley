@@ -49,4 +49,5 @@ table historico_status_moto {
       field: [{name: "created_at", op: "desc"}]
     }
   ]
+  guid = "w0eMxcQuohvq7zRSnH_sNyPF3kQ"
 }

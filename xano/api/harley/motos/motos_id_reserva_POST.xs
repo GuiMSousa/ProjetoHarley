@@ -102,4 +102,5 @@ query "motos/{motos_id}/reserva" verb=POST {
   }
 
   response = $detalhe
+  guid = "pLCmo6yM44Uk7rR-L8bSm9UcOXA"
 }

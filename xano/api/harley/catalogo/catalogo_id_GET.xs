@@ -18,4 +18,5 @@ query "catalogo/{modelo_id}" verb=GET {
   }
 
   response = $vitrine|first
+  guid = "TfuXFRLZU2mn6kaR4rY6jY5t6Kc"
 }
