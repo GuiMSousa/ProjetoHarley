@@ -4,7 +4,10 @@
 // mesmo status viola o índice e desfaz a transação inteira.
 // O patch da OS também atualiza atualizado_em, travando a linha: inclusões e remoções de itens
 // concorrentes esperam o commit. No cancelamento, as peças baixadas voltam ao estoque na mesma
-// transação, consultadas depois do patch (Change 7).
+// transação, consultadas depois do patch (Change 7). Na conclusão, o total recalculado dos itens
+// vira uma receita ORDEM_SERVICO em transacoes, também na mesma transação; OS com total zero
+// conclui sem lançamento (Change 10, D2). Como a OS sai de EM_ANDAMENTO uma única vez, há no
+// máximo um lançamento por OS.
 query "ordens_servico/{ordens_servico_id}/status" verb=POST {
   api_group = "HARLEY"
   auth = "user"
@@ -43,7 +46,7 @@ query "ordens_servico/{ordens_servico_id}/status" verb=POST {
     db.get ordens_servico {
       field_name = "id"
       field_value = $input.ordens_servico_id
-      output = ["id", "status"]
+      output = ["id", "status", "id_cliente", "id_moto_cliente"]
     } as $os
 
     precondition ($os != null) {
@@ -66,6 +69,25 @@ query "ordens_servico/{ordens_servico_id}/status" verb=POST {
 
     var $agora {
       value = "now"|to_timestamp
+    }
+
+    // Cliente do lançamento: fotografia da OS ou, em OS anteriores à Change 6, o dono da moto.
+    var $id_cliente {
+      value = $os.id_cliente
+    }
+
+    conditional {
+      if ($input.status_novo == "CONCLUIDA" && $id_cliente == null) {
+        db.get motos_clientes {
+          field_name = "id"
+          field_value = $os.id_moto_cliente
+          output = ["id", "id_cliente"]
+        } as $moto_da_os
+
+        var.update $id_cliente {
+          value = $moto_da_os.id_cliente
+        }
+      }
     }
 
     var $dados {
@@ -113,6 +135,32 @@ query "ordens_servico/{ordens_servico_id}/status" verb=POST {
               field_value = $input.ordens_servico_id
               data = $dados
             } as $os_atualizada
+
+            // Conclusão: o total recalculado dos itens vira receita (Change 10). O patch acima já
+            // travou a OS, então nenhum item muda entre o cálculo e o lançamento.
+            conditional {
+              if ($input.status_novo == "CONCLUIDA") {
+                function.run "Oficina/totais_os" {
+                  input = {os_id: $input.ordens_servico_id}
+                } as $totais
+
+                conditional {
+                  if ($totais.valor_total > 0) {
+                    db.add transacoes {
+                      data = {
+                        tipo_transacao : "ORDEM_SERVICO"
+                        id_funcionario : $auth_user.id_funcionario
+                        id_cliente     : $id_cliente
+                        id_moto_cliente: $os.id_moto_cliente
+                        id_os          : $input.ordens_servico_id
+                        data_transacao : $agora
+                        valor_total    : $totais.valor_total
+                      }
+                    } as $transacao
+                  }
+                }
+              }
+            }
 
             // Cancelamento devolve as peças baixadas, em ordem de produto (evita deadlock).
             conditional {

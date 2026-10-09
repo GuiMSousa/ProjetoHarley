@@ -161,7 +161,7 @@ def entrada_form_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=EntradasState.close_form),
             primary_button(
-                rx.cond(EntradasState.is_saving, "Registrando...", "Registrar entrada"),
+                rx.cond(EntradasState.is_saving, "Registrando…", "Registrar entrada"),
                 on_click=EntradasState.save_entrada,
                 disabled=EntradasState.is_busy,
             ),
@@ -196,7 +196,7 @@ def entradas_page() -> rx.Component:
             toolbar(
                 EntradasState.search_text,
                 EntradasState.set_search_text,
-                "Buscar por documento, fornecedor ou responsável...",
+                "Buscar por documento, fornecedor ou responsável…",
                 disabled=EntradasState.is_loading_list,
                 current_page=EntradasState.current_page,
                 total_pages=EntradasState.total_pages,
@@ -216,7 +216,7 @@ def entradas_page() -> rx.Component:
                 history_row,
                 empty_text="Nenhuma entrada encontrada.",
                 loading=EntradasState.is_loading_list,
-                loading_text="Carregando entradas...",
+                loading_text="Carregando entradas…",
             ),
             pager(EntradasState.previous_page, EntradasState.next_page, EntradasState.is_busy),
             rx.cond(EntradasState.detail_open, detail_modal()),

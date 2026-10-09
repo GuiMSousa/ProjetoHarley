@@ -46,4 +46,4 @@
 ## 5. Documentação e arquivamento
 
 - [x] `docs/domain-model.md` e `docs/xano-api-client.md` (contrato, matriz, checklist de deploy, testes).
-- [ ] Arquivar: aplicar o delta em `openspec/specs/catalogo-vendas-motos.md` e mover a change para `openspec/archive/` depois do push e da integração.
+- [x] Arquivar: aplicar o delta em `openspec/specs/catalogo-vendas-motos.md` e mover a change para `openspec/archive/`.

@@ -7,6 +7,11 @@ query "logs/user/my_events" verb=GET {
   }
 
   stack {
+    // Same rule as every business endpoint: active linked employee (saneamento pós-Change 9).
+    function.run "Quick Start/enforce_role" {
+      input = {user_id: $auth.id, required_role: "ALL"}
+    } as $role_check
+
     // Retrieve event logs for the authenticated user
     db.query event_log {
       where = $db.event_log.user_id == $auth.id

@@ -156,7 +156,7 @@ def create_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=WorkshopState.close_form),
             primary_button(
-                rx.cond(WorkshopState.is_saving, "Abrindo...", "Abrir OS"),
+                rx.cond(WorkshopState.is_saving, "Abrindo…", "Abrir OS"),
                 on_click=WorkshopState.save_os,
                 disabled=WorkshopState.is_busy,
             ),
@@ -190,7 +190,7 @@ def workshop_page() -> rx.Component:
             toolbar(
                 WorkshopState.search_text,
                 WorkshopState.set_search_text,
-                "Buscar por nº, cliente, placa, mecânico ou descrição...",
+                "Buscar por nº, cliente, placa, mecânico ou descrição…",
                 disabled=WorkshopState.is_loading_list,
                 current_page=WorkshopState.current_page,
                 total_pages=WorkshopState.total_pages,
@@ -212,7 +212,7 @@ def workshop_page() -> rx.Component:
                 ordem_row,
                 empty_text="Nenhuma ordem de serviço encontrada.",
                 loading=WorkshopState.is_loading_list,
-                loading_text="Carregando ordens de serviço...",
+                loading_text="Carregando ordens de serviço…",
             ),
             pager(WorkshopState.previous_page, WorkshopState.next_page, WorkshopState.is_busy),
             rx.cond(WorkshopState.detail_open, detail_modal()),

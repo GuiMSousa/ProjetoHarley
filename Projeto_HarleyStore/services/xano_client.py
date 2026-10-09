@@ -46,6 +46,7 @@ from Projeto_HarleyStore.services.entradas import (
     EntradaMercadoriaDetalhe,
     EntradaMercadoriaResumo,
 )
+from Projeto_HarleyStore.services.financeiro import PeriodoFinanceiro, ResumoFinanceiro
 from Projeto_HarleyStore.services.ordens_servico import (
     ItemOSCreate,
     Mecanico,
@@ -602,6 +603,17 @@ class XanoClient:
             f"motos/{moto_id}/reserva/cancelar",
             json=cancelamento.model_dump(mode="json"),
             response_model=MotoEstoqueDetalhe,
+        )
+
+    # ----- consolidated financial view -----
+
+    def resumo_financeiro(self, periodo: PeriodoFinanceiro) -> ResumoFinanceiro:
+        """Revenue (transactions) and expenses (goods receipts) of the period; GERENTE only.
+
+        Transactions are immutable (Change 10): there is no write method for them.
+        """
+        return self.get(
+            "financeiro/resumo", params=periodo.params(), response_model=ResumoFinanceiro
         )
 
     def vender_moto(self, venda: VendaMotoCreate) -> VendaMotoResultado:

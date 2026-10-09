@@ -145,7 +145,7 @@ def cadastro_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=CadastrosState.close_form),
             primary_button(
-                rx.cond(CadastrosState.is_saving, "Salvando...", "Salvar"),
+                rx.cond(CadastrosState.is_saving, "Salvando…", "Salvar"),
                 on_click=CadastrosState.save_form,
                 disabled=CadastrosState.is_busy,
             ),
@@ -206,7 +206,7 @@ def cadastro_page(section: str) -> rx.Component:
             toolbar(
                 CadastrosState.search_text,
                 CadastrosState.set_search_text,
-                "Buscar neste cadastro...",
+                "Buscar neste cadastro…",
                 disabled=CadastrosState.is_loading_list,
                 current_page=CadastrosState.current_page,
                 total_pages=CadastrosState.total_pages,
@@ -218,7 +218,7 @@ def cadastro_page(section: str) -> rx.Component:
                 lambda row: cadastro_row(row, section),
                 empty_text="Nenhum registro encontrado.",
                 loading=CadastrosState.is_loading_list,
-                loading_text="Carregando registros...",
+                loading_text="Carregando registros…",
             ),
             pager(CadastrosState.previous_page, CadastrosState.next_page, CadastrosState.is_busy),
             rx.cond(CadastrosState.form_open, cadastro_modal()),

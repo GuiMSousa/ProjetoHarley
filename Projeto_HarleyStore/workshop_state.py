@@ -309,6 +309,26 @@ def os_row(ordem: OrdemServicoResumo) -> dict[str, str]:
     }
 
 
+def lancamento_texto(detalhe: OrdemServicoDetalhe) -> str:
+    """Billing line of a concluded order (Change 10); empty for orders that are not concluded."""
+    if detalhe.status != "CONCLUIDA":
+        return ""
+    if detalhe.id_transacao is not None:
+        return f"Faturada · transação #{detalhe.id_transacao} · {format_datetime(detalhe.data_lancamento)}"
+    if (detalhe.valor_total or Decimal("0")) <= 0:
+        return "Concluída sem lançamento financeiro (total zero)."
+    # Concluded before Change 10 and not yet posted by Financeiro/lancar_os_concluidas_legadas.
+    return "Concluída sem lançamento financeiro registrado."
+
+
+def nota_conclusao(total_valor: str) -> str:
+    """Warning of the conclusion panel: what will be posted as service revenue."""
+    total = parse_decimal(total_valor) if total_valor else Decimal("0")
+    if total <= 0:
+        return "Total zero: a OS será concluída sem lançamento."
+    return f"O total de {format_currency(total)} será lançado como receita de serviço."
+
+
 def detalhe_row(detalhe: OrdemServicoDetalhe) -> dict[str, str]:
     row = os_row(detalhe)
     row.update(
@@ -322,6 +342,8 @@ def detalhe_row(detalhe: OrdemServicoDetalhe) -> dict[str, str]:
                 else EMPTY_VALUE
             ),
             "motivo": detalhe.motivo_cancelamento or "",
+            "id_transacao": str(detalhe.id_transacao or ""),
+            "lancamento": lancamento_texto(detalhe),
         }
     )
     return row
@@ -449,6 +471,13 @@ class WorkshopState(AuthState):
         return TRANSITION_ACTIONS.get(self.transition_target, "")
 
     @rx.var
+    def conclusion_note(self) -> str:
+        """Revenue warning shown while confirming the conclusion (Change 10)."""
+        if self.transition_target != "CONCLUIDA":
+            return ""
+        return nota_conclusao(self.detalhe_totais.get("total_valor", ""))
+
+    @rx.var
     def can_edit_items(self) -> bool:
         return can_edit_items(self.detalhe.get("status", ""), self.employee_role)
 
@@ -521,6 +550,7 @@ class WorkshopState(AuthState):
         ):
             return None
         self.is_loading_list = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 self._reload_ordens(client)
@@ -615,6 +645,7 @@ class WorkshopState(AuthState):
         if self.is_loading_detail:
             return None
         self.is_loading_detail = True
+        yield  # render the busy state before the Xano call
         self._reset_item_form()
         try:
             with XanoClient(token=self.auth_token) as client:
@@ -743,6 +774,7 @@ class WorkshopState(AuthState):
             return toast_error(self.form_error)
 
         self.is_saving = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 ordem = client.abrir_ordem_servico(payload)
@@ -800,6 +832,7 @@ class WorkshopState(AuthState):
 
         os_id = int(self.detalhe["id"])
         self.is_transitioning = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 detalhe = client.transicionar_ordem_servico(os_id, payload)
@@ -918,6 +951,7 @@ class WorkshopState(AuthState):
 
         os_id = int(self.detalhe["id"])
         self.is_saving_item = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 detalhe = client.adicionar_item_ordem_servico(os_id, payload)
@@ -959,6 +993,7 @@ class WorkshopState(AuthState):
             for row in self.detalhe_itens
         )
         self.is_removing_item = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 detalhe = client.remover_item_ordem_servico(os_id, item_id)

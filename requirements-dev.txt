@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Test runner (python -m pytest); the suite is unittest-compatible.
+pytest==9.1.1

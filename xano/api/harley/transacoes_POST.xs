@@ -1,36 +1,23 @@
-// Add transacoes record
+// Bloqueado na Change 10 (D5): transações nascem somente das operações de negócio (venda de moto
+// e conclusão de OS) e são imutáveis. Correções serão feitas por estorno numa Change futura.
 query transacoes verb=POST {
   api_group = "HARLEY"
   auth = "user"
 
   input {
-    dblink {
-      table = "transacoes"
-    }
   }
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "VENDEDOR"}
+      input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
-      db.get user {
-      field_name = "id"
-      field_value = $auth.id
-      output = ["id_funcionario"]
-    } as $auth_user
-      db.add transacoes {
-      enforce_hidden_fields = false
-      data = {
-        tipo_transacao : $input.tipo_transacao
-        id_funcionario : $auth_user.id_funcionario
-        id_cliente     : $input.id_cliente
-        id_moto_cliente: $input.id_moto_cliente
-        data_transacao : $input.data_transacao
-        valor_total    : $input.valor_total
-      }
-    } as $model
+
+    precondition (false) {
+      error_type = "accessdenied"
+      error = "Transações são registradas somente pelas operações de venda e de oficina."
+    }
   }
 
-  response = $model
+  response = null
   guid = "0rGHlasmcKmdcQD9cpHBeWBCoZI"
 }

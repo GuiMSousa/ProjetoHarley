@@ -57,6 +57,8 @@ class ThemeTests(unittest.TestCase):
                 "VENDIDA",
                 "ATIVO",
                 "INATIVO",
+                "RECEITA",
+                "DESPESA",
             },
         )
 
@@ -84,7 +86,28 @@ class ThemeTests(unittest.TestCase):
 
     def test_app_loads_fonts_before_the_global_stylesheet(self):
         entry = (PACKAGE / "Projeto_HarleyStore.py").read_text(encoding="utf-8")
-        self.assertIn('rx.App(stylesheets=[GOOGLE_FONTS_URL, "/harley.css"])', entry)
+        self.assertIn('stylesheets=[GOOGLE_FONTS_URL, "/harley.css"]', entry)
+        self.assertIn('rx.el.meta(name="theme-color", content=COLORS["black"])', entry)
+
+    def test_global_stylesheet_uses_only_theme_colors(self):
+        """harley.css mirrors theme.py: no color outside the token palette (no drift)."""
+        css = (ROOT / "assets" / "harley.css").read_text(encoding="utf-8")
+        palette = {value.upper() for value in COLORS.values() if value.startswith("#")}
+        used = {value.upper() for value in re.findall(r"#[0-9A-Fa-f]{6}\b", css)}
+        self.assertTrue(used)
+        self.assertLessEqual(used, palette)
+
+    def test_global_stylesheet_covers_dark_mode_motion_and_skip_link(self):
+        css = (ROOT / "assets" / "harley.css").read_text(encoding="utf-8")
+        for declaration in (
+            "color-scheme: dark;",
+            "@media (prefers-reduced-motion: reduce)",
+            "font-variant-numeric: tabular-nums;",
+            "touch-action: manipulation;",
+            ".skip-link:focus-visible",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, css)
 
 
 if __name__ == "__main__":

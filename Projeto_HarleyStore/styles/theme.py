@@ -116,6 +116,9 @@ STATUS_COLORS: dict[str, tuple[str, str]] = {
     # Registration records (soft delete)
     "ATIVO": ("#14532D", "#BBF7D0"),
     "INATIVO": ("#2E2E2E", "#D4D4D4"),
+    # Financial operations (Change 10)
+    "RECEITA": ("#14532D", "#BBF7D0"),
+    "DESPESA": ("#7F1D1D", "#FECACA"),
 }
 STATUS_FALLBACK = ("#2E2E2E", "#D4D4D4")
 
@@ -125,6 +128,9 @@ TEXT_PAIRS: dict[str, tuple[str, str]] = {
     "text_on_surface": (COLORS["text"], COLORS["surface"]),
     "muted_on_background": (COLORS["muted"], COLORS["black"]),
     "muted_on_graphite": (COLORS["muted"], COLORS["graphite"]),
+    # Brand pair of the shell: titles and the orange role/active text on the matte black bars.
+    "text_on_graphite": (COLORS["text"], COLORS["graphite"]),
+    "accent_on_graphite": (COLORS["orange"], COLORS["graphite"]),
     "muted_on_surface": (COLORS["muted"], COLORS["surface"]),
     "accent_on_surface": (COLORS["orange"], COLORS["surface"]),
     "accent_on_background": (COLORS["orange"], COLORS["black"]),

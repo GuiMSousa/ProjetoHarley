@@ -99,7 +99,7 @@ Representa o atendimento técnico prestado na oficina mecânica para a moto de u
 - **Abertura:** a OS nasce sempre `ABERTA`, com `data_abertura` do servidor. A moto e o cliente devem estar ativos; o mecânico responsável deve ser um funcionário ativo do tipo `MECANICO` (quando o autor é mecânico e não informa outro, ele próprio é o responsável). `tipo_servico` e `descricao_problema` são obrigatórios; `quilometragem`, opcional e `>= 0`.
 - **Cliente:** `id_cliente` é uma fotografia do dono da moto no momento da abertura e preserva o histórico se a moto mudar de dono.
 - **Uma OS em aberto por moto:** não é possível abrir uma OS para uma moto que já tenha outra `ABERTA` ou `EM_ANDAMENTO`.
-- **Máquina de estados:** `ABERTA → EM_ANDAMENTO | CANCELADA`; `EM_ANDAMENTO → CONCLUIDA | CANCELADA`. `CONCLUIDA` e `CANCELADA` são finais; não há reabertura nem `ABERTA → CONCLUIDA`. O cancelamento exige motivo. As transições ocorrem somente por `POST ordens_servico/{id}/status`, que preenche `data_inicio` ao iniciar e `data_encerramento` ao concluir ou cancelar.
+- **Máquina de estados:** `ABERTA → EM_ANDAMENTO | CANCELADA`; `EM_ANDAMENTO → CONCLUIDA | CANCELADA`. `CONCLUIDA` e `CANCELADA` são finais; não há reabertura nem `ABERTA → CONCLUIDA`. O cancelamento exige motivo. As transições ocorrem somente por `POST ordens_servico/{id}/status`, que preenche `data_inicio` ao iniciar e `data_encerramento` ao concluir ou cancelar. Concluir uma OS com total maior que zero lança a receita `ORDEM_SERVICO` na mesma transação (Change 10).
 - **Histórico de status (`historico_status_os`):** cada abertura e cada transição grava status anterior, novo status, funcionário autenticado, data e observação. O índice único `(id_os, status_anterior)` garante que cada OS saia de cada status uma única vez e serializa transições concorrentes.
 - **Controle otimista:** a transição informa o status visto pelo usuário (`status_atual`); se a OS tiver mudado, a operação é rejeitada sem efeito.
 - **Autoria:** `id_funcionario` e o funcionário do histórico vêm do usuário autenticado (`$auth.id → user.id_funcionario`), nunca do payload. Edição e exclusão diretas de OS (`PUT`/`PATCH`/`DELETE`) respondem `403`.
@@ -113,14 +113,20 @@ Representa o atendimento técnico prestado na oficina mecânica para a moto de u
 
 ### Transacoes
 Registra o fluxo financeiro de vendas e movimentações comerciais do estabelecimento.
-- **Atributos:** Identificador (`id_transacao`), Tipo da Transação (`tipo_transacao`), Funcionário (`id_funcionario`), Cliente (`id_cliente`), Moto do Cliente (`id_moto_cliente`), Data (`data_transacao`), Valor Total (`valor_total`).
+- **Atributos:** Identificador (`id_transacao`), Tipo da Transação (`tipo_transacao`), Funcionário (`id_funcionario`), Cliente (`id_cliente`), Moto do Cliente (`id_moto_cliente`), OS faturada (`id_os`, Change 10), Data (`data_transacao`), Valor Total (`valor_total`).
 - **Regras:** O tipo de transação deve ser restrito aos valores: `MOTO`, `PECAS`, `BALCAO`, `COMPRA`, `ORDEM_SERVICO`.
 - **Regras financeiras:** `valor_total` deve ser estritamente positivo (`> 0`).
-- **Autoria:** `id_funcionario` deve ser derivado do usuário autenticado e do vínculo `user.id_funcionario`. `POST`/`PUT` gravam o funcionário do JWT e o `PATCH` descarta `id_funcionario` do payload.
+- **Origem e imutabilidade (Change 10):** transações nascem somente das operações de negócio: a venda de moto (`MOTO`), a conclusão de OS (`ORDEM_SERVICO`) e o lançamento retroativo das OS concluídas antes da Change 10. `POST`, `PUT`, `PATCH` e `DELETE` manuais respondem `403` para qualquer perfil; correções serão feitas por estorno numa Change futura.
+- **Autoria:** `id_funcionario` é sempre o usuário autenticado (`$auth.id → user.id_funcionario`): o vendedor na venda e quem concluiu a OS no faturamento.
+- **Acesso:** dados financeiros são do `GERENTE`: somente ele consulta transações e a visão consolidada.
 - **Venda de moto:** a venda (`Vendas/vender_moto`) grava a transação `MOTO` com `valor_total` = valor da venda, o cliente comprador e a moto do cliente criada na mesma transação.
-- **Situação atual:** transações não possuem linhas de itens; vendas de peças com baixa de estoque dependem de uma decisão de modelagem ainda pendente. O `DELETE` físico está bloqueado (`403`); `PUT`/`PATCH` ainda são genéricos e serão revistos na Change de vendas.
+- **Faturamento da OS (Change 10):** concluir uma OS grava, na mesma transação, a receita `ORDEM_SERVICO` com o total recalculado dos itens, o `id_os`, o cliente e a moto da OS. OS com total zero (garantia, cortesia) conclui sem lançamento. Como a OS sai de `EM_ANDAMENTO` uma única vez, há no máximo um lançamento por OS (`id_os` tem índice simples, não único).
+- **Situação atual:** transações não possuem linhas de itens; a venda no balcão (`BALCAO`/`PECAS`) com baixa de estoque depende de uma decisão de modelagem e fica para a Change 11.
 
 ---
 
 ## Visão Consolidada (`vw_resumo_operacoes`)
-O domínio conta com um consolidado conceitual de operações que unifica as **Transações Comerciais** e as **Entradas de Mercadorias** para relatórios e consultas gerais de fluxo operacional.
+O domínio conta com um consolidado de operações que unifica as **Transações Comerciais** e as **Entradas de Mercadorias** para relatórios e consultas gerais de fluxo operacional. Desde a Change 10 ele existe como a função `Financeiro/resumo_operacoes`, exposta em `GET financeiro/resumo` (somente `GERENTE`) e na tela `/financeiro`.
+- **Natureza:** `MOTO`, `ORDEM_SERVICO`, `PECAS` e `BALCAO` são receitas; as entradas de mercadoria (e transações `COMPRA` antigas) são despesas. As entradas não geram transação `COMPRA`, então nada conta duas vezes.
+- **Período:** de 1 a 366 dias, com os limites de cada dia em UTC−3; saldo = receitas − despesas.
+- **Limites:** os totais cobrem o período inteiro; a lista traz as 500 operações mais recentes e indica quando foi truncada.

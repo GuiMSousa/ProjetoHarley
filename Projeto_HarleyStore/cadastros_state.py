@@ -210,6 +210,7 @@ class CadastrosState(AuthState):
         ):
             return None
         self.is_loading_list = True
+        yield  # render the busy state before the Xano call
         try:
             self._load_section(section)
         except XanoError as error:
@@ -230,23 +231,23 @@ class CadastrosState(AuthState):
 
     @rx.event
     def load_clientes(self):
-        return self._load("clientes")
+        return (yield from self._load("clientes"))
 
     @rx.event
     def load_motos_clientes(self):
-        return self._load("motos_clientes")
+        return (yield from self._load("motos_clientes"))
 
     @rx.event
     def load_produtos(self):
-        return self._load("produtos")
+        return (yield from self._load("produtos"))
 
     @rx.event
     def load_fornecedores(self):
-        return self._load("fornecedores")
+        return (yield from self._load("fornecedores"))
 
     @rx.event
     def load_funcionarios(self):
-        return self._load("funcionarios")
+        return (yield from self._load("funcionarios"))
 
     def _new_form(self, section: str) -> None:
         self.set_section(section)
@@ -368,6 +369,7 @@ class CadastrosState(AuthState):
             self.form_error = "Seu perfil não pode alterar este cadastro."
             return toast_error(self.form_error)
         self.is_saving = True
+        yield  # render the busy state before the Xano call
         try:
             payload, _ = self._payload()
             with XanoClient(token=self.auth_token) as client:
@@ -423,6 +425,7 @@ class CadastrosState(AuthState):
         if not self._can_write(section):
             return toast_error("Seu perfil não pode desativar este cadastro.")
         self.is_deactivating = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 if section == "clientes":

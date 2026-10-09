@@ -135,7 +135,7 @@ def motos_table() -> rx.Component:
         moto_row,
         empty_text="Nenhuma moto nesta situação.",
         loading=VendasState.is_loading_list,
-        loading_text="Carregando estoque de motos...",
+        loading_text="Carregando estoque de motos…",
     )
 
 
@@ -245,7 +245,7 @@ def reserva_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=VendasState.close_reserva),
             primary_button(
-                rx.cond(VendasState.is_reserving, "Reservando...", "Confirmar reserva"),
+                rx.cond(VendasState.is_reserving, "Reservando…", "Confirmar reserva"),
                 on_click=VendasState.confirm_reserva,
                 disabled=VendasState.is_busy,
             ),
@@ -272,7 +272,7 @@ def cancelamento_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Voltar", on_click=VendasState.close_cancelamento),
             danger_button(
-                rx.cond(VendasState.is_cancelling, "Cancelando...", "Cancelar reserva"),
+                rx.cond(VendasState.is_cancelling, "Cancelando…", "Cancelar reserva"),
                 on_click=VendasState.confirm_cancelamento,
                 disabled=VendasState.is_busy,
             ),
@@ -373,7 +373,7 @@ def venda_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=VendasState.close_venda),
             primary_button(
-                rx.cond(VendasState.is_selling, "Registrando venda...", "Confirmar venda"),
+                rx.cond(VendasState.is_selling, "Registrando venda…", "Confirmar venda"),
                 on_click=VendasState.confirm_venda,
                 disabled=VendasState.is_busy,
             ),
@@ -553,7 +553,7 @@ def modelo_form_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=VendasState.close_modelo_form),
             primary_button(
-                rx.cond(VendasState.is_saving_modelo, "Salvando...", "Salvar modelo"),
+                rx.cond(VendasState.is_saving_modelo, "Salvando…", "Salvar modelo"),
                 on_click=VendasState.save_modelo,
                 disabled=VendasState.is_busy,
             ),
@@ -645,7 +645,7 @@ def moto_form_modal() -> rx.Component:
             rx.spacer(),
             metal_button("Cancelar", on_click=VendasState.close_moto_form),
             primary_button(
-                rx.cond(VendasState.is_saving_moto, "Salvando...", "Salvar unidade"),
+                rx.cond(VendasState.is_saving_moto, "Salvando…", "Salvar unidade"),
                 on_click=VendasState.save_moto,
                 disabled=VendasState.is_busy,
             ),
@@ -668,7 +668,7 @@ def vendas_page() -> rx.Component:
             toolbar(
                 VendasState.busca,
                 VendasState.set_busca,
-                "Buscar por modelo, chassi ou cliente...",
+                "Buscar por modelo, chassi ou cliente…",
                 disabled=VendasState.is_loading_list,
             ),
             error_callout(VendasState.list_error),

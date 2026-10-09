@@ -1,6 +1,9 @@
 // Registra uma entrada de mercadoria com seus itens e incrementa o estoque atomicamente.
 // O saldo muda somente por Estoque/movimentar_estoque (ENTRADA), que grava o livro de
 // movimentações e serializa movimentações concorrentes do mesmo produto (Change 7).
+// As validações rodam antes da transação, com mensagens específicas; dentro dela ficam só as
+// gravações. Uma corrida (mesmo documento ou mesmo produto ao mesmo tempo) viola um índice
+// único, desfaz tudo e responde 400 com a mensagem de conflito (saneamento pós-Change 9).
 query entrada_mercadoria verb=POST {
   api_group = "HARLEY"
   auth = "user"
@@ -64,72 +67,87 @@ query entrada_mercadoria verb=POST {
       }
     }
 
-    db.transaction {
-      stack {
-        db.get fornecedores {
+    db.get fornecedores {
+      field_name = "id"
+      field_value = $input.id_fornecedor
+      output = ["id", "ativo"]
+    } as $fornecedor
+
+    precondition ($fornecedor != null && $fornecedor.ativo != false) {
+      error_type = "inputerror"
+      error = "Fornecedor inativo ou inexistente."
+    }
+
+    db.query entrada_mercadoria {
+      where = $db.entrada_mercadoria.id_fornecedor == $input.id_fornecedor && $db.entrada_mercadoria.numero_documento == $input.numero_documento
+      return = {type: "exists"}
+    } as $documento_existente
+
+    precondition (!$documento_existente) {
+      error_type = "inputerror"
+      error = "Este documento já foi registrado para o fornecedor."
+    }
+
+    foreach ($input.itens) {
+      each as $item_validado {
+        db.get produtos {
           field_name = "id"
-          field_value = $input.id_fornecedor
+          field_value = $item_validado.id_produto
           output = ["id", "ativo"]
-        } as $fornecedor
+        } as $produto
 
-        precondition ($fornecedor != null && $fornecedor.ativo != false) {
+        precondition ($produto != null && $produto.ativo != false) {
           error_type = "inputerror"
-          error = "Fornecedor inativo ou inexistente."
+          error = "Produto inativo ou inexistente: " ~ $item_validado.id_produto
         }
+      }
+    }
 
-        db.query entrada_mercadoria {
-          where = $db.entrada_mercadoria.id_fornecedor == $input.id_fornecedor && $db.entrada_mercadoria.numero_documento == $input.numero_documento
-          return = {type: "exists"}
-        } as $documento_existente
-
-        precondition (!$documento_existente) {
-          error_type = "inputerror"
-          error = "Este documento já foi registrado para o fornecedor."
-        }
-
-        db.add entrada_mercadoria {
-          data = {
-            id_fornecedor   : $input.id_fornecedor
-            numero_documento: $input.numero_documento
-            id_funcionario  : $auth_user.id_funcionario
-            data_entrada    : now
-            valor_total     : $valor_total
-          }
-        } as $entrada
-
-        // Itens em ordem de produto: transações com vários produtos travam na mesma ordem.
-        foreach ($input.itens|sort:"id_produto":"int":false) {
-          each as $item {
-            db.get produtos {
-              field_name = "id"
-              field_value = $item.id_produto
-              output = ["id", "codigo", "ativo"]
-            } as $produto
-
-            precondition ($produto != null && $produto.ativo != false) {
-              error_type = "inputerror"
-              error = "Produto inativo ou inexistente: " ~ $item.id_produto
-            }
-
-            db.add itens_compra_estoque {
+    try_catch {
+      try {
+        db.transaction {
+          stack {
+            db.add entrada_mercadoria {
               data = {
-                id_entrada    : $entrada.id
-                id_produto    : $item.id_produto
-                quantidade    : $item.quantidade
-                valor_unitario: $item.valor_unitario
+                id_fornecedor   : $input.id_fornecedor
+                numero_documento: $input.numero_documento
+                id_funcionario  : $auth_user.id_funcionario
+                data_entrada    : now
+                valor_total     : $valor_total
               }
-            } as $item_compra
+            } as $entrada
 
-            function.run "Estoque/movimentar_estoque" {
-              input = {
-                id_produto    : $item.id_produto
-                tipo          : "ENTRADA"
-                quantidade    : $item.quantidade
-                id_funcionario: $auth_user.id_funcionario
-                id_entrada    : $entrada.id
+            // Itens em ordem de produto: transações com vários produtos travam na mesma ordem.
+            foreach ($input.itens|sort:"id_produto":"int":false) {
+              each as $item {
+                db.add itens_compra_estoque {
+                  data = {
+                    id_entrada    : $entrada.id
+                    id_produto    : $item.id_produto
+                    quantidade    : $item.quantidade
+                    valor_unitario: $item.valor_unitario
+                  }
+                } as $item_compra
+
+                function.run "Estoque/movimentar_estoque" {
+                  input = {
+                    id_produto    : $item.id_produto
+                    tipo          : "ENTRADA"
+                    quantidade    : $item.quantidade
+                    id_funcionario: $auth_user.id_funcionario
+                    id_entrada    : $entrada.id
+                  }
+                } as $movimento
               }
-            } as $movimento
+            }
           }
+        }
+      }
+
+      catch {
+        precondition (false) {
+          error_type = "inputerror"
+          error = "A entrada não foi registrada: o documento ou o estoque foram alterados por outra operação. Atualize e tente novamente."
         }
       }
     }

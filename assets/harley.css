@@ -19,8 +19,45 @@ html .radix-themes {
   --heading-font-family: 'Oswald', 'Arial Narrow', Arial, sans-serif;
 }
 
+/* Dark native UI: scrollbars, date pickers and form controls follow the theme. */
+html {
+  color-scheme: dark;
+}
+
 body {
   background: #000000;
+}
+
+/* Money and quantity columns line up digit by digit. */
+.rt-TableCell,
+.rt-TableColumnHeaderCell {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Taps act at once on touch screens (no double-tap zoom delay). */
+button,
+a,
+[role='button'],
+[role='tab'] {
+  touch-action: manipulation;
+}
+
+/* Skip link: hidden until focused by the keyboard, then shown above the navigation. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: #FF6600;
+  color: #000000;
+  font-weight: 700;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.skip-link:focus-visible {
+  top: 1rem;
 }
 
 /* Module titles: robust uppercase; the text itself keeps its case for screen readers. */
@@ -38,4 +75,17 @@ body {
 ::selection {
   background: #FF6600;
   color: #000000;
+}
+
+/* Respect the system setting: no transitions or animations for people who reduce motion.
+   !important is the standard way to override the component libraries' own transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

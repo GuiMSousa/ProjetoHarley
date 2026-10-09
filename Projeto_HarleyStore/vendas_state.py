@@ -474,6 +474,7 @@ class VendasState(AuthState):
         if not self.is_authenticated or not role_allows_route(self.employee_role, VENDAS_ROUTE):
             return None
         self.is_loading_list = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 self._reload(client)
@@ -510,6 +511,7 @@ class VendasState(AuthState):
         if self._operation_blocked():
             return None
         self.is_loading_detail = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 self._apply_detail(client.get_moto_estoque(int(moto_id)))
@@ -578,6 +580,7 @@ class VendasState(AuthState):
             return None
         moto_id = int(self.reserva_moto_id)
         self.is_reserving = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 detalhe = client.reservar_moto(moto_id, payload)
@@ -629,6 +632,7 @@ class VendasState(AuthState):
             return None
         moto_id = int(self.cancel_moto_id)
         self.is_cancelling = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 detalhe = client.cancelar_reserva_moto(moto_id, payload)
@@ -724,6 +728,7 @@ class VendasState(AuthState):
             self.venda_error = str(error)
             return None
         self.is_selling = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 client.vender_moto(payload)
@@ -826,6 +831,7 @@ class VendasState(AuthState):
             self.modelo_error = str(error)
             return None
         self.is_saving_modelo = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 if editing:
@@ -849,6 +855,7 @@ class VendasState(AuthState):
         if self._operation_blocked() or not can_manage_catalog(self.employee_role):
             return None
         self.is_saving_modelo = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 client.atualizar_modelo_moto(int(modelo_id), ModeloMotoUpdate(ativo=ativo != "true"))
@@ -913,6 +920,7 @@ class VendasState(AuthState):
             self.moto_error = str(error)
             return None
         self.is_saving_moto = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 if editing:

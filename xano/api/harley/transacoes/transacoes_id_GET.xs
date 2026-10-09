@@ -1,4 +1,4 @@
-// Get transacoes record
+// Detalhe de uma transação financeira. Somente GERENTE (saneamento pós-Change 9).
 query "transacoes/{transacoes_id}" verb=GET {
   api_group = "HARLEY"
   auth = "user"
@@ -9,7 +9,7 @@ query "transacoes/{transacoes_id}" verb=GET {
 
   stack {
     function.run "Quick Start/enforce_role" {
-      input = {user_id: $auth.id, required_role: "ALL"}
+      input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
       db.get transacoes {
       field_name = "id"

@@ -11,7 +11,9 @@ from Projeto_HarleyStore.components import app_shell, guarded_page, login_page
 from Projeto_HarleyStore.dashboard_pages import admin_placeholder, dashboard
 from Projeto_HarleyStore.entradas_pages import entradas_page
 from Projeto_HarleyStore.entradas_state import ENTRADAS_ROUTE, EntradasState
-from Projeto_HarleyStore.styles.theme import GOOGLE_FONTS_URL
+from Projeto_HarleyStore.financeiro_pages import financeiro_page
+from Projeto_HarleyStore.financeiro_state import FINANCEIRO_ROUTE, FinanceiroState
+from Projeto_HarleyStore.styles.theme import COLORS, GOOGLE_FONTS_URL
 from Projeto_HarleyStore.vendas_pages import vendas_page
 from Projeto_HarleyStore.vendas_state import VENDAS_ROUTE, VendasState
 from Projeto_HarleyStore.workshop_pages import workshop_page
@@ -30,7 +32,11 @@ def login() -> rx.Component:
     return login_page()
 
 
-app = rx.App(stylesheets=[GOOGLE_FONTS_URL, "/harley.css"])
+app = rx.App(
+    stylesheets=[GOOGLE_FONTS_URL, "/harley.css"],
+    # Mobile browser chrome matches the app background.
+    head_components=[rx.el.meta(name="theme-color", content=COLORS["black"])],
+)
 app.add_page(index, route="/", title="Harley Store", on_load=AuthState.restore_session)
 app.add_page(login, route="/login", title="Entrar | Harley Store")
 app.add_page(
@@ -92,4 +98,10 @@ app.add_page(
     route=VENDAS_ROUTE,
     title="Vendas de motos | Harley Store",
     on_load=[AuthState.restore_session, VendasState.load_vendas],
+)
+app.add_page(
+    financeiro_page,
+    route=FINANCEIRO_ROUTE,
+    title="Financeiro | Harley Store",
+    on_load=[AuthState.restore_session, FinanceiroState.load_financeiro],
 )

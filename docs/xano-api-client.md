@@ -40,6 +40,25 @@ Regras importantes:
 3. Conferir que não há produtos antigos com `codigo` vazio repetido; o índice único de `produtos.codigo` falharia na criação.
 4. Rodar a suíte de integração (seção "Testes de integração").
 
+### Checklist de deploy da Change 10 (fechamento financeiro)
+
+1. Revisar `xano workspace push -d ./xano --dry-run`. Esperado, sem exclusões e sem `--sync`:
+   - `transacoes`: `ADD_FIELD` (`id_os`, anulável) e índice simples;
+   - funções criadas: `Financeiro/resumo_operacoes` e `Financeiro/lancar_os_concluidas_legadas`; `Oficina/detalhe_os` atualizada;
+   - `financeiro/resumo GET` criado; `ordens_servico/{id}/status POST`, `transacoes POST` e `transacoes/{id} PUT/PATCH` atualizados;
+   - a diferença anterior em `modelos_moto` (padrão de `destaque`) não faz parte da Change 10.
+2. Publicar com `xano workspace push -d ./xano`.
+3. Executar uma vez `Financeiro/lancar_os_concluidas_legadas` (Run & Debug) com o id de um `GERENTE` ativo: lança a receita das OS concluídas antes do push. Pode ser repetida sem duplicar.
+4. Conferir em `/financeiro` as transações antigas criadas pelo CRUD genérico, que entram no resumo como estão.
+5. Rodar a integração: `XANO_TEST_LIVE=true` (acesso, imutabilidade, período) e `XANO_TEST_ALLOW_WRITES=true` (conclusão de OS gera um único lançamento visível no resumo; OS vazia e cancelada não geram); `XANO_TEST_CONCURRENCY=true` para duas conclusões simultâneas.
+
+### Checklist de deploy do saneamento pós-Change 9
+
+1. Revisar `xano workspace push -d ./xano --dry-run`: só atualizações de 8 endpoints (`transacoes` GET/POST, `transacoes/{id}` GET/PUT/PATCH/DELETE, `entrada_mercadoria` POST e `logs/user/my_events` GET), sem `--sync`. A diferença em `modelos_moto` (padrão de `destaque`) é anterior e não faz parte deste saneamento.
+2. Publicar com `xano workspace push -d ./xano`.
+3. Desligar o Swagger público do workspace ou exigir token (`xano workspace edit --no-swagger`, ou pelo painel): o token do grupo `HARLEY` fica em texto puro no export versionado (`xano/api/harley/harley.xs`) e não protege nada num repositório público.
+4. Rodar a integração (`XANO_TEST_LIVE=true` para os 403 de RBAC sem gravar dados; `XANO_TEST_ALLOW_WRITES=true` para a suíte completa).
+
 ### Checklist de deploy da Change 9 (fechamento de vendas de motos)
 
 1. Revisar `xano workspace push -d ./xano --dry-run`: `motos_clientes.placa` passa a anulável (relaxamento; o índice único continua), e `Vendas/vender_moto` e `POST vender_moto` aceitam placa opcional. Se o push não aplicar a mudança do campo, publicar com `--sync`, de preferência num branch.
@@ -111,6 +130,8 @@ Métodos:
 | `registrar_entrada(entrada)` | `POST entrada_mercadoria` | `GERENTE` |
 
 `registrar_entrada` envia somente cabeçalho e itens. `id_funcionario`, `valor_total` e `data_entrada` são definidos pelo Xano, que grava cabeçalho, itens e incremento de estoque na mesma transação. O incremento passa por `Estoque/movimentar_estoque` e gera uma linha `ENTRADA` no livro de movimentações. Não existem métodos de edição ou exclusão de entradas: elas são imutáveis.
+
+As validações (fornecedor e produtos ativos, documento ainda não registrado) rodam antes da transação e devolvem `400` com mensagem própria. Dentro da transação ficam só as gravações, protegidas por `try_catch`: uma corrida (mesmo documento ou mesmo produto ao mesmo tempo) viola um índice único, desfaz tudo e responde `400` "A entrada não foi registrada: o documento ou o estoque foram alterados por outra operação. Atualize e tente novamente." em vez de um `500`.
 
 ## Livro de movimentações de estoque
 
@@ -190,7 +211,7 @@ Os DTOs ficam em `Projeto_HarleyStore.services.ordens_servico`:
 - `OrdemServicoCreate` — `id_moto_cliente`, `id_mecanico` (opcional), `tipo_servico` (`PREVENTIVA` | `CORRETIVA`), `descricao_problema` e `quilometragem` (opcional, `>= 0`);
 - `TransicaoStatusOS` — `status_atual` (o status que o usuário está vendo), `status_novo` e `observacao` (obrigatória para `CANCELADA`); valida a tabela `TRANSICOES_OS`, espelho da função Xano `Oficina/validar_transicao_os`;
 - `OrdemServicoResumo` — linha da lista com `nome_cliente`, `placa`, `modelo`, `nome_funcionario` (autor), `nome_mecanico` e `valor_total`; os campos das Changes 6 e 7 são opcionais para OS antigas;
-- `OrdemServicoDetalhe` — resumo com `quilometragem`, `motivo_cancelamento`, `valor_pecas`, `valor_servicos`, `historico` (`HistoricoStatusOS`) e `itens` (`ItemOrdemServico`);
+- `OrdemServicoDetalhe` — resumo com `quilometragem`, `motivo_cancelamento`, `valor_pecas`, `valor_servicos`, `historico` (`HistoricoStatusOS`), `itens` (`ItemOrdemServico`) e, desde a Change 10, `id_transacao` e `data_lancamento` (receita lançada na conclusão; nulos sem lançamento);
 - `ItemOSCreate` — `tipo_item` (`PECA` | `SERVICO`), `id_produto` (peça), `descricao` e `valor_unitario` (serviço, `> 0`, duas casas) e `quantidade > 0`; a peça descarta descrição e valor, porque o preço vem do produto, e o serviço descarta o produto;
 - `ItemOrdemServico` — item lido, com `tipo_item` (nulo em itens legados, lido como `PECA`), `valor_unitario`, `valor_total_item` e `estoque_baixado`;
 - `Mecanico` — `id` e `nome_funcionario`.
@@ -211,6 +232,8 @@ Métodos:
 
 Uma transição recusada porque a OS mudou (`status_atual` desatualizado) chega como `XanoValidationError`; o Reflex recarrega o detalhe e exibe o status real.
 
+**Faturamento (Change 10):** a transição para `CONCLUIDA` grava, na mesma transação, a receita `ORDEM_SERVICO` com o total recalculado dos itens, o `id_os`, o cliente e a moto da OS e o funcionário do JWT. OS com total zero conclui sem lançamento; se o lançamento falhar, nada é gravado e a resposta é o `400` de conflito. O detalhe mostra "Faturada · transação #N", e o painel de conclusão avisa o valor que será lançado.
+
 ### Itens da OS
 
 As duas rotas de itens devolvem o `OrdemServicoDetalhe` atualizado e só aceitam OS `ABERTA` ou `EM_ANDAMENTO`:
@@ -221,6 +244,23 @@ As duas rotas de itens devolvem o `OrdemServicoDetalhe` atualizado e só aceitam
 - **Cancelamento da OS:** devolve todas as peças baixadas na mesma transação da transição; concluir não movimenta estoque. Os itens e totais da OS cancelada ficam como registro.
 - **Totais:** a cada mutação o Xano grava `valor_pecas`, `valor_servicos` e `valor_total` na OS (usados pela lista); o detalhe sempre os recalcula a partir dos itens (`Oficina/totais_os`).
 - **Concorrência:** toda mutação da OS começa atualizando `ordens_servico.atualizado_em`, o que trava a linha e serializa inclusões, remoções e transições da mesma OS. Uma falha dentro da transação (corrida) responde `400` "O estoque ou a OS foram alterados por outra operação. Atualize e tente novamente."; o Reflex recarrega detalhe, itens e saldos.
+
+## Financeiro (Change 10)
+
+Os DTOs ficam em `Projeto_HarleyStore.services.financeiro`:
+
+- `PeriodoFinanceiro` — `inicio` e `fim` (datas, inclusivas, de 1 a 366 dias); `params()` gera os limites do dia em UTC−3 fixo (`FUSO_LOJA`), em milissegundos (00:00:00.000 e 23:59:59.999);
+- `ResumoFinanceiro` — `receitas`, `despesas`, `saldo`, `por_tipo` (`TotalPorTipo`), `operacoes` (`OperacaoFinanceira`), `total_operacoes` e `truncado`;
+- `OperacaoFinanceira` — `origem` (`TRANSACAO` | `ENTRADA`), `tipo`, `natureza` (`RECEITA` | `DESPESA`), `data`, `valor`, `contraparte` (cliente ou fornecedor), `funcionario` e as referências (`id_os`, `id_moto_cliente`, `modelo`, `placa`, `id_entrada`, `numero_documento`).
+
+| Método | Endpoint | Perfil |
+| --- | --- | --- |
+| `resumo_financeiro(periodo)` | `GET financeiro/resumo?inicio=&fim=` | `GERENTE` |
+
+- **Resumo:** une as transações do período (receitas; `COMPRA` antigas como despesa) e as entradas de mercadoria (despesas). Os totais cobrem o período inteiro; a lista traz as 500 operações mais recentes. Período invertido ou maior que 366 dias responde `400`.
+- **Imutabilidade:** não há método de escrita de transações. `POST transacoes` e `PUT`/`PATCH`/`DELETE transacoes/{id}` respondem `403` para qualquer perfil; `GET transacoes[/{id}]` é só do `GERENTE`.
+- **Retroativo:** a função `Financeiro/lancar_os_concluidas_legadas` (Run & Debug, nunca chamada por endpoint) lança as OS concluídas antes da Change 10.
+- **Tela `/financeiro`:** período com atalhos, cartões de receitas, despesas e saldo, totais por tipo e lista de operações com filtro por tipo e busca locais (sem nova chamada ao Xano).
 
 ## Erros
 
@@ -241,7 +281,9 @@ O cliente não interpreta payloads de domínio. Cada serviço futuro deve defini
 
 ## Autoria operacional
 
-Endpoints de OS e transações derivam `id_funcionario` do usuário autenticado no Xano: o backend resolve `$auth.id` para `user.id_funcionario` e persiste esse vínculo na criação. `POST`/`PUT` não mapeiam `id_funcionario` do input e os `PATCH` de OS e transações removem a chave (`|unset:"id_funcionario"`) antes de gravar. Um `id_funcionario` enviado pelo frontend nunca é fonte de autoria.
+Endpoints de OS e transações derivam `id_funcionario` do usuário autenticado no Xano: o backend resolve `$auth.id` para `user.id_funcionario` e persiste esse vínculo na criação. `POST` não mapeia `id_funcionario` do input e o `PATCH` de OS (bloqueado) nunca grava a chave. Transações não têm escrita manual desde a Change 10: nascem da venda e da conclusão de OS, sempre com o funcionário do JWT. Um `id_funcionario` enviado pelo frontend nunca é fonte de autoria.
+
+Todo endpoint com `auth = "user"` chama `Quick Start/enforce_role` (funcionário vinculado, existente, ativo e com o papel mínimo); a exceção é `auth/me`, que devolve só a identidade de quem chama. Um teste de contrato (`test_every_authenticated_endpoint_enforces_an_employee_role`) impede regressões.
 
 O frontend pode esconder ações incompatíveis com o cargo, mas a autorização final, a autoria e a integridade dos dados permanecem no Xano.
 
@@ -266,21 +308,33 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Cancelar reserva | qualquer | própria ou vencida | não |
 | Vender unidade (disponível, ou reservada ao cliente da reserva) | sim | sim | não |
 | Criar e editar modelos e unidades | sim | não | não |
+| Consultar transações (`GET transacoes[/{id}]`) | sim | não | não |
+| Lançar, corrigir ou excluir transação manualmente (`POST`/`PUT`/`PATCH`/`DELETE transacoes`) | não | não | não |
+| Visão consolidada (`/financeiro`, `GET financeiro/resumo`) | sim | não | não |
+| Concluir OS (gera a receita `ORDEM_SERVICO`) | sim | não | sim |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
 
 ## Testes
 
 ```bash
-python -m unittest discover -s tests
+pip install -r requirements-dev.txt     # pytest
+python -m pytest                        # suíte completa; a integração real fica ignorada
+python -m pytest -m "not integration"   # somente offline
+XANO_TEST_LIVE=true python -m pytest -m integration          # integração só de leitura
+XANO_TEST_ALLOW_WRITES=true python -m pytest -m integration  # integração completa
 ```
 
+- O pytest é o executor (`pytest.ini`: `testpaths`, `-ra` para listar o motivo de cada teste ignorado e marcadores estritos). A suíte continua compatível com `python -m unittest discover -s tests`.
+- Marcadores aplicados automaticamente por `tests/conftest.py`: `integration` (toda chamada real ao Xano), `writes` (grava dados) e `concurrency` (corridas).
+- Handlers que mostram carregamento são geradores (fazem `yield` antes de chamar o Xano). Nos testes, use `tests.event_runner.run_event(Handler, state, ...)`, que executa o handler como o Reflex e devolve o evento final; `tests/test_loading_states.py` garante que todo handler de submissão e de carga continue gerador.
 - Os testes offline usam `httpx.MockTransport` e contratos estáticos sobre `xano/`; não precisam de rede.
-- `tests/test_integration_xano.py` executa chamadas HTTP reais quando `XANO_API_BASE_URL` está configurada (ambiente ou `.env`); caso contrário, é ignorado.
+- `tests/test_integration_xano.py` é opt-in: só chama o Xano com `XANO_API_BASE_URL` configurada **e** `XANO_TEST_ALLOW_WRITES=true` (suíte completa) ou `XANO_TEST_LIVE=true` (apenas leitura). Sem isso, cada teste é ignorado com o motivo, e um `pytest` comum nunca depende de rede, credenciais ou do limite de `429`.
 - Credenciais por perfil: `XANO_TEST_GERENTE_EMAIL`/`_PASSWORD`, `XANO_TEST_VENDEDOR_*` e `XANO_TEST_MECANICO_*`. Perfis sem credenciais são ignorados individualmente.
 - Os cenários que gravam dados (registro de entrada, documento duplicado, rollback, ciclo completo de OS com as rejeições da máquina de estados, e ciclo de itens com baixa, devolução, totais e cancelamento) exigem `XANO_TEST_ALLOW_WRITES=true`. Como entradas, OS encerradas e movimentações de estoque são imutáveis, rode-os em um branch ou workspace de testes. As OS abertas pelos testes são canceladas ao final, devolvendo as peças.
 - `XANO_TEST_CONCURRENCY=true` (junto com as escritas) roda as corridas: duas OS disputando todo o saldo de um produto e uma inclusão simultânea ao cancelamento. Exige duas motos de cliente sem OS em aberto.
-- A leitura pública do catálogo roda só com a URL configurada (sem credenciais) e é ignorada, com aviso, enquanto a Change 8 não estiver publicada. O ciclo de reserva (`ALLOW_WRITES`) cria um modelo e uma unidade próprios e retira o modelo do catálogo ao final; a corrida de duas reservas da mesma unidade exige `XANO_TEST_CONCURRENCY`.
+- A leitura pública do catálogo roda sem credenciais (com a integração ativada) e é ignorada, com aviso, enquanto a Change 8 não estiver publicada. O ciclo de reserva (`ALLOW_WRITES`) cria um modelo e uma unidade próprios e retira o modelo do catálogo ao final; a corrida de duas reservas da mesma unidade exige `XANO_TEST_CONCURRENCY`.
+- O financeiro (Change 10) tem testes sem escrita (`VENDEDOR` e `MECANICO` recebem `403` no resumo e em `GET transacoes`; escrita manual `403` até para o `GERENTE`; período inválido `400`), o ciclo com escrita (conclusão gera um único lançamento visível no resumo; OS vazia e cancelada não geram) e a corrida de duas conclusões (`XANO_TEST_CONCURRENCY`).
 - A venda (Change 9) tem um teste sem escrita (`MECANICO` recebe `403`, unidade inexistente `404`), o ciclo com escrita (venda sem placa, venda repetida, unidade reservada para outro cliente, segunda moto sem placa) e a corrida de duas vendas da mesma unidade (`XANO_TEST_CONCURRENCY`). Vendas são finais: unidades vendidas, motos de clientes e transações de teste ficam no banco.
 - O workspace do Xano limita a taxa de requisições (`429` após cerca de 6 chamadas seguidas): a suíte completa com credenciais pode falhar de forma intermitente por isso.
 - Os testes de cada Change exigem o respectivo push; antes dele, os endpoints novos respondem `404`.

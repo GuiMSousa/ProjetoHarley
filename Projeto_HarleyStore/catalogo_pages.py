@@ -230,7 +230,7 @@ def catalogo_page() -> rx.Component:
                     rx.spacer(),
                     rx.input(
                         rx.input.slot(rx.icon("search", size=16)),
-                        placeholder="Buscar modelo...",
+                        placeholder="Buscar modelo…",
                         value=CatalogoState.busca,
                         on_change=CatalogoState.set_busca,
                         width=rx.breakpoints(initial="100%", md="18rem"),
@@ -243,7 +243,7 @@ def catalogo_page() -> rx.Component:
                 error_callout(CatalogoState.erro),
                 rx.cond(
                     CatalogoState.is_loading_catalogo | ~CatalogoState.carregado,
-                    rx.text("Carregando catálogo...", color=COLORS["muted"]),
+                    rx.text("Carregando catálogo…", color=COLORS["muted"]),
                     rx.cond(
                         CatalogoState.cards_visiveis.length() > 0,
                         rx.grid(

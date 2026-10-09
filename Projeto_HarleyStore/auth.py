@@ -30,6 +30,7 @@ ROUTE_ROLES: dict[str, frozenset[str]] = {
     "/cadastros/funcionarios": frozenset({"GERENTE"}),
     "/estoque/entradas": ALL_ROLES,
     "/vendas": frozenset({"GERENTE", "VENDEDOR"}),
+    "/financeiro": frozenset({"GERENTE"}),
 }
 
 
@@ -157,6 +158,7 @@ class AuthState(rx.State):
             return None
 
         self.is_loading = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient() as client:
                 response = client.login(self.email, self.password)

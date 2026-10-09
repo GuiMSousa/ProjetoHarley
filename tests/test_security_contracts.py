@@ -12,10 +12,10 @@ class SecurityContractTests(unittest.TestCase):
         return (XANO / relative_path).read_text(encoding="utf-8")
 
     def test_patch_endpoints_never_accept_authorship(self):
-        self.assertIn(
-            '|unset:"id_funcionario"',
-            self.read("api/harley/transacoes/transacoes_id_PATCH.xs"),
-        )
+        # Since Change 10 transactions are immutable: the generic PATCH writes nothing.
+        transacoes = self.read("api/harley/transacoes/transacoes_id_PATCH.xs")
+        self.assertIn("precondition (false)", transacoes)
+        self.assertNotIn("db.patch", transacoes)
         # Since Change 6 the generic OS PATCH is blocked: status changes go through
         # POST ordens_servico/{id}/status and nothing is written from the payload.
         content = self.read("api/harley/ordens_servico/ordens_servico_id_PATCH.xs")
@@ -112,6 +112,24 @@ class SecurityContractTests(unittest.TestCase):
         for relative_path in ("api/harley/catalogo_GET.xs", "api/harley/catalogo/catalogo_id_GET.xs"):
             with self.subTest(path=relative_path):
                 self.assertIn("verb=GET", self.read(relative_path))
+
+    def test_every_authenticated_endpoint_enforces_an_employee_role(self):
+        """A valid token is not enough: the linked employee must exist, be active and have the role.
+
+        ``auth/me`` is the only exception: it returns just the caller's own identity, so the
+        Reflex can explain an inactive employee instead of showing a generic 403.
+        """
+        identity_only = {"api/authentication/auth/me_GET.xs"}
+        checked = 0
+        for path in (XANO / "api").rglob("*.xs"):
+            content = path.read_text(encoding="utf-8")
+            relative = path.relative_to(XANO).as_posix()
+            if relative in identity_only or not re.search(r'^\s*auth = "user"', content, re.M):
+                continue
+            checked += 1
+            with self.subTest(path=relative):
+                self.assertIn('function.run "Quick Start/enforce_role"', content)
+        self.assertGreater(checked, 70)
 
     def test_event_logs_never_store_whole_records(self):
         for path in (XANO / "api").rglob("*.xs"):

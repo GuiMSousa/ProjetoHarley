@@ -15,7 +15,7 @@ query "transacoes/{transacoes_id}" verb=DELETE {
 
     precondition (false) {
       error_type = "accessdenied"
-      error = "Exclusão física desabilitada: o ciclo de vida das transações será definido na Change de vendas."
+      error = "Exclusão física desabilitada: transações são registros financeiros permanentes."
     }
   }
 

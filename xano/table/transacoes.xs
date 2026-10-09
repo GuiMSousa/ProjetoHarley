@@ -21,6 +21,12 @@ table transacoes {
   
     timestamp data_transacao?=now
     decimal valor_total? filters=min:0.01
+
+    // OS faturada (Change 10): receita ORDEM_SERVICO gravada na conclusão. Nulo nas demais.
+    // Índice simples, não único (D8): a máquina de estados já garante um lançamento por OS.
+    int? id_os? {
+      table = "ordens_servico"
+    }
   }
 
   index = [
@@ -29,6 +35,7 @@ table transacoes {
     {type: "btree", field: [{name: "id_funcionario"}]}
     {type: "btree", field: [{name: "id_cliente"}]}
     {type: "btree", field: [{name: "id_moto_cliente"}]}
+    {type: "btree", field: [{name: "id_os"}]}
     {
       type : "btree"
       field: [{name: "data_transacao", op: "desc"}]

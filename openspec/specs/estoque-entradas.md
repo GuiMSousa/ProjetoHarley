@@ -97,6 +97,13 @@ Cada movimentação DEVE partir da `versao_estoque` lida junto com o saldo e gra
 - **QUANDO** ambas terminarem
 - **ENTÃO** o saldo DEVE refletir as duas operações aceitas, sem sobrescrita
 
+### Cenário: entrada perdedora de uma corrida
+
+- **DADO** duas entradas do mesmo documento, ou uma entrada disputando a versão de um produto, ao mesmo tempo
+- **QUANDO** a transação perdedora violar um índice único
+- **ENTÃO** a resposta DEVE ser `400` "A entrada não foi registrada: o documento ou o estoque foram alterados por outra operação. Atualize e tente novamente."
+- **E** nada da entrada perdedora DEVE ser gravado (as validações com mensagem própria rodam antes da transação)
+
 ## Requisito: matriz de acesso
 
 | Operação | GERENTE | VENDEDOR | MECANICO |

@@ -35,6 +35,7 @@ NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] = (
             ("Funcionários", "/cadastros/funcionarios", "id-card"),
         ),
     ),
+    ("Gestão", (("Financeiro", "/financeiro", "chart-column"),)),
     ("Administração", (("Administração", "/admin", "shield"),)),
 )
 PUBLIC_ROUTES = frozenset({"/", "/catalogo"})
@@ -42,6 +43,9 @@ MOBILE_BREAKPOINT = "md"
 
 LOGO_SRC = "/HARLEY_LOGO.png"
 LOGO_HEIGHT = "45px"
+# Display box of the 175x135 PNG at 45px tall; the HTML width/height reserve it before the
+# image loads, so the header never shifts.
+LOGO_BOX = {"width": "58", "height": "45"}
 # Shared height of the sidebar brand area and the top bars, so their bottom borders form one line.
 HEADER_HEIGHT = "4.5rem"
 # Left inset of the nav items (3px active border + 0.75rem padding); the logo aligns with their icons.
@@ -49,13 +53,25 @@ NAV_INSET = "calc(0.75rem + 3px)"
 
 
 def brand_logo() -> rx.Component:
-    """Store logo (assets/HARLEY_LOGO.png: shield cut from harley-davidson-logo.webp, transparent background)."""
+    """Store logo (assets/HARLEY_LOGO.png: shield cut from harley-davidson-logo.webp, transparent background).
+
+    Never taller than 45px. If the file fails to load, the alt text shows inside the same box,
+    and the "HARLEY STORE" title next to it keeps the brand readable.
+    """
     return rx.image(
         src=LOGO_SRC,
-        height=LOGO_HEIGHT,
-        width="auto",
         alt="Harley-Davidson",
+        height=LOGO_HEIGHT,
+        max_height=LOGO_HEIGHT,
+        width="auto",
+        object_fit="contain",
         flex_shrink="0",
+        overflow="hidden",
+        font_size="0.625rem",
+        color=COLORS["muted"],
+        loading="eager",
+        decoding="async",
+        custom_attrs={**LOGO_BOX, "fetchPriority": "high", "translate": "no"},
     )
 
 
@@ -75,6 +91,7 @@ def brand_mark(size: str = "4", subtitle_display: str | rx.breakpoints = "block"
                 letter_spacing="0.14em",
                 color=COLORS["text"],
                 white_space="nowrap",
+                custom_attrs={"translate": "no"},
             ),
             rx.text(
                 "Concessionária e oficina",
@@ -107,22 +124,28 @@ def login_page() -> rx.Component:
                     rx.input(
                         placeholder="Email",
                         type="email",
+                        name="email",
+                        aria_label="Email",
                         value=AuthState.email,
                         on_change=AuthState.set_email,
                         width="100%",
                         size="3",
+                        custom_attrs={"autoComplete": "username", "spellCheck": "false"},
                     ),
                     rx.input(
                         placeholder="Senha",
                         type="password",
+                        name="password",
+                        aria_label="Senha",
                         value=AuthState.password,
                         on_change=AuthState.set_password,
                         width="100%",
                         size="3",
+                        custom_attrs={"autoComplete": "current-password"},
                     ),
                     error_callout(AuthState.error_message),
                     primary_button(
-                        rx.cond(AuthState.is_loading, "Validando...", "Entrar"),
+                        rx.cond(AuthState.is_loading, "Validando…", "Entrar"),
                         on_click=AuthState.login,
                         disabled=AuthState.is_loading,
                         width="100%",
@@ -157,7 +180,7 @@ def _nav_link(label: str, route: str, icon: str) -> rx.Component:
     active = _is_active(route)
     link = rx.link(
         rx.hstack(
-            rx.icon(icon, size=16),
+            rx.icon(icon, size=16, aria_hidden="true"),
             rx.text(label, size="2"),
             align="center",
             spacing="3",
@@ -293,30 +316,56 @@ def top_bar() -> rx.Component:
     )
 
 
+MAIN_ID = "conteudo"
+
+
+def skip_link() -> rx.Component:
+    """First focusable element: lets keyboard users jump past the navigation (styled in harley.css).
+
+    Reflex renders the anchor as a router link, which changes the hash without moving focus,
+    so the click focuses the <main> landmark explicitly.
+    """
+    return rx.el.a(
+        "Pular para o conteúdo",
+        href=f"#{MAIN_ID}",
+        on_click=rx.set_focus(MAIN_ID),
+        class_name="skip-link",
+    )
+
+
+def main_region(content: rx.Component) -> rx.Component:
+    """The page content as the <main> landmark, target of the skip link."""
+    return rx.el.main(content, id=MAIN_ID, tab_index=-1, width="100%", min_width="0")
+
+
 def app_shell(content: rx.Component) -> rx.Component:
-    return rx.hstack(
-        sidebar(),
-        rx.vstack(
-            top_bar(),
-            content,
-            align="stretch",
+    return rx.fragment(
+        skip_link(),
+        rx.hstack(
+            sidebar(),
+            rx.vstack(
+                top_bar(),
+                main_region(content),
+                align="stretch",
+                spacing="0",
+                width="100%",
+                min_width="0",
+                min_height="100vh",
+                background=COLORS["black"],
+            ),
+            align="start",
             spacing="0",
             width="100%",
-            min_width="0",
             min_height="100vh",
             background=COLORS["black"],
         ),
-        align="start",
-        spacing="0",
-        width="100%",
-        min_height="100vh",
-        background=COLORS["black"],
     )
 
 
 def public_shell(content: rx.Component) -> rx.Component:
     """Shell of pages open to visitors (no sidebar, link to the staff area)."""
     return rx.vstack(
+        skip_link(),
         rx.hstack(
             rx.link(
                 brand_mark(subtitle_display=rx.breakpoints(initial="none", sm="block")),
@@ -344,7 +393,7 @@ def public_shell(content: rx.Component) -> rx.Component:
             background=COLORS["graphite"],
             border_bottom=f"1px solid {COLORS['border']}",
         ),
-        content,
+        main_region(content),
         spacing="0",
         align="stretch",
         width="100%",
@@ -398,11 +447,15 @@ def modal_panel(*children: rx.Component, width: str = "min(100%, 34rem)") -> rx.
     return rx.box(
         rx.vstack(
             *children,
+            role="dialog",
+            aria_modal="true",
             align="stretch",
             spacing="4",
             width=width,
             max_height="90vh",
             overflow_y="auto",
+            # Scrolling a long form never scrolls the page behind the overlay.
+            overscroll_behavior="contain",
             padding="1.5rem",
             border_top=f"3px solid {COLORS['orange']}",
             **CARD,

@@ -34,6 +34,8 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoValidationError,
 )
 
+from tests.event_runner import run_event
+
 
 def item(produto="10 - PX100 · Pastilha", quantidade="5", valor="10,00"):
     return {"produto": produto, "quantidade": quantidade, "valor_unitario": valor}
@@ -157,7 +159,7 @@ class EntradasStateEventTests(unittest.TestCase):
     def test_load_skips_xano_without_session(self):
         state = self.make_state(authenticated=False)
         with patch("Projeto_HarleyStore.entradas_state.XanoClient") as client_class:
-            EntradasState.load_entradas.fn(state)
+            run_event(EntradasState.load_entradas, state)
         client_class.assert_not_called()
 
     def test_save_blocks_non_manager_before_calling_xano(self):
@@ -165,7 +167,7 @@ class EntradasStateEventTests(unittest.TestCase):
             with self.subTest(role=role):
                 state = self.make_state(role=role)
                 with patch("Projeto_HarleyStore.entradas_state.XanoClient") as client_class:
-                    EntradasState.save_entrada.fn(state)
+                    run_event(EntradasState.save_entrada, state)
                 client_class.assert_not_called()
                 self.assertIn("gerente", state.form_error)
 
@@ -173,7 +175,7 @@ class EntradasStateEventTests(unittest.TestCase):
         state = self.make_state()
         state.itens_form = [item(quantidade="0")]
         with patch("Projeto_HarleyStore.entradas_state.XanoClient") as client_class:
-            EntradasState.save_entrada.fn(state)
+            run_event(EntradasState.save_entrada, state)
         client_class.assert_not_called()
         self.assertIn("quantidade", state.form_error)
         self.assertTrue(state.form_open)
@@ -182,7 +184,7 @@ class EntradasStateEventTests(unittest.TestCase):
         state = self.make_state()
         state.is_saving = True
         with patch("Projeto_HarleyStore.entradas_state.XanoClient") as client_class:
-            EntradasState.save_entrada.fn(state)
+            run_event(EntradasState.save_entrada, state)
         client_class.assert_not_called()
 
     def test_successful_save_closes_form_reloads_history_and_clears_flag(self):
@@ -193,7 +195,7 @@ class EntradasStateEventTests(unittest.TestCase):
         ]
         with patch("Projeto_HarleyStore.entradas_state.XanoClient") as client_class:
             client_class.return_value.__enter__.return_value = client
-            EntradasState.save_entrada.fn(state)
+            run_event(EntradasState.save_entrada, state)
         payload = client.registrar_entrada.call_args.args[0]
         self.assertEqual(payload.numero_documento, "NF-1")
         self.assertFalse(state.form_open)
@@ -208,7 +210,7 @@ class EntradasStateEventTests(unittest.TestCase):
         )
         with patch("Projeto_HarleyStore.entradas_state.XanoClient") as client_class:
             client_class.return_value.__enter__.return_value = client
-            EntradasState.save_entrada.fn(state)
+            run_event(EntradasState.save_entrada, state)
         self.assertTrue(state.form_open)
         self.assertFalse(state.is_saving)
         self.assertEqual(state.form_error, "Este documento já foi registrado para o fornecedor.")

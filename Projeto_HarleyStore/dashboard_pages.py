@@ -21,6 +21,7 @@ SHORTCUTS: tuple[tuple[str, str, str, str], ...] = (
     ("Motos de clientes", "Veículos atendidos pela oficina.", "/cadastros/motos-clientes", "bike"),
     ("Fornecedores", "Parceiros de abastecimento.", "/cadastros/fornecedores", "truck"),
     ("Funcionários", "Equipe e perfis de acesso.", "/cadastros/funcionarios", "id-card"),
+    ("Financeiro", "Receitas, despesas e saldo do período.", "/financeiro", "chart-column"),
 )
 
 

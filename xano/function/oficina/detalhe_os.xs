@@ -1,4 +1,5 @@
-// Monta o detalhe de uma OS: dados enriquecidos, linha do tempo de status, itens e totais.
+// Monta o detalhe de uma OS: dados enriquecidos, linha do tempo de status, itens, totais e o
+// lançamento financeiro da conclusão (id_transacao e data_lancamento, Change 10).
 // Os totais são recalculados a partir dos itens (fonte de verdade), o que cobre OS legadas.
 function "Oficina/detalhe_os" {
   input {
@@ -85,6 +86,13 @@ function "Oficina/detalhe_os" {
       input = {os_id: $input.os_id}
     } as $totais
 
+    // Receita lançada na conclusão (Change 10); nula se a OS não foi faturada.
+    db.query transacoes {
+      where = $db.transacoes.id_os == $input.os_id
+      output = ["id", "data_transacao"]
+      return = {type: "single"}
+    } as $transacao
+
     var $detalhe {
       value = $os
         |set:"id_cliente":$id_cliente
@@ -98,6 +106,8 @@ function "Oficina/detalhe_os" {
         |set:"valor_pecas":$totais.valor_pecas
         |set:"valor_servicos":$totais.valor_servicos
         |set:"valor_total":$totais.valor_total
+        |set:"id_transacao":$transacao.id
+        |set:"data_lancamento":$transacao.data_transacao
     }
   }
 

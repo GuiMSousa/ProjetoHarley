@@ -16,6 +16,8 @@ from Projeto_HarleyStore.services.cadastros import (
 )
 from Projeto_HarleyStore.services.xano_client import XanoAuthenticationError, XanoError
 
+from tests.event_runner import run_event
+
 
 class CadastrosStateTests(unittest.TestCase):
     def make_state(self, role):
@@ -71,7 +73,7 @@ class CadastrosStateTests(unittest.TestCase):
             with self.subTest(role=role, handler=handler):
                 state = self.make_real_state(role, authenticated)
                 with patch("Projeto_HarleyStore.cadastros_state.XanoClient") as client_class:
-                    getattr(CadastrosState, handler).fn(state)
+                    run_event(getattr(CadastrosState, handler), state)
                 client_class.assert_not_called()
                 self.assertFalse(state.is_loading_list)
 
@@ -81,7 +83,7 @@ class CadastrosStateTests(unittest.TestCase):
             client_class.return_value.__enter__.return_value.list_produtos.side_effect = (
                 XanoError("Unable to reach the Xano API.")
             )
-            CadastrosState.load_produtos.fn(state)
+            run_event(CadastrosState.load_produtos, state)
         self.assertEqual(
             state.list_error, "Não foi possível comunicar com o Xano. Tente novamente."
         )
@@ -97,7 +99,7 @@ class CadastrosStateTests(unittest.TestCase):
         with patch("Projeto_HarleyStore.cadastros_state.XanoClient") as client_class:
             client = client_class.return_value.__enter__.return_value
             client.list_clientes.side_effect = XanoError("Unable to reach the Xano API.")
-            CadastrosState.save_form.fn(state)
+            run_event(CadastrosState.save_form, state)
         client.create_cliente.assert_called_once()
         self.assertEqual(state.form_error, "")
         self.assertFalse(state.form_open)
@@ -112,7 +114,7 @@ class CadastrosStateTests(unittest.TestCase):
             client_class.return_value.__enter__.return_value.create_cliente.side_effect = (
                 XanoAuthenticationError("expired")
             )
-            CadastrosState.save_form.fn(state)
+            run_event(CadastrosState.save_form, state)
         self.assertEqual(state.auth_token, "")
         self.assertFalse(state.is_authenticated)
         self.assertFalse(state.is_saving)
@@ -123,7 +125,7 @@ class CadastrosStateTests(unittest.TestCase):
         state.motos_clientes = [
             {"id": "5", "id_cliente": "9", "modelo": "Street", "ativo_value": "true"}
         ]
-        CadastrosState.open_edit.fn(state, "motos_clientes", "5")
+        run_event(CadastrosState.open_edit, state, "motos_clientes", "5")
         self.assertTrue(state.form_open)
         self.assertEqual(state.form_data["id_cliente"], "9 - ")
 

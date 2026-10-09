@@ -25,6 +25,38 @@ class EstoqueContractTests(unittest.TestCase):
             with self.subTest(operation=operation):
                 self.assertIn(operation, transaction)
 
+    def test_versioned_helpers_only_run_inside_a_transaction(self):
+        """transicionar_moto and movimentar_estoque write a versioned ledger row and then the record:
+        outside a db.transaction a failure between the two writes would leave them out of sync."""
+        helpers = ('"Vendas/transicionar_moto"', '"Estoque/movimentar_estoque"')
+        calls = 0
+        for path in (ROOT / "xano").rglob("*.xs"):
+            content = path.read_text(encoding="utf-8")
+            for helper in helpers:
+                for match in re.finditer(r"function\.run\s+" + re.escape(helper), content):
+                    calls += 1
+                    blocks: list[str] = []
+                    for token in re.finditer(r"(?:([\w.]+)\s*)?\{|\}", content[: match.start()]):
+                        if token.group(0) == "}":
+                            if blocks:
+                                blocks.pop()
+                        else:
+                            blocks.append(token.group(1) or "")
+                    with self.subTest(path=path.relative_to(ROOT).as_posix(), helper=helper):
+                        self.assertIn("db.transaction", blocks)
+        # Entrada, inclusão/remoção de item, cancelamento de OS; reserva, cancelamento e venda de moto.
+        self.assertGreaterEqual(calls, 7)
+
+    def test_receipt_race_is_a_readable_conflict(self):
+        """A race (same document or product) rolls back and answers 400, never a 500."""
+        content = self.read(f"{API}/entrada_mercadoria_POST.xs")
+        guarded = content[content.index("try_catch {") :]
+        transaction = guarded.index("db.transaction {")
+        self.assertLess(guarded.index("try {"), transaction)
+        catch = guarded[guarded.index("catch {", transaction) :]
+        self.assertIn('error_type = "inputerror"', catch)
+        self.assertIn("A entrada não foi registrada", catch)
+
     def test_receipt_post_moves_stock_through_the_ledger(self):
         content = self.read(f"{API}/entrada_mercadoria_POST.xs")
         self.assertNotIn("db.edit produtos", content)
@@ -77,10 +109,11 @@ class EstoqueContractTests(unittest.TestCase):
 
     def test_receipt_post_validates_supplier_products_and_items(self):
         content = self.read(f"{API}/entrada_mercadoria_POST.xs")
-        transaction = content[content.index("db.transaction {") :]
-        self.assertIn("$fornecedor.ativo != false", transaction)
-        self.assertIn("$produto.ativo != false", transaction)
-        self.assertIn("$documento_existente", transaction)
+        # Specific messages come from checks that run before the transaction (saneamento pós-Change 9).
+        checks = content[: content.index("try_catch {")]
+        self.assertIn("$fornecedor.ativo != false", checks)
+        self.assertIn("$produto.ativo != false", checks)
+        self.assertIn("$documento_existente", checks)
         self.assertIn("($input.itens|count) > 0", content)
         self.assertIn("($ids_produto|unique|count)", content)
         self.assertIn("int quantidade filters=min:1", content)

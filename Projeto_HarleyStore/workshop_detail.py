@@ -55,6 +55,10 @@ def transition_panel() -> rx.Component:
     confirm = rx.vstack(
         rx.text("Confirmar: ", rx.text.strong(WorkshopState.transition_label), "?"),
         rx.cond(
+            WorkshopState.conclusion_note != "",
+            rx.text(WorkshopState.conclusion_note, size="2", color=COLORS["muted"]),
+        ),
+        rx.cond(
             WorkshopState.transition_target == "CANCELADA",
             labeled(
                 "Motivo do cancelamento",
@@ -69,7 +73,7 @@ def transition_panel() -> rx.Component:
         ),
         rx.hstack(
             primary_button(
-                rx.cond(WorkshopState.is_transitioning, "Registrando...", "Confirmar"),
+                rx.cond(WorkshopState.is_transitioning, "Registrando…", "Confirmar"),
                 on_click=WorkshopState.confirm_transition,
                 disabled=WorkshopState.is_busy,
             ),
@@ -169,7 +173,7 @@ def remove_confirm() -> rx.Component:
         rx.hstack(
             rx.text(WorkshopState.remove_message, size="2", flex="1"),
             danger_button(
-                rx.cond(WorkshopState.is_removing_item, "Removendo...", "Remover"),
+                rx.cond(WorkshopState.is_removing_item, "Removendo…", "Remover"),
                 on_click=WorkshopState.confirm_remove_item,
                 size="1",
                 disabled=WorkshopState.is_busy,
@@ -246,7 +250,7 @@ def peca_fields() -> rx.Component:
         rx.vstack(
             rx.input(
                 rx.input.slot(rx.icon("search", size=16)),
-                placeholder="Buscar peça por código ou nome...",
+                placeholder="Buscar peça por código ou nome…",
                 value=WorkshopState.produto_busca,
                 on_change=WorkshopState.set_produto_busca,
                 width="100%",
@@ -354,7 +358,7 @@ def item_form() -> rx.Component:
         rx.hstack(
             rx.spacer(),
             primary_button(
-                rx.cond(WorkshopState.is_saving_item, "Adicionando...", "Adicionar"),
+                rx.cond(WorkshopState.is_saving_item, "Adicionando…", "Adicionar"),
                 on_click=WorkshopState.save_item,
                 disabled=WorkshopState.is_busy,
             ),
@@ -390,6 +394,19 @@ def historico_moto_row(row: rx.Var) -> rx.Component:
     )
 
 
+def billing_callout() -> rx.Component:
+    """Whether the concluded order was billed (Change 10): green with the transaction id, else gray."""
+    detalhe = WorkshopState.detalhe
+    return rx.cond(
+        detalhe["lancamento"] != "",
+        rx.cond(
+            detalhe["id_transacao"] != "",
+            rx.callout(detalhe["lancamento"], icon="receipt", color_scheme="green", width="100%"),
+            rx.callout(detalhe["lancamento"], icon="info", color_scheme="gray", width="100%"),
+        ),
+    )
+
+
 def detail_modal() -> rx.Component:
     detalhe = WorkshopState.detalhe
     return modal_panel(
@@ -419,6 +436,7 @@ def detail_modal() -> rx.Component:
                 width="100%",
             ),
         ),
+        billing_callout(),
         transition_panel(),
         section("Linha do tempo", rx.foreach(WorkshopState.detalhe_historico, timeline_row)),
         section(

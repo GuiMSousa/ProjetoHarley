@@ -151,3 +151,20 @@ Registro OpenSpec em `openspec/archive/saneamento-pos-change-7/`.
 
 - um erro tipado para `429`, com mensagem "Muitas requisições, aguarde alguns segundos";
 - nova tentativa com espera (backoff) nos testes de integração.
+
+### Saneamento pós-Change 9 (2026-10-09)
+
+Registro OpenSpec em `openspec/archive/saneamento-pos-change-9/`.
+
+| # | Débito | Situação |
+| --- | --- | --- |
+| 1 | Integração com escrita e concorrência no Xano real | **Pendente** (credenciais `XANO_TEST_*`). A integração passou a ser opt-in (`XANO_TEST_ALLOW_WRITES` ou `XANO_TEST_LIVE`) e marcada no pytest (`integration`, `writes`, `concurrency`) |
+| 3 | Redesenho de `transacoes` | **Resolvido em parte**: leitura e lançamentos/correções manuais só para `GERENTE`, autor preservado no `PUT`. A imutabilidade completa e o lançamento da OS ficam na Change 10 |
+| 6 | `try_catch` na entrada de mercadoria | **Resolvido**: validações antes da transação, corrida responde `400` com mensagem de conflito |
+| 10 | Índice em `user.id_funcionario`, token do Swagger, dados de clientes | **Pendente**: o token do Swagger não se corrige pelo export (fica em texto puro); requer desligar o Swagger ou exigir token no workspace. Dados de clientes ao mecânico dependem de decisão de negócio |
+
+**Novos achados corrigidos:**
+
+- Os rótulos de carregamento ("Salvando…") nunca apareciam e os botões não eram desabilitados durante o pedido: o Reflex só envia o estado ao fim do handler ou num `yield`. Todos os handlers de submissão e de carga agora fazem `yield` antes de chamar o Xano (teste `tests/test_loading_states.py`).
+- `logs/user/my_events` não exigia funcionário ativo; agora chama `enforce_role`. Um teste de contrato garante `enforce_role` em todo endpoint autenticado (exceto `auth/me`).
+- Acessibilidade: rótulos associados aos campos, `aria-label` na busca e no login, `autocomplete` no login, link "Pular para o conteúdo", `role="dialog"` nos modais, `color-scheme: dark`, `prefers-reduced-motion` e `theme-color`.

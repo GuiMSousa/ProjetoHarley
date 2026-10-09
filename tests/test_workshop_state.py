@@ -32,13 +32,17 @@ from Projeto_HarleyStore.workshop_state import (
     filtrar_produtos,
     historico_row,
     item_row,
+    lancamento_texto,
     motos_do_cliente,
+    nota_conclusao,
     os_row,
     preview_item_total,
     produto_row,
     status_counts,
     totais_row,
 )
+
+from tests.event_runner import run_event
 
 
 def resumo(os_id=31, status="ABERTA", **extra):
@@ -61,6 +65,49 @@ def resumo(os_id=31, status="ABERTA", **extra):
 
 def detalhe(os_id=31, status="ABERTA", **extra):
     return OrdemServicoDetalhe(**{**resumo(os_id, status).model_dump(), **extra})
+
+
+class FaturamentoOSTests(unittest.TestCase):
+    """Change 10: the concluded order shows its revenue posting."""
+
+    def test_billed_order_shows_the_transaction(self):
+        faturada = detalhe(
+            status="CONCLUIDA",
+            valor_total=Decimal("1250"),
+            id_transacao=41,
+            data_lancamento=datetime(2026, 10, 9, 15, 30, tzinfo=timezone.utc),
+        )
+        texto = lancamento_texto(faturada)
+        self.assertTrue(texto.startswith("Faturada · transação #41 · "))
+        row = detalhe_row(faturada)
+        self.assertEqual((row["id_transacao"], row["lancamento"]), ("41", texto))
+
+    def test_concluded_without_posting(self):
+        self.assertEqual(
+            lancamento_texto(detalhe(status="CONCLUIDA", valor_total=Decimal("0"))),
+            "Concluída sem lançamento financeiro (total zero).",
+        )
+        # Concluded before Change 10 and not yet posted by the backfill function.
+        self.assertEqual(
+            lancamento_texto(detalhe(status="CONCLUIDA", valor_total=Decimal("980"))),
+            "Concluída sem lançamento financeiro registrado.",
+        )
+        for status in ("ABERTA", "EM_ANDAMENTO", "CANCELADA"):
+            with self.subTest(status=status):
+                self.assertEqual(lancamento_texto(detalhe(status=status, valor_total=Decimal("100"))), "")
+                self.assertEqual(detalhe_row(detalhe(status=status))["id_transacao"], "")
+
+    def test_conclusion_note_announces_the_revenue(self):
+        self.assertEqual(nota_conclusao("1250.50"), "O total de R$ 1.250,50 será lançado como receita de serviço.")
+        self.assertEqual(nota_conclusao("0"), "Total zero: a OS será concluída sem lançamento.")
+        self.assertEqual(nota_conclusao(""), "Total zero: a OS será concluída sem lançamento.")
+
+    def test_detail_parses_the_posting_fields(self):
+        parsed = OrdemServicoDetalhe.model_validate(
+            {**resumo(31, "CONCLUIDA").model_dump(), "id_transacao": 41, "data_lancamento": 1791990000000}
+        )
+        self.assertEqual((parsed.id_transacao, parsed.data_lancamento.year), (41, 2026))
+        self.assertIsNone(OrdemServicoDetalhe.model_validate(resumo(31, "ABERTA").model_dump()).id_transacao)
 
 
 class WorkshopRulesTests(unittest.TestCase):
@@ -181,20 +228,20 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
     def test_load_without_session_does_not_call_xano(self):
         state = self.make_state(authenticated=False)
         client_class, _ = self.patched_client()
-        WorkshopState.load_ordens.fn(state)
+        run_event(WorkshopState.load_ordens, state)
         client_class.assert_not_called()
 
     def test_salesperson_loads_orders_but_cannot_operate(self):
         state = self.make_state(role="VENDEDOR")
         client_class, client = self.patched_client()
         client.list_ordens_servico.return_value = [resumo()]
-        WorkshopState.load_ordens.fn(state)
+        run_event(WorkshopState.load_ordens, state)
         self.assertEqual(state.ordens[0]["numero"], "#31")
         self.assertFalse(state.can_operate)
 
         client_class.reset_mock()
-        WorkshopState.open_create.fn(state)
-        WorkshopState.save_os.fn(state)
+        run_event(WorkshopState.open_create, state)
+        run_event(WorkshopState.save_os, state)
         client_class.assert_not_called()
         self.assertFalse(state.form_open)
 
@@ -213,18 +260,18 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
             Mecanico(id=3, nome_funcionario="Ana Mecânica"),
             Mecanico(id=4, nome_funcionario="Bruno"),
         ]
-        WorkshopState.open_create.fn(state)
+        run_event(WorkshopState.open_create, state)
         self.assertTrue(state.form_open)
         self.assertEqual(state.cliente_options, ["5 - Ana"])
         self.assertEqual(state.mecanico, "4 - Bruno")
-        WorkshopState.set_cliente.fn(state, "5 - Ana")
+        run_event(WorkshopState.set_cliente, state, "5 - Ana")
         self.assertEqual(state.moto_options, ["12 - ABC · Street"])
 
     def test_invalid_form_is_rejected_locally(self):
         state = self.make_state()
         client_class, _ = self.patched_client()
         state.cliente = "5 - Ana"
-        WorkshopState.save_os.fn(state)
+        run_event(WorkshopState.save_os, state)
         client_class.assert_not_called()
         self.assertEqual(state.form_error, "Selecione a moto do cliente.")
 
@@ -236,7 +283,7 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
         state.form_open = True
         state.cliente, state.moto, state.mecanico = "5 - Ana", "12 - ABC", "4 - Bruno"
         state.tipo_servico, state.descricao_problema = "Corretiva", "Ruído"
-        WorkshopState.save_os.fn(state)
+        run_event(WorkshopState.save_os, state)
         self.assertEqual(client.abrir_ordem_servico.call_args.args[0].id_moto_cliente, 12)
         self.assertFalse(state.form_open)
         self.assertFalse(state.is_saving)
@@ -251,7 +298,7 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
         state.form_open = True
         state.cliente, state.moto = "5 - Ana", "12 - ABC"
         state.tipo_servico, state.descricao_problema = "Corretiva", "Ruído"
-        WorkshopState.save_os.fn(state)
+        run_event(WorkshopState.save_os, state)
         self.assertTrue(state.form_open)
         self.assertIn("OS em aberto", state.form_error)
 
@@ -260,7 +307,7 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
         _, client = self.patched_client()
         client.get_ordem_servico.return_value = detalhe(31, "EM_ANDAMENTO")
         client.list_ordens_servico.return_value = [resumo(31), resumo(20, "CONCLUIDA")]
-        WorkshopState.open_detail.fn(state, "31")
+        run_event(WorkshopState.open_detail, state, "31")
         self.assertTrue(state.detail_open)
         self.assertEqual([row["id"] for row in state.historico_moto], ["20"])
         self.assertEqual(
@@ -272,12 +319,12 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
     def test_transition_requires_allowed_target_and_reason(self):
         state = self.make_state()
         state.detalhe = {"id": "31", "status": "ABERTA"}
-        WorkshopState.start_transition.fn(state, "CONCLUIDA")
+        run_event(WorkshopState.start_transition, state, "CONCLUIDA")
         self.assertEqual(state.transition_target, "")
-        WorkshopState.start_transition.fn(state, "CANCELADA")
+        run_event(WorkshopState.start_transition, state, "CANCELADA")
         self.assertEqual(state.transition_target, "CANCELADA")
         client_class, _ = self.patched_client()
-        WorkshopState.confirm_transition.fn(state)
+        run_event(WorkshopState.confirm_transition, state)
         client_class.assert_not_called()
         self.assertEqual(state.transition_error, "Informe o motivo do cancelamento.")
 
@@ -288,11 +335,34 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
         _, client = self.patched_client()
         client.transicionar_ordem_servico.return_value = detalhe(31, "EM_ANDAMENTO")
         client.list_ordens_servico.return_value = [resumo(31, "EM_ANDAMENTO")]
-        WorkshopState.confirm_transition.fn(state)
+        run_event(WorkshopState.confirm_transition, state)
         os_id, payload = client.transicionar_ordem_servico.call_args.args
         self.assertEqual((os_id, payload.status_atual, payload.status_novo), (31, "ABERTA", "EM_ANDAMENTO"))
         self.assertEqual(state.detalhe["status"], "EM_ANDAMENTO")
         self.assertEqual(state.transition_target, "")
+        self.assertFalse(state.is_transitioning)
+
+    def test_conclusion_panel_warns_about_the_revenue(self):
+        state = self.make_state()
+        state.detalhe_totais = {"total_valor": "1250.50"}
+        state.transition_target = "CONCLUIDA"
+        self.assertEqual(state.conclusion_note, "O total de R$ 1.250,50 será lançado como receita de serviço.")
+        state.transition_target = "CANCELADA"
+        self.assertEqual(state.conclusion_note, "")
+
+    def test_transition_renders_the_busy_state_before_calling_xano(self):
+        state = self.make_state()
+        state.detalhe = {"id": "31", "status": "ABERTA"}
+        state.transition_target = "EM_ANDAMENTO"
+        _, client = self.patched_client()
+        client.transicionar_ordem_servico.return_value = detalhe(31, "EM_ANDAMENTO")
+        client.list_ordens_servico.return_value = [resumo(31, "EM_ANDAMENTO")]
+        steps = WorkshopState.confirm_transition.fn(state)
+        next(steps)  # "Registrando…" and the disabled button reach the browser first
+        self.assertTrue(state.is_transitioning and state.is_busy)
+        client.transicionar_ordem_servico.assert_not_called()
+        with self.assertRaises(StopIteration):
+            next(steps)
         self.assertFalse(state.is_transitioning)
 
     def test_conflict_reloads_real_status_and_shows_message(self):
@@ -305,7 +375,7 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
         )
         client.get_ordem_servico.return_value = detalhe(31, "CANCELADA")
         client.list_ordens_servico.return_value = []
-        WorkshopState.confirm_transition.fn(state)
+        run_event(WorkshopState.confirm_transition, state)
         self.assertEqual(state.detalhe["status"], "CANCELADA")
         self.assertEqual(state.transition_target, "")
         self.assertIn("alterada por outro usuário", state.transition_error)
@@ -317,14 +387,14 @@ class WorkshopStateEventTests(WorkshopStateTestCase):
         state.transition_target = "EM_ANDAMENTO"
         state.is_transitioning = True
         client_class, _ = self.patched_client()
-        WorkshopState.confirm_transition.fn(state)
+        run_event(WorkshopState.confirm_transition, state)
         client_class.assert_not_called()
 
     def test_expired_session_on_load_clears_session(self):
         state = self.make_state()
         _, client = self.patched_client()
         client.list_ordens_servico.side_effect = XanoAuthenticationError("expired")
-        WorkshopState.load_ordens.fn(state)
+        run_event(WorkshopState.load_ordens, state)
         self.assertEqual(state.auth_token, "")
         self.assertFalse(state.is_authenticated)
         self.assertEqual(state.ordens, [])
@@ -459,7 +529,7 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
         client.get_ordem_servico.return_value = detalhe(31, status, itens=[item()])
         client.list_ordens_servico.return_value = [resumo(31, status)]
         client.list_produtos.return_value = [produto(), produto(9, "INATIVO", "x", ativo=False)]
-        WorkshopState.open_detail.fn(state, "31")
+        run_event(WorkshopState.open_detail, state, "31")
         return state, client_class, client
 
     def test_open_order_loads_active_catalog_for_operators(self):
@@ -474,33 +544,33 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
         state, client_class, client = self.open_state(status="CONCLUIDA")
         self.assertFalse(state.can_edit_items)
         client.list_produtos.assert_not_called()
-        WorkshopState.ask_remove_item.fn(state, "7")
+        run_event(WorkshopState.ask_remove_item, state, "7")
         self.assertEqual(state.item_to_remove, "")
         client_class.reset_mock()
-        WorkshopState.save_item.fn(state)
+        run_event(WorkshopState.save_item, state)
         client_class.assert_not_called()
         self.assertIn("aberta ou em andamento", state.item_error)
 
     def test_selecting_product_without_balance_is_ignored(self):
         state, _, _ = self.open_state()
         state.catalogo_produtos = CATALOGO
-        WorkshopState.select_produto.fn(state, "4")
+        run_event(WorkshopState.select_produto, state, "4")
         self.assertEqual(state.item_produto_id, "")
-        WorkshopState.select_produto.fn(state, "3")
+        run_event(WorkshopState.select_produto, state, "3")
         self.assertEqual(state.produto_selecionado["codigo"], "OLEO20W50")
 
     def test_segmented_control_value_is_normalized(self):
         state = self.make_state()
-        WorkshopState.set_item_tipo.fn(state, ["SERVICO"])
+        run_event(WorkshopState.set_item_tipo, state, ["SERVICO"])
         self.assertEqual(state.item_tipo, "SERVICO")
-        WorkshopState.set_item_tipo.fn(state, "OUTRO")
+        run_event(WorkshopState.set_item_tipo, state, "OUTRO")
         self.assertEqual(state.item_tipo, "SERVICO")
 
     def test_local_balance_check_does_not_call_xano(self):
         state, client_class, client = self.open_state()
         state.item_produto_id = "3"
         state.item_quantidade = "9"
-        WorkshopState.save_item.fn(state)
+        run_event(WorkshopState.save_item, state)
         client.adicionar_item_ordem_servico.assert_not_called()
         self.assertEqual(state.item_error, "Saldo insuficiente para OLEO20W50: disponível 5.")
 
@@ -517,7 +587,7 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
             valor_total=Decimal("183.6"),
         )
         client.list_produtos.return_value = [produto(saldo=3)]
-        WorkshopState.save_item.fn(state)
+        run_event(WorkshopState.save_item, state)
         os_id, payload = client.adicionar_item_ordem_servico.call_args.args
         self.assertEqual((os_id, payload.id_produto, payload.quantidade), (31, 3, 2))
         self.assertEqual(len(state.detalhe_itens), 2)
@@ -533,7 +603,7 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
         message = "Saldo insuficiente para OLEO20W50: disponível 1, solicitado 2."
         client.adicionar_item_ordem_servico.side_effect = XanoValidationError(message, status_code=400)
         client.list_produtos.return_value = [produto(saldo=1)]
-        WorkshopState.save_item.fn(state)
+        run_event(WorkshopState.save_item, state)
         self.assertEqual(state.item_error, message)
         self.assertEqual(state.item_produto_id, "3")
         self.assertEqual(state.catalogo_produtos[0]["saldo"], "1")
@@ -541,13 +611,13 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
 
     def test_remove_requires_confirmation_and_reports_stock_return(self):
         state, _, client = self.open_state()
-        WorkshopState.ask_remove_item.fn(state, "7")
+        run_event(WorkshopState.ask_remove_item, state, "7")
         self.assertIn("A peça volta ao estoque.", state.remove_message)
-        WorkshopState.cancel_remove_item.fn(state)
+        run_event(WorkshopState.cancel_remove_item, state)
         client.remover_item_ordem_servico.assert_not_called()
-        WorkshopState.ask_remove_item.fn(state, "7")
+        run_event(WorkshopState.ask_remove_item, state, "7")
         client.remover_item_ordem_servico.return_value = detalhe(31, "EM_ANDAMENTO")
-        response = WorkshopState.confirm_remove_item.fn(state)
+        response = run_event(WorkshopState.confirm_remove_item, state)
         client.remover_item_ordem_servico.assert_called_once_with(31, 7)
         self.assertEqual(state.detalhe_itens, [])
         self.assertEqual(state.item_to_remove, "")
@@ -557,9 +627,9 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
         state, _, client = self.open_state()
         state.item_produto_id = "3"
         state.is_transitioning = True
-        WorkshopState.save_item.fn(state)
+        run_event(WorkshopState.save_item, state)
         state.item_to_remove = "7"
-        WorkshopState.confirm_remove_item.fn(state)
+        run_event(WorkshopState.confirm_remove_item, state)
         client.adicionar_item_ordem_servico.assert_not_called()
         client.remover_item_ordem_servico.assert_not_called()
 

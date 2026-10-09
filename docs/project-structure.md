@@ -9,7 +9,7 @@ Esta página explica onde cada tipo de arquivo deve ficar. A ideia é permitir q
 3. Crie uma mudança pequena em `openspec/changes/` antes de implementar uma alteração significativa.
 4. Escreva ou altere o código da aplicação em `Projeto_HarleyStore/`.
 5. Coloque imagens e arquivos estáticos em `assets/`.
-6. Valide com `python -m unittest discover -s tests`, `python -m py_compile`, `reflex compile --dry` e o validador XanoScript; publique o backend com `xano workspace push -d ./xano` (ver `docs/xano-api-client.md`).
+6. Valide com `python -m pytest` (ou `python -m unittest discover -s tests`), `python -m py_compile`, `reflex compile --dry` e o validador XanoScript; publique o backend com `xano workspace push -d ./xano` (ver `docs/xano-api-client.md`).
 7. Atualize a documentação e os artefatos da mudança quando o comportamento estiver concluído.
 
 ## Pastas principais
@@ -19,8 +19,10 @@ Esta página explica onde cada tipo de arquivo deve ficar. A ideia é permitir q
 | `Projeto_HarleyStore/` | Ponto de entrada e componentes da aplicação Reflex. |
 | `assets/` | Recursos estáticos usados pela aplicação, incluindo `harley.css` (sobrescritas globais do tema) e o logo `HARLEY_LOGO.png` (escudo recortado de `harley-davidson-logo.webp`, com fundo transparente, usado no cabeçalho). |
 | `Projeto_HarleyStore/styles/theme.py` | Tokens do design system (cores, tipografia, status, contraste); única origem de cores junto com `assets/harley.css`. |
+| `Projeto_HarleyStore/financeiro_state.py`, `financeiro_pages.py` e `services/financeiro.py` | Visão consolidada `/financeiro` (Change 10): período, cartões de receitas, despesas e saldo, totais por tipo e operações; somente `GERENTE`. |
 | `Projeto_HarleyStore/ui_helpers.py` e `components.py` | Componentes compartilhados (cabeçalho, tabela, botões, badges, swatches) e shell (sidebar, vitrine pública, modal). |
 | `docs/` | Visão geral, domínio e decisões que ajudam no entendimento do sistema. |
+| `tests/` | Suíte pytest/unittest: contratos XanoScript, DTOs, cliente e estados. `conftest.py` aplica os marcadores `integration`, `writes` e `concurrency`; `event_runner.py` executa handlers geradores como o Reflex. A configuração fica em `pytest.ini` e as dependências de teste em `requirements-dev.txt`. |
 | `xano/` | Exports, tabelas e endpoints do backend oficial Xano. Não são importados diretamente pelo Reflex. |
 | `openspec/` | Propostas, especificações, designs e tarefas de mudanças incrementais. |
 | `.vscode/` | Configurações e integrações específicas do editor. |

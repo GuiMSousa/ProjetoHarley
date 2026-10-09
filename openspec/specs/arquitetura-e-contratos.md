@@ -32,13 +32,13 @@ O backend DEVE rejeitar `preco_venda` e `valor_unitario` menores ou iguais a zer
 
 ## Requisito: criação de motocicleta de estoque
 
-O endpoint `POST motos` DEVE persistir todos os campos de domínio recebidos no payload (`clientes_id`, `marca` e `modelo`) e o timestamp de criação.
+Desde a Change 8, `POST motos` (somente `GERENTE`) DEVE aceitar apenas `id_modelo`, `chassi`, `cor`, `ano_modelo` e `preco_venda`; status, cliente, vendedor e validade NUNCA vêm do payload. As regras completas estão na spec `catalogo-vendas-motos` (requisito "cadastro de unidades").
 
-### Cenário: payload de moto
+### Cenário: payload de moto com status
 
-- **DADO** um payload válido para uma motocicleta de estoque
+- **DADO** um payload de unidade com `status = VENDIDA` e `clientes_id`
 - **QUANDO** o endpoint `POST motos` for executado
-- **ENTÃO** os campos recebidos DEVEM aparecer no registro criado
+- **ENTÃO** a unidade DEVE nascer `DISPONIVEL`, sem cliente, e esses campos DEVEM ser ignorados
 
 ## Requisito: vínculo de identidade
 
@@ -49,6 +49,7 @@ A tabela `user` DEVE possuir o campo opcional `id_funcionario` como referência 
 - **DADO** um usuário com `id_funcionario` preenchido
 - **ENTÃO** o valor DEVE identificar um registro existente em `funcionarios`
 - **E** o campo `user.role` DEVE continuar sendo tratado como papel técnico separado do tipo do funcionário
+
 ## Requisito: grupos de API do Xano
 
 O cliente DEVE endereçar cada grupo de APIs pela sua própria URL base: `XANO_API_BASE_URL` para o grupo `HARLEY` e `XANO_AUTH_API_BASE_URL` para o grupo `Authentication`.
@@ -107,7 +108,27 @@ Componentes e regras repetidos entre páginas DEVEM viver em módulos compartilh
 
 ## Requisito: autoria imutável
 
-Nenhum endpoint DEVE gravar `id_funcionario` vindo do payload. Em `PATCH` de OS e transações, a chave DEVE ser descartada antes da gravação.
+Nenhum endpoint DEVE gravar `id_funcionario` vindo do payload. Em `PATCH` de OS e transações, a chave DEVE ser descartada antes da gravação. Correções de transações (`PUT`/`PATCH`) NÃO DEVEM substituir o autor original, nem pelo payload nem por quem edita.
+
+## Requisito: papel verificado em todo endpoint autenticado
+
+Todo endpoint com `auth = "user"` DEVE chamar `Quick Start/enforce_role`, que exige funcionário vinculado, existente e ativo e o papel mínimo da operação. A única exceção é `auth/me`, que devolve apenas a identidade de quem chama, para o Reflex explicar um funcionário inativo. IDs de funcionário recebidos no payload (`id_mecanico` na abertura de OS, `id_funcionario` no `auth/signup`) DEVEM ser validados no servidor (existente, ativo e do tipo esperado).
+
+### Cenário: token válido de funcionário desativado
+
+- **DADO** um JWT válido de um usuário cujo funcionário foi desativado
+- **QUANDO** chamar qualquer endpoint de negócio, inclusive `logs/user/my_events`
+- **ENTÃO** a resposta DEVE ser `403`
+
+## Requisito: dados financeiros restritos
+
+`GET transacoes` e `GET transacoes/{id}` DEVEM exigir `GERENTE`. Lançamentos e correções manuais (`POST transacoes`, `PUT`/`PATCH transacoes/{id}`) DEVEM exigir `GERENTE`; as operações de negócio (venda de moto) gravam suas transações por funções próprias. A Change 10 (`fechamento-financeiro-operacoes`) proposta torna as transações imutáveis.
+
+### Cenário: vendedor tenta lançar uma transação
+
+- **DADO** um `VENDEDOR` autenticado
+- **QUANDO** enviar `POST transacoes` com um `valor_total`
+- **ENTÃO** a resposta DEVE ser `403` e nada DEVE ser gravado
 
 ## Requisito: auditoria sem segredos
 

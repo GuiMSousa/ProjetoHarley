@@ -15,6 +15,8 @@ from Projeto_HarleyStore.xano_config import (
     xano_auth_cookie_secure,
 )
 
+from tests.event_runner import run_event
+
 
 class AuthenticationTests(unittest.TestCase):
     def make_state(self):
@@ -191,7 +193,7 @@ class AuthenticationTests(unittest.TestCase):
             AuthState, "_mark_dirty", lambda instance: None
         ):
             client_class.return_value.__enter__.return_value = client
-            result = AuthState.load_user.fn(state)
+            result = run_event(AuthState.load_user, state)
         self.assertIsNone(result)
         self.assertTrue(state.is_authenticated)
 

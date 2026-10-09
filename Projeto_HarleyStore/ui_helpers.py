@@ -22,21 +22,28 @@ from Projeto_HarleyStore.styles.theme import (
 
 
 def labeled(label: str, control: rx.Component, **props) -> rx.Component:
-    """Stack a muted caption above a form control or value."""
-    return rx.vstack(
-        rx.text(label, size="2", color=COLORS["muted"]),
-        control,
-        align="stretch",
-        spacing="1",
-        **props,
+    """Stack a muted caption above a form control or value.
+
+    The wrapper is a ``<label>``, so screen readers announce the caption with the control
+    and a click on the caption focuses it.
+    """
+    return rx.el.label(
+        rx.vstack(
+            rx.text(label, size="2", color=COLORS["muted"]),
+            control,
+            align="stretch",
+            spacing="1",
+            width="100%",
+        ),
+        **{"display": "block", **props},
     )
 
 
 def error_callout(message: rx.Var) -> rx.Component:
-    """Red callout rendered only while the message is not empty."""
+    """Red callout rendered only while the message is not empty; announced by screen readers."""
     return rx.cond(
         message != "",
-        rx.callout(message, icon="triangle_alert", color_scheme="red", width="100%"),
+        rx.callout(message, icon="triangle_alert", color_scheme="red", width="100%", role="alert"),
     )
 
 
@@ -123,7 +130,7 @@ def modal_header(*title: rx.Component | str, on_close) -> rx.Component:
 
 def empty_state(message: str, icon: str = "inbox") -> rx.Component:
     return rx.vstack(
-        rx.icon(icon, size=28, color=COLORS["muted"]),
+        rx.icon(icon, size=28, color=COLORS["muted"], aria_hidden="true"),
         rx.text(message, color=COLORS["muted"]),
         align="center",
         spacing="2",
@@ -132,14 +139,17 @@ def empty_state(message: str, icon: str = "inbox") -> rx.Component:
     )
 
 
-def stat_tile(label: str, value: rx.Var | str, accent: bool = False) -> rx.Component:
+def stat_tile(
+    label: str, value: rx.Var | str, accent: bool = False, color: rx.Var | str | None = None
+) -> rx.Component:
+    """Label over a value; ``accent`` enlarges it in orange, ``color`` overrides the value color."""
     return rx.vstack(
         rx.text(label, size="1", color=COLORS["muted"], text_transform="uppercase", letter_spacing="0.08em"),
         rx.text(
             value,
             font_weight="700",
             size="5" if accent else "4",
-            color=COLORS["orange"] if accent else COLORS["text"],
+            color=color if color is not None else (COLORS["orange"] if accent else COLORS["text"]),
         ),
         spacing="0",
         align="start",
@@ -168,11 +178,14 @@ def toolbar(
         )
     return rx.hstack(
         rx.input(
-            rx.input.slot(rx.icon("search", size=16)),
+            rx.input.slot(rx.icon("search", size=16, aria_hidden="true")),
             placeholder=placeholder,
             value=search_value,
             on_change=on_search,
             disabled=disabled,
+            type="search",
+            aria_label=placeholder.rstrip("…"),
+            custom_attrs={"autoComplete": "off"},
             width="min(100%, 30rem)",
         ),
         rx.spacer(),
@@ -209,7 +222,7 @@ def data_table(
     *,
     empty_text: str,
     loading: rx.Var | None = None,
-    loading_text: str = "Carregando...",
+    loading_text: str = "Carregando…",
 ) -> rx.Component:
     """Table inside a card, with loading and empty states."""
     table = rx.table.root(
@@ -221,7 +234,7 @@ def data_table(
     if loading is not None:
         content = rx.cond(
             loading,
-            rx.text(loading_text, color=COLORS["muted"], padding="2rem"),
+            rx.text(loading_text, color=COLORS["muted"], padding="2rem", role="status"),
             content,
         )
     return rx.box(content, width="100%", overflow_x="auto", padding="0 1rem", **CARD)

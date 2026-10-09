@@ -128,6 +128,7 @@ class CatalogoState(AuthState):
         if self.is_loading_catalogo:
             return
         self.is_loading_catalogo = True
+        yield  # render the busy state before the Xano call
         self.erro = ""
         try:
             self.cards = [modelo_card(modelo) for modelo in catalogo_cache.get(_fetch_catalogo)]

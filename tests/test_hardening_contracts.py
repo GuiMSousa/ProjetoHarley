@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -25,8 +26,6 @@ class HardeningContractTests(unittest.TestCase):
             "xano/api/harley/motos/motos_id_reserva_POST.xs",
             "xano/api/harley/motos/motos_id_reserva_cancelar_POST.xs",
             "xano/api/harley/vender_moto_POST.xs",
-            "xano/api/harley/transacoes_POST.xs",
-            "xano/api/harley/transacoes/transacoes_id_PUT.xs",
         ]
         for relative_path in operation_files:
             with self.subTest(path=relative_path):
@@ -35,6 +34,35 @@ class HardeningContractTests(unittest.TestCase):
                 self.assertIn("as $auth_user", content)
                 self.assertIn("$auth_user.id_funcionario", content)
                 self.assertNotIn("id_funcionario : $input.id_funcionario", content)
+
+    def test_transactions_are_read_by_managers_and_never_written_manually(self):
+        """Change 10 (D5, D6): only GERENTE reads; manual create, edit and delete answer 403."""
+        for relative_path in (
+            "xano/api/harley/transacoes_GET.xs",
+            "xano/api/harley/transacoes_POST.xs",
+            "xano/api/harley/transacoes/transacoes_id_GET.xs",
+            "xano/api/harley/transacoes/transacoes_id_PUT.xs",
+            "xano/api/harley/transacoes/transacoes_id_PATCH.xs",
+            "xano/api/harley/transacoes/transacoes_id_DELETE.xs",
+        ):
+            with self.subTest(path=relative_path):
+                content = self.read(relative_path)
+                self.assertIn('auth = "user"', content)
+                self.assertIn('required_role: "GERENTE"', content)
+                self.assertNotIn('required_role: "VENDEDOR"', content)
+                self.assertNotIn('required_role: "ALL"', content)
+        for relative_path in (
+            "xano/api/harley/transacoes_POST.xs",
+            "xano/api/harley/transacoes/transacoes_id_PUT.xs",
+            "xano/api/harley/transacoes/transacoes_id_PATCH.xs",
+            "xano/api/harley/transacoes/transacoes_id_DELETE.xs",
+        ):
+            with self.subTest(blocked=relative_path):
+                content = self.read(relative_path)
+                self.assertIn("precondition (false)", content)
+                self.assertIn('error_type = "accessdenied"', content)
+                self.assertIsNone(re.search(r"\bdb\.(add|edit|patch|del)\s", content))
+                self.assertNotIn("dblink", content)
 
     def test_financial_schemas_reject_zero(self):
         schemas = [

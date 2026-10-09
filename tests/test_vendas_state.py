@@ -36,6 +36,8 @@ from Projeto_HarleyStore.vendas_state import (
     venda_ainda_possivel,
 )
 
+from tests.event_runner import run_event
+
 
 AGORA = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
 COR = VariacaoCor(nome="Vivid Black", hex="#0B0B0B", imagem_url="https://img.test/a.jpg")
@@ -235,28 +237,28 @@ class VendasStateTests(unittest.TestCase):
     def test_seller_loads_units_filtered_by_the_model_query_parameter(self):
         _, client = self.patched_client()
         state = self.make_state(modelo_param="3")
-        VendasState.load_vendas.fn(state)
+        run_event(VendasState.load_vendas, state)
         self.assertEqual(state.filtro_modelo, "3")
         self.assertEqual(state.filtro_modelo_nome, "Street Glide")
         self.assertEqual([row["id"] for row in state.visible_rows], ["1"])
         self.assertEqual(state.counts, {"DISPONIVEL": 1, "RESERVADA": 1, "VENDIDA": 0})
         client.list_modelos_moto.assert_not_called()
-        VendasState.set_aba.fn(state, ABA_ESTOQUE)
+        run_event(VendasState.set_aba, state, ABA_ESTOQUE)
         self.assertEqual(state.aba, "DISPONIVEL")
 
     def test_manager_also_loads_the_catalog_models(self):
         _, client = self.patched_client()
         state = self.make_state(role="GERENTE")
-        VendasState.load_vendas.fn(state)
+        run_event(VendasState.load_vendas, state)
         self.assertEqual([row["nome"] for row in state.modelos], ["Street Glide"])
         self.assertEqual(state.modelo_options, ["3 - Street Glide"])
-        VendasState.set_aba.fn(state, ABA_ESTOQUE)
+        run_event(VendasState.set_aba, state, ABA_ESTOQUE)
         self.assertEqual(state.aba, ABA_ESTOQUE)
 
     def test_mechanic_does_not_load_sales(self):
         client_class, _ = self.patched_client()
         state = self.make_state(role="MECANICO")
-        VendasState.load_vendas.fn(state)
+        run_event(VendasState.load_vendas, state)
         client_class.assert_not_called()
 
     @patch("Projeto_HarleyStore.vendas_state.catalogo_cache")
@@ -268,10 +270,10 @@ class VendasStateTests(unittest.TestCase):
         ]
         client.reservar_moto.return_value = MotoEstoqueDetalhe(**reservada().model_dump())
         state = self.make_state()
-        VendasState.open_reserva.fn(state, "1")
+        run_event(VendasState.open_reserva, state, "1")
         self.assertEqual(state.cliente_options, ["5 - Ana Souza"])
-        VendasState.set_reserva_cliente.fn(state, "5 - Ana Souza")
-        VendasState.confirm_reserva.fn(state)
+        run_event(VendasState.set_reserva_cliente, state, "5 - Ana Souza")
+        run_event(VendasState.confirm_reserva, state)
         moto_id, payload = client.reservar_moto.call_args.args
         self.assertEqual((moto_id, payload.id_cliente, payload.dias_validade), (1, 5, 7))
         cache.invalidate.assert_called_once()
@@ -285,9 +287,9 @@ class VendasStateTests(unittest.TestCase):
             "Esta moto não está disponível para reserva.", status_code=400
         )
         state = self.make_state()
-        VendasState.open_reserva.fn(state, "1")
-        VendasState.set_reserva_cliente.fn(state, "5 - Ana")
-        VendasState.confirm_reserva.fn(state)
+        run_event(VendasState.open_reserva, state, "1")
+        run_event(VendasState.set_reserva_cliente, state, "5 - Ana")
+        run_event(VendasState.confirm_reserva, state)
         self.assertEqual(state.reserva_moto_id, "1")
         self.assertEqual(state.reserva_error, "Esta moto não está disponível para reserva.")
         self.assertEqual(client.list_motos_estoque.call_count, 1)
@@ -296,12 +298,12 @@ class VendasStateTests(unittest.TestCase):
         _, client = self.patched_client()
         client.cancelar_reserva_moto.side_effect = XanoPermissionError("x", status_code=403)
         state = self.make_state()
-        VendasState.open_cancelamento.fn(state, "9")
-        VendasState.confirm_cancelamento.fn(state)
+        run_event(VendasState.open_cancelamento, state, "9")
+        run_event(VendasState.confirm_cancelamento, state)
         self.assertEqual(state.cancel_error, "Informe o motivo do cancelamento (até 500 caracteres).")
         client.cancelar_reserva_moto.assert_not_called()
-        VendasState.set_cancel_motivo.fn(state, "Cliente desistiu")
-        VendasState.confirm_cancelamento.fn(state)
+        run_event(VendasState.set_cancel_motivo, state, "Cliente desistiu")
+        run_event(VendasState.confirm_cancelamento, state)
         self.assertIn("permissão", state.cancel_error)
         self.assertTrue(state.is_authenticated)
 
@@ -309,31 +311,31 @@ class VendasStateTests(unittest.TestCase):
     def test_manager_creates_models_with_colors_and_units(self, cache):
         _, client = self.patched_client()
         state = self.make_state(role="GERENTE")
-        VendasState.load_vendas.fn(state)
-        VendasState.open_modelo_create.fn(state)
+        run_event(VendasState.load_vendas, state)
+        run_event(VendasState.open_modelo_create, state)
         for field, value in (
             ("nome_modelo", "Fat Boy"),
             ("familia", "Cruiser"),
             ("preco_base", "139900"),
             ("imagem_principal", "https://img.test/fb.jpg"),
         ):
-            VendasState.set_modelo_field.fn(state, field, value)
-        VendasState.set_cor_field.fn(state, 0, "nome", "Preto")
-        VendasState.set_cor_field.fn(state, 0, "hex", "#1A1A1A")
-        VendasState.set_cor_field.fn(state, 0, "imagem_url", "https://img.test/fb-preto.jpg")
-        VendasState.add_cor.fn(state)
-        VendasState.remove_cor.fn(state, 1)
-        VendasState.save_modelo.fn(state)
+            run_event(VendasState.set_modelo_field, state, field, value)
+        run_event(VendasState.set_cor_field, state, 0, "nome", "Preto")
+        run_event(VendasState.set_cor_field, state, 0, "hex", "#1A1A1A")
+        run_event(VendasState.set_cor_field, state, 0, "imagem_url", "https://img.test/fb-preto.jpg")
+        run_event(VendasState.add_cor, state)
+        run_event(VendasState.remove_cor, state, 1)
+        run_event(VendasState.save_modelo, state)
         (payload,) = client.criar_modelo_moto.call_args.args
         self.assertEqual((payload.familia, [cor.nome for cor in payload.variacoes_cor]), ("CRUISER", ["Preto"]))
         self.assertFalse(state.modelo_form_open)
 
-        VendasState.open_moto_create.fn(state)
-        VendasState.set_moto_field.fn(state, "modelo", "3 - Street Glide")
+        run_event(VendasState.open_moto_create, state)
+        run_event(VendasState.set_moto_field, state, "modelo", "3 - Street Glide")
         self.assertEqual(state.cor_options, ["Vivid Black"])
         for field, value in (("chassi", "1HD1KTP19RB600009"), ("cor", "Vivid Black"), ("ano_modelo", "2025"), ("preco_venda", "189900")):
-            VendasState.set_moto_field.fn(state, field, value)
-        VendasState.save_moto.fn(state)
+            run_event(VendasState.set_moto_field, state, field, value)
+        run_event(VendasState.save_moto, state)
         (nova,) = client.cadastrar_moto_estoque.call_args.args
         self.assertEqual((nova.id_modelo, nova.cor), (3, "Vivid Black"))
         self.assertEqual(cache.invalidate.call_count, 2)
@@ -341,8 +343,8 @@ class VendasStateTests(unittest.TestCase):
     def test_seller_cannot_open_management_forms(self):
         self.patched_client()
         state = self.make_state()
-        VendasState.open_modelo_create.fn(state)
-        VendasState.open_moto_create.fn(state)
+        run_event(VendasState.open_modelo_create, state)
+        run_event(VendasState.open_moto_create, state)
         self.assertFalse(state.modelo_form_open or state.moto_form_open)
 
     def test_operations_are_blocked_while_another_runs(self):
@@ -351,7 +353,7 @@ class VendasStateTests(unittest.TestCase):
         state.reserva_moto_id = "1"
         state.reserva_cliente = "5 - Ana"
         state.is_cancelling = True
-        VendasState.confirm_reserva.fn(state)
+        run_event(VendasState.confirm_reserva, state)
         client.reservar_moto.assert_not_called()
 
     def open_sale(self, client, moto_id="1", role="VENDEDOR"):
@@ -362,8 +364,8 @@ class VendasStateTests(unittest.TestCase):
         ]
         client.vender_moto.return_value = VendaMotoResultado(id_transacao=41, id_moto_cliente=87, status="SUCESSO")
         state = self.make_state(role=role)
-        VendasState.load_vendas.fn(state)
-        VendasState.open_venda.fn(state, moto_id)
+        run_event(VendasState.load_vendas, state)
+        run_event(VendasState.open_venda, state, moto_id)
         return state
 
     @patch("Projeto_HarleyStore.vendas_state.catalogo_cache")
@@ -373,10 +375,10 @@ class VendasStateTests(unittest.TestCase):
         self.assertEqual(state.cliente_options, ["5 - Ana Souza", "6 - Bruno"])
         self.assertEqual((state.venda_valor, state.venda_cliente_fixo), ("189900,00", False))
         self.assertEqual(state.venda_resumo["modelo"], "Street Glide")
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
-        VendasState.set_venda_valor.fn(state, "185000")
-        VendasState.set_venda_placa.fn(state, "")
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
+        run_event(VendasState.set_venda_valor, state, "185000")
+        run_event(VendasState.set_venda_placa, state, "")
+        run_event(VendasState.confirm_venda, state)
         (payload,) = client.vender_moto.call_args.args
         self.assertEqual(
             (payload.id_moto, payload.id_cliente, payload.valor_venda, payload.placa),
@@ -391,19 +393,19 @@ class VendasStateTests(unittest.TestCase):
         state = self.open_sale(client, moto_id="9")
         client.list_clientes.assert_not_called()
         self.assertEqual((state.venda_cliente, state.venda_cliente_fixo), ("5 - Ana Souza", True))
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
         self.assertEqual(state.venda_cliente, "5 - Ana Souza")
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         self.assertEqual(client.vender_moto.call_args.args[0].id_cliente, 5)
 
     def test_invalid_form_never_reaches_xano(self):
         _, client = self.patched_client()
         state = self.open_sale(client)
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         self.assertEqual(state.venda_error, "Selecione o cliente.")
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
-        VendasState.set_venda_valor.fn(state, "0")
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
+        run_event(VendasState.set_venda_valor, state, "0")
+        run_event(VendasState.confirm_venda, state)
         self.assertIn("maior que zero", state.venda_error)
         client.vender_moto.assert_not_called()
 
@@ -413,9 +415,9 @@ class VendasStateTests(unittest.TestCase):
         vendida = moto(1, status="VENDIDA", clientes_id=5, nome_cliente="Ana Souza")
         client.list_motos_estoque.side_effect = [[moto(1), reservada()], [vendida, reservada()]]
         state = self.open_sale(client)
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
         client.vender_moto.side_effect = XanoValidationError("Esta moto já foi vendida.", status_code=400)
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         self.assertEqual(state.venda_moto_id, "")
         self.assertEqual(state.motos[0]["status"], "VENDIDA")
         self.assertEqual(state.counts["VENDIDA"], 1)
@@ -425,12 +427,12 @@ class VendasStateTests(unittest.TestCase):
     def test_rejection_of_a_still_available_unit_keeps_the_modal(self):
         _, client = self.patched_client()
         state = self.open_sale(client)
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
-        VendasState.set_venda_placa.fn(state, "ABC1D23")
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
+        run_event(VendasState.set_venda_placa, state, "ABC1D23")
         client.vender_moto.side_effect = XanoValidationError(
             "Placa já cadastrada em uma moto de cliente.", status_code=400
         )
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         self.assertEqual(state.venda_moto_id, "1")
         self.assertEqual(state.venda_error, "Placa já cadastrada em uma moto de cliente.")
         self.assertEqual(client.list_motos_estoque.call_count, 2)
@@ -439,17 +441,17 @@ class VendasStateTests(unittest.TestCase):
         _, client = self.patched_client()
         client.list_motos_estoque.side_effect = [[moto(1), reservada()], [reservada()]]
         state = self.open_sale(client)
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
         client.vender_moto.side_effect = XanoNotFoundError("x", status_code=404)
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         self.assertEqual(state.venda_moto_id, "")
 
     def test_forbidden_sale_shows_the_reason(self):
         _, client = self.patched_client()
         state = self.open_sale(client)
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
         client.vender_moto.side_effect = XanoPermissionError("x", status_code=403)
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         self.assertIn("permissão", state.venda_error)
         self.assertEqual(state.venda_moto_id, "1")
         self.assertTrue(state.is_authenticated)
@@ -458,20 +460,33 @@ class VendasStateTests(unittest.TestCase):
         _, client = self.patched_client()
         client.list_motos_estoque.return_value = [moto(1, status="VENDIDA")]
         state = self.make_state()
-        VendasState.load_vendas.fn(state)
-        VendasState.open_venda.fn(state, "1")
+        run_event(VendasState.load_vendas, state)
+        run_event(VendasState.open_venda, state, "1")
         self.assertEqual(state.venda_moto_id, "")
         mecanico = self.make_state(role="MECANICO")
-        VendasState.open_venda.fn(mecanico, "1")
+        run_event(VendasState.open_venda, mecanico, "1")
         self.assertEqual(mecanico.venda_moto_id, "")
         client.list_clientes.assert_not_called()
+
+    def test_sale_renders_the_busy_state_before_calling_xano(self):
+        _, client = self.patched_client()
+        state = self.open_sale(client)
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
+        steps = VendasState.confirm_venda.fn(state)
+        next(steps)  # first state update sent to the browser
+        self.assertTrue(state.is_selling and state.is_busy)
+        client.vender_moto.assert_not_called()
+        with self.assertRaises(StopIteration):
+            next(steps)
+        client.vender_moto.assert_called_once()
+        self.assertFalse(state.is_selling)
 
     def test_sale_is_blocked_while_another_operation_runs(self):
         _, client = self.patched_client()
         state = self.open_sale(client)
-        VendasState.set_venda_cliente.fn(state, "6 - Bruno")
+        run_event(VendasState.set_venda_cliente, state, "6 - Bruno")
         state.is_reserving = True
-        VendasState.confirm_venda.fn(state)
+        run_event(VendasState.confirm_venda, state)
         client.vender_moto.assert_not_called()
 
 

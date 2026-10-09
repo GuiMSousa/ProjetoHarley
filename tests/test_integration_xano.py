@@ -1,19 +1,23 @@
-"""Integration tests against a real Xano workspace.
+"""Integration tests against a real Xano workspace (pytest marker ``integration``).
 
-The suite is skipped unless ``XANO_API_BASE_URL`` is configured in the
-environment or in the project ``.env`` file, so the offline suite stays green.
+Opt-in only: a plain ``pytest`` run never calls Xano. Every test here is skipped, with
+the reason shown by ``pytest -ra``, unless ``XANO_API_BASE_URL`` is configured AND the
+run is explicitly enabled with ``XANO_TEST_ALLOW_WRITES=true`` (full suite) or
+``XANO_TEST_LIVE=true`` (read-only scenarios). Without credentials, each profile's
+tests are skipped individually.
 
 Settings (environment variables take precedence over ``.env``):
 
 - ``XANO_API_BASE_URL`` / ``XANO_AUTH_API_BASE_URL``: API group base URLs;
 - ``XANO_TEST_<PERFIL>_EMAIL`` / ``XANO_TEST_<PERFIL>_PASSWORD`` for
   ``GERENTE``, ``VENDEDOR`` and ``MECANICO`` (each profile is optional);
-- ``XANO_TEST_ALLOW_WRITES=true`` enables scenarios that persist data. Goods
+- ``XANO_TEST_LIVE=true`` runs only the read-only scenarios (marker ``integration``);
+- ``XANO_TEST_ALLOW_WRITES=true`` (marker ``writes``) enables scenarios that persist data. Goods
   receipts, service orders and stock movements are immutable, so those
   records stay in the database: point the suite at a test branch or workspace.
   Orders opened by the tests are cancelled at the end, returning their parts.
   Sales are final: the sold units, customer bikes and MOTO transactions stay.
-- ``XANO_TEST_CONCURRENCY=true`` (with writes) runs the race scenarios of the
+- ``XANO_TEST_CONCURRENCY=true`` (with writes, marker ``concurrency``) runs the race scenarios of the
   stock ledger, the order lock, reservations and sales; the order races need
   two free customer bikes.
 """
@@ -25,12 +29,14 @@ import threading
 import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
 from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCor
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
+from Projeto_HarleyStore.services.financeiro import FUSO_LOJA, OPERACOES_LIMITE, PeriodoFinanceiro
 from Projeto_HarleyStore.services.motos import (
     CancelamentoReservaMoto,
     MotoEstoqueCreate,
@@ -79,18 +85,24 @@ def live_settings() -> dict[str, str]:
     return settings
 
 
+def enabled(name: str) -> bool:
+    return SETTINGS.get(name, "").strip().lower() in {"1", "true", "yes"}
+
+
 SETTINGS = live_settings()
 BASE_URL = SETTINGS.get("XANO_API_BASE_URL", "").strip()
-LIVE = bool(BASE_URL) and BASE_URL != PLACEHOLDER_URL
-ALLOW_WRITES = SETTINGS.get("XANO_TEST_ALLOW_WRITES", "").lower() in {"1", "true", "yes"}
-CONCURRENCY = ALLOW_WRITES and SETTINGS.get("XANO_TEST_CONCURRENCY", "").lower() in {
-    "1",
-    "true",
-    "yes",
-}
+CONFIGURED = bool(BASE_URL) and BASE_URL != PLACEHOLDER_URL
+ALLOW_WRITES = enabled("XANO_TEST_ALLOW_WRITES")
+# Writes imply live reads; XANO_TEST_LIVE alone enables the read-only scenarios.
+LIVE = CONFIGURED and (ALLOW_WRITES or enabled("XANO_TEST_LIVE"))
+CONCURRENCY = LIVE and ALLOW_WRITES and enabled("XANO_TEST_CONCURRENCY")
+LIVE_SKIP_REASON = (
+    "Integração real desativada: defina XANO_TEST_ALLOW_WRITES=true (ou XANO_TEST_LIVE=true "
+    "para só leitura) e XANO_API_BASE_URL."
+)
 
 
-@unittest.skipUnless(LIVE, "XANO_API_BASE_URL não configurada: integração ignorada.")
+@unittest.skipUnless(LIVE, LIVE_SKIP_REASON)
 class XanoLiveTestCase(unittest.TestCase):
     tokens: dict[str, str] = {}
 
@@ -897,3 +909,141 @@ class XanoLiveStockUnitConcurrencyTests(XanoLiveSalesWriteTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def periodo_de_hoje() -> PeriodoFinanceiro:
+    hoje = datetime.now(FUSO_LOJA).date()
+    return PeriodoFinanceiro(inicio=hoje, fim=hoje)
+
+
+class XanoLiveFinanceReadTests(XanoLiveTestCase):
+    """Change 10 without writes: access, immutability and period validation."""
+
+    def test_financial_data_is_manager_only(self):
+        for role in ("VENDEDOR", "MECANICO"):
+            with self.subTest(role=role), self.client_for(role) as client:
+                with self.assertRaises(XanoPermissionError):
+                    client.resumo_financeiro(periodo_de_hoje())
+                with self.assertRaises(XanoPermissionError):
+                    client.request("GET", "transacoes")
+
+    def test_manager_reads_the_summary_and_the_period_is_validated(self):
+        with self.client_for("GERENTE") as client:
+            hoje = datetime.now(FUSO_LOJA).date()
+            resumo = client.resumo_financeiro(PeriodoFinanceiro(inicio=hoje.replace(day=1), fim=hoje))
+            self.assertAlmostEqual(resumo.saldo, resumo.receitas - resumo.despesas, delta=Decimal("0.01"))
+            self.assertLessEqual(len(resumo.operacoes), OPERACOES_LIMITE)
+            params = periodo_de_hoje().params()
+            for invalid in (
+                {"inicio": params["fim"], "fim": params["inicio"]},
+                {"inicio": params["inicio"] - 367 * 24 * 60 * 60 * 1000, "fim": params["fim"]},
+            ):
+                with self.subTest(params=invalid), self.assertRaises(XanoValidationError):
+                    client.request("GET", "financeiro/resumo", params=invalid)
+
+    def test_transactions_cannot_be_written_manually(self):
+        with self.client_for("GERENTE") as client:
+            for method, path in (
+                ("POST", "transacoes"),
+                ("PUT", f"transacoes/{NONEXISTENT_ID}"),
+                ("PATCH", f"transacoes/{NONEXISTENT_ID}"),
+            ):
+                with self.subTest(method=method), self.assertRaises(XanoPermissionError):
+                    client.request(method, path, json={"tipo_transacao": "BALCAO", "valor_total": 1})
+
+
+class XanoLiveFinanceWriteTests(XanoLiveWriteTestCase):
+    """Change 10 with writes: concluding an order posts its revenue exactly once."""
+
+    def test_conclusion_posts_the_revenue_once_and_the_summary_shows_it(self):
+        with self.client_for("GERENTE") as client:
+            (product,) = self.restocked_products(client, 1, 1)
+            ordem = self.open_order(client)
+            try:
+                client.adicionar_item_ordem_servico(
+                    ordem.id, ItemOSCreate(tipo_item="PECA", id_produto=product.id, quantidade=1)
+                )
+                client.adicionar_item_ordem_servico(
+                    ordem.id,
+                    ItemOSCreate(
+                        tipo_item="SERVICO",
+                        descricao="Mão de obra de teste",
+                        quantidade=1,
+                        valor_unitario=Decimal("80.00"),
+                    ),
+                )
+                client.transicionar_ordem_servico(
+                    ordem.id, TransicaoStatusOS(status_atual="ABERTA", status_novo="EM_ANDAMENTO")
+                )
+                concluida = client.transicionar_ordem_servico(
+                    ordem.id, TransicaoStatusOS(status_atual="EM_ANDAMENTO", status_novo="CONCLUIDA")
+                )
+            finally:
+                self.cancel_quietly(client, ordem.id)
+
+            self.assertEqual(concluida.status, "CONCLUIDA")
+            self.assertIsNotNone(concluida.id_transacao)
+            lancamentos = [
+                operacao
+                for operacao in client.resumo_financeiro(periodo_de_hoje()).operacoes
+                if operacao.id_os == ordem.id
+            ]
+            self.assertEqual(len(lancamentos), 1)
+            (lancamento,) = lancamentos
+            self.assertEqual(
+                (lancamento.id, lancamento.tipo, lancamento.natureza, lancamento.valor),
+                (concluida.id_transacao, "ORDEM_SERVICO", "RECEITA", concluida.valor_total),
+            )
+
+    def test_orders_without_items_or_cancelled_post_nothing(self):
+        with self.client_for("GERENTE") as client:
+            vazia = self.open_order(client)
+            try:
+                client.transicionar_ordem_servico(
+                    vazia.id, TransicaoStatusOS(status_atual="ABERTA", status_novo="EM_ANDAMENTO")
+                )
+                concluida = client.transicionar_ordem_servico(
+                    vazia.id, TransicaoStatusOS(status_atual="EM_ANDAMENTO", status_novo="CONCLUIDA")
+                )
+            finally:
+                self.cancel_quietly(client, vazia.id)
+            self.assertIsNone(concluida.id_transacao)
+
+            cancelada = self.open_order(client)
+            client.transicionar_ordem_servico(
+                cancelada.id,
+                TransicaoStatusOS(status_atual="ABERTA", status_novo="CANCELADA", observacao="Teste"),
+            )
+            self.assertIsNone(client.get_ordem_servico(cancelada.id).id_transacao)
+
+
+@unittest.skipUnless(
+    CONCURRENCY, "XANO_TEST_CONCURRENCY desativado: cenários concorrentes ignorados."
+)
+class XanoLiveFinanceConcurrencyTests(XanoLiveWriteTestCase):
+    def test_two_simultaneous_conclusions_post_once(self):
+        with self.client_for("GERENTE") as client:
+            ordem = self.open_order(client)
+            client.adicionar_item_ordem_servico(
+                ordem.id,
+                ItemOSCreate(
+                    tipo_item="SERVICO",
+                    descricao="Mão de obra de teste",
+                    quantidade=1,
+                    valor_unitario=Decimal("10.00"),
+                ),
+            )
+            client.transicionar_ordem_servico(
+                ordem.id, TransicaoStatusOS(status_atual="ABERTA", status_novo="EM_ANDAMENTO")
+            )
+        concluir = TransicaoStatusOS(status_atual="EM_ANDAMENTO", status_novo="CONCLUIDA")
+        results = self.race(*[lambda c: c.transicionar_ordem_servico(ordem.id, concluir) for _ in range(2)])
+        errors = [result for result in results if isinstance(result, XanoValidationError)]
+        self.assertEqual(len(errors), 1, results)
+        with self.client_for("GERENTE") as client:
+            lancamentos = [
+                operacao
+                for operacao in client.resumo_financeiro(periodo_de_hoje()).operacoes
+                if operacao.id_os == ordem.id
+            ]
+            self.assertEqual(len(lancamentos), 1)

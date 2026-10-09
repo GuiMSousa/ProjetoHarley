@@ -158,6 +158,9 @@ class OrdemServicoDetalhe(OrdemServicoResumo):
     valor_servicos: Decimal | None = None
     historico: list[HistoricoStatusOS] = []
     itens: list[ItemOrdemServico] = []
+    # Revenue posted when the order was concluded (Change 10); None if it was not billed.
+    id_transacao: int | None = None
+    data_lancamento: datetime | None = None
 
 
 class Mecanico(BaseModel):

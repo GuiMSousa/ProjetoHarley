@@ -16,6 +16,8 @@ from Projeto_HarleyStore.catalogo_state import (
 from Projeto_HarleyStore.services.catalogo import ModeloCatalogo, VariacaoCor, catalogo_cache
 from Projeto_HarleyStore.services.xano_client import XanoNotFoundError, XanoRateLimitError
 
+from tests.event_runner import run_event
+
 
 def vitrine(modelo_id=3, nome="Street Glide", familia="TOURING", destaque=False, disponiveis=2):
     return ModeloCatalogo(
@@ -92,9 +94,9 @@ class CatalogoStateTests(unittest.TestCase):
         client.list_catalogo.return_value = [vitrine(3), vitrine(4, "Fat Boy", "CRUISER", destaque=True)]
         first, second = self.make_state(), self.make_state()
         self.assertFalse(first.carregado)  # the page shows "loading", never a false empty state
-        CatalogoState.load_catalogo.fn(first)
+        run_event(CatalogoState.load_catalogo, first)
         self.assertTrue(first.carregado)
-        CatalogoState.load_catalogo.fn(second)
+        run_event(CatalogoState.load_catalogo, second)
         self.assertEqual(client.list_catalogo.call_count, 1)
         self.assertEqual([card.id for card in second.cards], ["3", "4"])
         self.assertEqual(second.hero.id, "4")
@@ -111,7 +113,7 @@ class CatalogoStateTests(unittest.TestCase):
                 catalogo_cache.invalidate()
                 client.list_catalogo.side_effect = error
                 state = self.make_state()
-                CatalogoState.load_catalogo.fn(state)
+                run_event(CatalogoState.load_catalogo, state)
                 self.assertEqual(state.cards, [])
                 self.assertIn(message, state.erro)
                 self.assertFalse(state.is_loading_catalogo)
@@ -120,7 +122,7 @@ class CatalogoStateTests(unittest.TestCase):
         client_class, _ = self.patched_client()
         state = self.make_state()
         state.cards = CARDS
-        CatalogoState.select_cor.fn(state, "3", "Laranja", "https://img.test/3-orange.jpg")
+        run_event(CatalogoState.select_cor, state, "3", "Laranja", "https://img.test/3-orange.jpg")
         self.assertEqual(state.imagem_por_modelo, {"3": "https://img.test/3-orange.jpg"})
         self.assertEqual(state.cor_por_modelo, {"3": "Laranja"})
         client_class.assert_not_called()
@@ -128,19 +130,19 @@ class CatalogoStateTests(unittest.TestCase):
     def test_family_tabs_accept_only_known_families(self):
         state = self.make_state()
         state.cards = CARDS
-        CatalogoState.set_familia.fn(state, "CRUISER")
+        run_event(CatalogoState.set_familia, state, "CRUISER")
         self.assertEqual([card.id for card in state.cards_visiveis], ["4"])
-        CatalogoState.set_familia.fn(state, "SCOOTER")
+        run_event(CatalogoState.set_familia, state, "SCOOTER")
         self.assertEqual(state.familia, "CRUISER")
-        CatalogoState.set_busca.fn(state, "street")
+        run_event(CatalogoState.set_busca, state, "street")
         self.assertEqual(state.cards_visiveis, [])
 
     def test_detail_opens_from_the_cached_cards(self):
         state = self.make_state()
         state.cards = CARDS
-        CatalogoState.open_detail.fn(state, "5")
+        run_event(CatalogoState.open_detail, state, "5")
         self.assertEqual(state.detalhe.nome, "Pan América")
-        CatalogoState.close_detail.fn(state)
+        run_event(CatalogoState.close_detail, state)
         self.assertEqual(state.detalhe.id, "")
 
 

@@ -235,6 +235,7 @@ class EntradasState(AuthState):
         ):
             return None
         self.is_loading_list = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 self._reload_entradas(client)
@@ -252,6 +253,7 @@ class EntradasState(AuthState):
         if self.is_loading_detail:
             return None
         self.is_loading_detail = True
+        yield  # render the busy state before the Xano call
         self.detalhe = {}
         self.detalhe_itens = []
         try:
@@ -349,6 +351,7 @@ class EntradasState(AuthState):
             return toast_error(self.form_error)
 
         self.is_saving = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 client.registrar_entrada(payload)
