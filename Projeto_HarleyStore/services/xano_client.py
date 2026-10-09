@@ -15,6 +15,8 @@ from Projeto_HarleyStore.services.motos import (
     MotoEstoqueDetalhe,
     MotoEstoqueUpdate,
     ReservaMotoCreate,
+    VendaMotoCreate,
+    VendaMotoResultado,
 )
 from Projeto_HarleyStore.services.catalogo import (
     ModeloCatalogo,
@@ -600,4 +602,15 @@ class XanoClient:
             f"motos/{moto_id}/reserva/cancelar",
             json=cancelamento.model_dump(mode="json"),
             response_model=MotoEstoqueDetalhe,
+        )
+
+    def vender_moto(self, venda: VendaMotoCreate) -> VendaMotoResultado:
+        """Close the sale atomically in Xano (customer bike, MOTO transaction, VENDIDA).
+
+        The seller comes from the JWT; an absent plate (0 km bike) is not sent.
+        """
+        return self.post(
+            "vender_moto",
+            json=venda.model_dump(mode="json", exclude_none=True),
+            response_model=VendaMotoResultado,
         )

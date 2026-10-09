@@ -17,7 +17,7 @@ Esta página explica onde cada tipo de arquivo deve ficar. A ideia é permitir q
 | Pasta | Responsabilidade |
 | --- | --- |
 | `Projeto_HarleyStore/` | Ponto de entrada e componentes da aplicação Reflex. |
-| `assets/` | Recursos estáticos usados pela aplicação, incluindo `harley.css` (sobrescritas globais do tema). |
+| `assets/` | Recursos estáticos usados pela aplicação, incluindo `harley.css` (sobrescritas globais do tema) e o logo `HARLEY_LOGO.png` (escudo recortado de `harley-davidson-logo.webp`, com fundo transparente, usado no cabeçalho). |
 | `Projeto_HarleyStore/styles/theme.py` | Tokens do design system (cores, tipografia, status, contraste); única origem de cores junto com `assets/harley.css`. |
 | `Projeto_HarleyStore/ui_helpers.py` e `components.py` | Componentes compartilhados (cabeçalho, tabela, botões, badges, swatches) e shell (sidebar, vitrine pública, modal). |
 | `docs/` | Visão geral, domínio e decisões que ajudam no entendimento do sistema. |

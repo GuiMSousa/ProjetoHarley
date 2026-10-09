@@ -1,4 +1,4 @@
-"""DTOs for stock motorcycle units and their reservations."""
+"""DTOs for stock motorcycle units, their reservations and their sale."""
 
 from __future__ import annotations
 
@@ -14,12 +14,22 @@ from Projeto_HarleyStore.services.catalogo import FamiliaMoto, VariacaoCor
 StatusMoto = Literal["DISPONIVEL", "RESERVADA", "VENDIDA"]
 STATUS_MOTO_LABELS = {"DISPONIVEL": "Disponível", "RESERVADA": "Reservada", "VENDIDA": "Vendida"}
 VIN_PATTERN = r"^[A-HJ-NPR-Z0-9]{17}$"
+# Brazilian plate: old format ABC1234 or Mercosul ABC1D23.
+PLACA_PATTERN = r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$"
 ANO_MINIMO = 1990
 DIAS_RESERVA_PADRAO = 7
 
 
 def _upper(value: object) -> object:
     return value.strip().upper() if isinstance(value, str) else value
+
+
+def _normalize_placa(value: object) -> object:
+    """Upper case without hyphen or spaces; a blank plate means no plate (0 km bike)."""
+    if not isinstance(value, str):
+        return value
+    placa = "".join(value.split()).replace("-", "").upper()
+    return placa or None
 
 
 def _check_ano(value: int | None) -> int | None:
@@ -81,6 +91,36 @@ class CancelamentoReservaMoto(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     motivo: str = Field(min_length=1, max_length=500)
+
+
+class VendaMotoCreate(BaseModel):
+    """Body of POST vender_moto; the seller always comes from the JWT, never from here."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    id_moto: int = Field(gt=0)
+    id_cliente: int = Field(gt=0)
+    valor_venda: Decimal = Field(gt=0, decimal_places=2)
+    placa: str | None = Field(default=None, pattern=PLACA_PATTERN)
+    observacao: str | None = Field(default=None, max_length=500)
+
+    @field_validator("placa", mode="before")
+    @classmethod
+    def _placa(cls, value: object) -> object:
+        return _normalize_placa(value)
+
+    @field_validator("observacao", mode="before")
+    @classmethod
+    def _blank_observacao(cls, value: object) -> object:
+        return (value.strip() or None) if isinstance(value, str) else value
+
+
+class VendaMotoResultado(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id_transacao: int
+    id_moto_cliente: int
+    status: Literal["SUCESSO"]
 
 
 class HistoricoStatusMoto(BaseModel):

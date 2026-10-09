@@ -40,6 +40,12 @@ Regras importantes:
 3. Conferir que não há produtos antigos com `codigo` vazio repetido; o índice único de `produtos.codigo` falharia na criação.
 4. Rodar a suíte de integração (seção "Testes de integração").
 
+### Checklist de deploy da Change 9 (fechamento de vendas de motos)
+
+1. Revisar `xano workspace push -d ./xano --dry-run`: `motos_clientes.placa` passa a anulável (relaxamento; o índice único continua), e `Vendas/vender_moto` e `POST vender_moto` aceitam placa opcional. Se o push não aplicar a mudança do campo, publicar com `--sync`, de preferência num branch.
+2. Publicar com `xano workspace push -d ./xano`.
+3. Rodar a integração com `XANO_TEST_ALLOW_WRITES=true` (venda sem placa, venda repetida, reserva de outro cliente) e `XANO_TEST_CONCURRENCY=true` (duas vendas simultâneas). As vendas de teste ficam no banco.
+
 ### Checklist de deploy da Change 8 (catálogo e reservas de motos)
 
 1. Publicar com `xano workspace push -d ./xano` (aditivo: tabelas `modelos_moto` e `historico_status_moto`, campos anuláveis em `motos`, funções `Catalogo/*` e `Vendas/*`, endpoints de catálogo, unidades e reservas).
@@ -147,7 +153,9 @@ Os DTOs ficam em `Projeto_HarleyStore.services.motos`:
 - `MotoEstoqueUpdate` — `chassi`, `cor`, `ano_modelo` e `preco_venda`, opcionais;
 - `MotoEstoque` / `MotoEstoqueDetalhe` — unidade enriquecida (modelo, família, cores, cliente, vendedor, validade) e, no detalhe, `historico` (`HistoricoStatusMoto`); `status` nulo de unidades legadas é lido como `DISPONIVEL`;
 - `ReservaMotoCreate` — `id_cliente`, `dias_validade` (1 a 30, padrão 7) e `observacao`;
-- `CancelamentoReservaMoto` — `motivo` obrigatório.
+- `CancelamentoReservaMoto` — `motivo` obrigatório;
+- `VendaMotoCreate` — `id_moto`, `id_cliente`, `valor_venda > 0` (duas casas), `placa` opcional (normalizada para caixa alta sem hífen ou espaços, padrão `ABC1234` ou `ABC1D23`; em branco vira ausente) e `observacao` (até 500); nunca carrega `id_funcionario`;
+- `VendaMotoResultado` — `id_transacao`, `id_moto_cliente` e `status` (`SUCESSO`).
 
 | Método | Endpoint | Perfil |
 | --- | --- | --- |
@@ -157,13 +165,23 @@ Os DTOs ficam em `Projeto_HarleyStore.services.motos`:
 | `atualizar_moto_estoque(id, moto)` | `PATCH motos/{id}` | `GERENTE` |
 | `reservar_moto(id, reserva)` | `POST motos/{id}/reserva` | `GERENTE`, `VENDEDOR` |
 | `cancelar_reserva_moto(id, cancelamento)` | `POST motos/{id}/reserva/cancelar` | `GERENTE`, `VENDEDOR` (regra abaixo) |
+| `vender_moto(venda)` | `POST vender_moto` | `GERENTE`, `VENDEDOR` |
 
-- **Status:** muda somente por `Vendas/transicionar_moto`, chamada dentro da transação da reserva e do cancelamento; `PUT` e `DELETE motos/{id}` respondem `403`.
+- **Status:** muda somente por `Vendas/transicionar_moto`, chamada dentro da transação da reserva, do cancelamento e da venda; `PUT` e `DELETE motos/{id}` respondem `403`.
 - **Reserva:** unidade `DISPONIVEL` com modelo, cliente ativo; vendedor (do JWT) e validade (`now + dias`) definidos pelo servidor.
 - **Cancelamento:** quem reservou, um `GERENTE` ou, depois do vencimento, qualquer vendedor; outros recebem `403`.
 - **Concorrência:** cada transição grava `historico_status_moto` com `versao_anterior` antes da unidade; o índice único `(id_moto, versao_anterior)` faz a segunda reserva simultânea falhar (`400`).
 - **Cadastro:** chassi único em `motos` e em `motos_clientes`; cor dentro das variações do modelo; a unidade nasce `DISPONIVEL` com histórico.
 - **Legado:** `list_motos`, `create_moto`, `update_moto` e os DTOs `Moto`/`MotoCreate`/`MotoUpdate` foram removidos.
+
+### Venda (`POST vender_moto`, Change 9)
+
+`vender_moto` envia o corpo com `exclude_none`: placa e observação ausentes não vão no JSON. O funcionário vem do JWT. O contrato completo está em `openspec/changes/fechamento-venda-motos/design.md`.
+
+- **Efeito:** numa única `db.transaction`, cria a moto do cliente (`motos_clientes`, com o nome do modelo comercial, o chassi da unidade e a placa ou nulo), registra a transação `MOTO` (`valor_total = valor_venda`) e passa a unidade a `VENDIDA` com o comprador.
+- **Regras:** unidade `DISPONIVEL` para qualquer cliente ativo ou `RESERVADA` somente para o cliente da reserva; a unidade precisa de chassi; chassi e placa informada não podem existir em `motos_clientes`.
+- **Recusas (`400`, mensagem do Xano):** "Esta moto já foi vendida.", "Esta moto está reservada para outro cliente.", "Cadastre o chassi desta moto antes de vendê-la.", "Cliente inativo ou inexistente.", "Chassi já cadastrado em uma moto de cliente.", "Placa já cadastrada em uma moto de cliente." e, numa corrida, "A moto foi alterada por outro usuário. Atualize e tente novamente.". Unidade inexistente: `404`.
+- **Reflex:** uma recusa `400`/`404` recarrega a lista de `/vendas`; se a unidade não está mais vendável para o cliente escolhido, o modal fecha e a notificação mostra a mensagem; senão, o modal continua com o erro. Uma venda aceita invalida o `catalogo_cache` e recarrega a lista.
 
 ## Ordens de serviço
 
@@ -246,6 +264,7 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Estoque de motos, reservas e histórico (`/vendas`) | sim | sim | não |
 | Reservar unidade disponível | sim | sim | não |
 | Cancelar reserva | qualquer | própria ou vencida | não |
+| Vender unidade (disponível, ou reservada ao cliente da reserva) | sim | sim | não |
 | Criar e editar modelos e unidades | sim | não | não |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
@@ -262,5 +281,6 @@ python -m unittest discover -s tests
 - Os cenários que gravam dados (registro de entrada, documento duplicado, rollback, ciclo completo de OS com as rejeições da máquina de estados, e ciclo de itens com baixa, devolução, totais e cancelamento) exigem `XANO_TEST_ALLOW_WRITES=true`. Como entradas, OS encerradas e movimentações de estoque são imutáveis, rode-os em um branch ou workspace de testes. As OS abertas pelos testes são canceladas ao final, devolvendo as peças.
 - `XANO_TEST_CONCURRENCY=true` (junto com as escritas) roda as corridas: duas OS disputando todo o saldo de um produto e uma inclusão simultânea ao cancelamento. Exige duas motos de cliente sem OS em aberto.
 - A leitura pública do catálogo roda só com a URL configurada (sem credenciais) e é ignorada, com aviso, enquanto a Change 8 não estiver publicada. O ciclo de reserva (`ALLOW_WRITES`) cria um modelo e uma unidade próprios e retira o modelo do catálogo ao final; a corrida de duas reservas da mesma unidade exige `XANO_TEST_CONCURRENCY`.
+- A venda (Change 9) tem um teste sem escrita (`MECANICO` recebe `403`, unidade inexistente `404`), o ciclo com escrita (venda sem placa, venda repetida, unidade reservada para outro cliente, segunda moto sem placa) e a corrida de duas vendas da mesma unidade (`XANO_TEST_CONCURRENCY`). Vendas são finais: unidades vendidas, motos de clientes e transações de teste ficam no banco.
 - O workspace do Xano limita a taxa de requisições (`429` após cerca de 6 chamadas seguidas): a suíte completa com credenciais pode falhar de forma intermitente por isso.
 - Os testes de cada Change exigem o respectivo push; antes dele, os endpoints novos respondem `404`.

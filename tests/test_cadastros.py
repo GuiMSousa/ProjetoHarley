@@ -10,6 +10,7 @@ from Projeto_HarleyStore.services.cadastros import (
     ClienteCreate,
     FornecedorCreate,
     FuncionarioCreate,
+    MotoCliente,
     MotoClienteCreate,
     Produto,
     ProdutoCreate,
@@ -99,6 +100,16 @@ class CadastrosTests(unittest.TestCase):
         self.assertEqual(requests[0][0:2], ("GET", "/api:test/clientes"))
         self.assertEqual(requests[1][0:2], ("PATCH", "/api:test/clientes/1"))
         self.assertIn(b'"ativo":false', requests[1][2])
+
+    def test_customer_bike_without_plate_reads_and_writes(self):
+        """Change 9: a 0 km bike is sold before it gets a plate."""
+        sem_placa = MotoCliente.model_validate(
+            {"id": 87, "id_cliente": 5, "modelo": "Street Glide", "placa": None, "chassi": "1HD1KTP19RB600001"}
+        )
+        self.assertIsNone(sem_placa.placa)
+        self.assertIsNone(MotoClienteCreate(id_cliente=1, modelo="Iron", chassi="CH1").placa)
+        with self.assertRaises(ValidationError):
+            MotoClienteCreate(id_cliente=1, modelo="Iron", placa="", chassi="CH1")
 
     def test_null_stock_from_xano_reads_as_zero(self):
         row = {

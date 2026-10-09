@@ -1,6 +1,6 @@
 // Venda de uma moto do estoque (GERENTE ou VENDEDOR). A lógica atômica fica em
 // Vendas/vender_moto; o funcionário vem do usuário autenticado ($auth.id -> user.id_funcionario),
-// nunca do payload.
+// nunca do payload. Placa opcional: moto 0 km sai sem placa (Change 9).
 query vender_moto verb=POST {
   api_group = "HARLEY"
   auth = "user"
@@ -8,7 +8,7 @@ query vender_moto verb=POST {
   input {
     int id_moto filters=min:1
     int id_cliente filters=min:1
-    text placa filters=trim|upper
+    text? placa? filters=trim|upper
     decimal valor_venda filters=min:0.01
     text? observacao? filters=trim|max:500
   }

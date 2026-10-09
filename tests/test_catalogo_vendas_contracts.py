@@ -179,5 +179,72 @@ class VendasContractTests(unittest.TestCase):
         )
 
 
+class VendaContractTests(unittest.TestCase):
+    def test_sale_endpoint_is_for_sellers_and_takes_the_employee_from_the_session(self):
+        content = read(f"{API}/vender_moto_POST.xs")
+        self.assertIn("query vender_moto verb=POST", content)
+        self.assertIn('api_group = "HARLEY"', content)
+        self.assertIn('auth = "user"', content)
+        self.assertIn('required_role: "VENDEDOR"', content)
+        self.assertIn("id_funcionario: $auth_user.id_funcionario", content)
+        self.assertNotIn("id_funcionario: $auth.id", content)
+        self.assertIn('function.run "Vendas/vender_moto"', content)
+        for field in ("id_moto", "id_cliente", "placa", "valor_venda", "observacao"):
+            with self.subTest(field=field):
+                self.assertIn(f"$input.{field}", content)
+
+    def test_sale_is_atomic_and_reuses_the_versioned_transition(self):
+        content = read("function/vendas/vender_moto.xs")
+        self.assertIn('function "Vendas/vender_moto"', content)
+        transaction = content[content.index("db.transaction {"):]
+        self.assertLess(transaction.index("db.add motos_clientes"), transaction.index("db.add transacoes"))
+        self.assertIn('tipo_transacao : "MOTO"', transaction)
+        self.assertIn('function.run "Vendas/transicionar_moto"', transaction)
+        self.assertIn('status_novo   : "VENDIDA"', transaction)
+        self.assertIn("try_catch {", content)
+        for rule in (
+            "Esta moto já foi vendida.",
+            "Esta moto está reservada para outro cliente.",
+            "Cliente inativo ou inexistente.",
+            "Chassi já cadastrado em uma moto de cliente.",
+            "Placa já cadastrada em uma moto de cliente.",
+            "A moto foi alterada por outro usuário. Atualize e tente novamente.",
+        ):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, content)
+
+    def test_plate_is_optional_and_checked_only_when_informed(self):
+        for relative_path in (f"{API}/vender_moto_POST.xs", "function/vendas/vender_moto.xs"):
+            with self.subTest(path=relative_path):
+                self.assertIn("text? placa? filters=trim|upper", read(relative_path))
+        content = read("function/vendas/vender_moto.xs")
+        # A combined "placa == x || chassi == y" query would match every bike without a plate.
+        self.assertNotRegex(content, r"motos_clientes\.placa == \$input\.placa \|\|")
+        conditional = content[content.index('if (($input.placa ?? "") != "")'):content.index("$nome_modelo {")]
+        self.assertIn("$db.motos_clientes.placa == $placa", conditional)
+        self.assertIn("placa     : $placa", content)
+        table = read("table/motos_clientes.xs")
+        self.assertIn("text? placa? filters=trim", table)
+        self.assertRegex(table, r'type: "btree\|unique", field: \[\{name: "placa"\}\]')
+
+    def test_customer_bike_gets_the_commercial_model_name(self):
+        content = read("function/vendas/vender_moto.xs")
+        self.assertIn('"id_modelo"', content)
+        self.assertIn("db.get modelos_moto", content)
+        self.assertIn("value = $modelo.nome_modelo", content)
+        self.assertIn("modelo    : $nome_modelo", content)
+
+    def test_functions_called_by_endpoints_exist(self):
+        defined = {
+            match
+            for path in (XANO / "function").rglob("*.xs")
+            for match in re.findall(r'^function "([^"]+)"', path.read_text(encoding="utf-8"), re.M)
+        }
+        for path in (XANO / "api").rglob("*.xs"):
+            for called in re.findall(r'function\.run "([^"]+)"', path.read_text(encoding="utf-8")):
+                with self.subTest(path=path.relative_to(XANO).as_posix(), function=called):
+                    self.assertIn(called, defined)
+
+
 if __name__ == "__main__":
     unittest.main()

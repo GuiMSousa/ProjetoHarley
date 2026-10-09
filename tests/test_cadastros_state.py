@@ -6,7 +6,14 @@ from reflex.state import State
 from decimal import Decimal
 
 from Projeto_HarleyStore.cadastros_state import CadastrosState, produto_resumo
-from Projeto_HarleyStore.services.cadastros import Produto, ProdutoCreate, ProdutoUpdate
+from Projeto_HarleyStore.services.cadastros import (
+    MotoCliente,
+    MotoClienteCreate,
+    MotoClienteUpdate,
+    Produto,
+    ProdutoCreate,
+    ProdutoUpdate,
+)
 from Projeto_HarleyStore.services.xano_client import XanoAuthenticationError, XanoError
 
 
@@ -119,6 +126,32 @@ class CadastrosStateTests(unittest.TestCase):
         CadastrosState.open_edit.fn(state, "motos_clientes", "5")
         self.assertTrue(state.form_open)
         self.assertEqual(state.form_data["id_cliente"], "9 - ")
+
+    def test_blank_plate_is_absent_on_create_and_unchanged_on_edit(self):
+        state = self.make_real_state("VENDEDOR")
+        state.active_section = "motos_clientes"
+        form = {"id_cliente": "5 - Ana", "modelo": "Street Glide", "placa": "  ", "chassi": "CH1"}
+        state.editing_id = ""
+        state.form_data = form
+        payload, model = state._payload()
+        self.assertIs(model, MotoClienteCreate)
+        self.assertIsNone(payload.placa)
+        state.editing_id = "87"
+        payload, model = state._payload()
+        self.assertIs(model, MotoClienteUpdate)
+        self.assertNotIn("placa", payload.model_dump(exclude_unset=True))
+        state.form_data = {**form, "placa": "ABC1D23"}
+        self.assertEqual(state._payload()[0].placa, "ABC1D23")
+
+    def test_bike_without_plate_lists_with_an_empty_plate_column(self):
+        state = self.make_real_state("VENDEDOR")
+        rows = state._rows(
+            [MotoCliente(id=87, id_cliente=5, modelo="Street Glide", placa=None, chassi="CH1")],
+            "modelo",
+            "placa",
+            "chassi",
+        )
+        self.assertEqual((rows[0]["secondary"], rows[0]["placa"]), ("", ""))
 
     def test_product_edit_payload_never_carries_stock_balance(self):
         state = self.make_real_state("GERENTE")

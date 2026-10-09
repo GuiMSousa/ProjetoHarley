@@ -39,7 +39,8 @@ class Cliente(CadastroModel, ClienteCreate):
 class MotoClienteCreate(BaseModel):
     id_cliente: int = Field(gt=0)
     modelo: str = Field(min_length=1)
-    placa: str = Field(min_length=1)
+    # Optional since Change 9: a 0 km bike leaves the store before it gets a plate.
+    placa: str | None = Field(default=None, min_length=1)
     chassi: str = Field(min_length=1)
 
 

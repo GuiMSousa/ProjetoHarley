@@ -1,4 +1,4 @@
-"""Sales page (/vendas): stock units by status, reservations and catalog management."""
+"""Sales page (/vendas): stock units by status, reservations, sales and catalog management."""
 
 from __future__ import annotations
 
@@ -103,8 +103,12 @@ def moto_row(row: rx.Var) -> rx.Component:
             rx.hstack(
                 metal_button("Detalhes", on_click=VendasState.open_detail(row["id"]), size="1", disabled=VendasState.is_busy),
                 rx.cond(
+                    row["pode_vender"] == "true",
+                    primary_button("Vender", on_click=VendasState.open_venda(row["id"]), size="1", disabled=VendasState.is_busy),
+                ),
+                rx.cond(
                     row["pode_reservar"] == "true",
-                    primary_button("Reservar", on_click=VendasState.open_reserva(row["id"]), size="1", disabled=VendasState.is_busy),
+                    metal_button("Reservar", on_click=VendasState.open_reserva(row["id"]), size="1", disabled=VendasState.is_busy),
                 ),
                 rx.cond(
                     row["pode_cancelar"] == "true",
@@ -274,6 +278,108 @@ def cancelamento_modal() -> rx.Component:
             ),
             width="100%",
         ),
+    )
+
+
+def _venda_resumo() -> rx.Component:
+    resumo = VendasState.venda_resumo
+    return rx.hstack(
+        rx.vstack(
+            rx.text(resumo["modelo"], font_weight="700"),
+            rx.text(resumo["familia"], " · ", resumo["cor"], " · ", resumo["ano"], size="1", color=COLORS["muted"]),
+            rx.text(resumo["chassi"], size="1", font_family="monospace", color=COLORS["muted"]),
+            spacing="0",
+            align="start",
+        ),
+        rx.spacer(),
+        rx.vstack(
+            rx.text("Preço de tabela", size="1", color=COLORS["muted"]),
+            rx.text(resumo["preco"], color=COLORS["orange"], font_weight="700"),
+            spacing="0",
+            align="end",
+        ),
+        width="100%",
+        align="center",
+        padding="0.75rem",
+        **PANEL,
+    )
+
+
+def venda_modal() -> rx.Component:
+    return modal_panel(
+        modal_header("Fechar venda", on_close=VendasState.close_venda),
+        error_callout(VendasState.venda_error),
+        _venda_resumo(),
+        labeled(
+            "Cliente",
+            rx.select(
+                VendasState.cliente_options,
+                value=VendasState.venda_cliente,
+                on_change=VendasState.set_venda_cliente,
+                placeholder="Selecione o cliente",
+                disabled=VendasState.venda_cliente_fixo,
+                width="100%",
+            ),
+        ),
+        rx.cond(
+            VendasState.venda_cliente_fixo,
+            rx.text("Unidade reservada: só pode ser vendida ao cliente da reserva.", size="1", color=COLORS["muted"]),
+        ),
+        rx.hstack(
+            labeled(
+                "Valor da venda (R$)",
+                rx.input(
+                    value=VendasState.venda_valor,
+                    on_change=VendasState.set_venda_valor,
+                    placeholder="189900,00",
+                    width="100%",
+                ),
+                flex="1",
+                min_width="10rem",
+            ),
+            labeled(
+                "Placa (opcional)",
+                rx.input(
+                    value=VendasState.venda_placa,
+                    on_change=VendasState.set_venda_placa,
+                    placeholder="ABC1D23",
+                    max_length=8,
+                    font_family="monospace",
+                    width="100%",
+                ),
+                flex="1",
+                min_width="9rem",
+            ),
+            width="100%",
+            wrap="wrap",
+        ),
+        labeled(
+            "Observação (opcional)",
+            rx.text_area(
+                value=VendasState.venda_observacao,
+                on_change=VendasState.set_venda_observacao,
+                placeholder="Ex.: pagamento à vista, entrega na sexta",
+                max_length=500,
+                width="100%",
+            ),
+        ),
+        rx.text(
+            "Moto 0 km pode sair sem placa. O vendedor vem do seu login; a moto passa a vendida, "
+            "entra nas motos do cliente e gera a transação financeira.",
+            size="1",
+            color=COLORS["muted"],
+        ),
+        rx.hstack(
+            rx.spacer(),
+            metal_button("Cancelar", on_click=VendasState.close_venda),
+            primary_button(
+                rx.cond(VendasState.is_selling, "Registrando venda...", "Confirmar venda"),
+                on_click=VendasState.confirm_venda,
+                disabled=VendasState.is_busy,
+            ),
+            width="100%",
+        ),
+        width="min(100%, 36rem)",
     )
 
 
@@ -531,7 +637,7 @@ def moto_form_modal() -> rx.Component:
             width="100%",
         ),
         rx.text(
-            "A unidade nasce disponível; o status muda somente por reserva e cancelamento.",
+            "A unidade nasce disponível; o status muda somente por reserva, cancelamento e venda.",
             size="1",
             color=COLORS["muted"],
         ),
@@ -554,7 +660,7 @@ def vendas_page() -> rx.Component:
         page_body(
             page_header(
                 "Vendas de motos",
-                "Unidades em estoque, reservas e catálogo da vitrine.",
+                "Unidades em estoque, reservas, fechamento de vendas e catálogo da vitrine.",
                 rx.link(metal_button(rx.icon("store", size=14), "Ver vitrine"), href="/catalogo"),
             ),
             abas(),
@@ -569,6 +675,7 @@ def vendas_page() -> rx.Component:
             rx.cond(VendasState.aba == ABA_ESTOQUE, estoque_panel(), motos_table()),
             rx.cond(VendasState.reserva_moto_id != "", reserva_modal()),
             rx.cond(VendasState.cancel_moto_id != "", cancelamento_modal()),
+            rx.cond(VendasState.venda_moto_id != "", venda_modal()),
             rx.cond(VendasState.detail_open, detail_modal()),
             rx.cond(VendasState.modelo_form_open, modelo_form_modal()),
             rx.cond(VendasState.moto_form_open, moto_form_modal()),

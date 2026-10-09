@@ -1,4 +1,4 @@
-"""Reflex state of /vendas: stock units, reservations and catalog management."""
+"""Reflex state of /vendas: stock units, reservations, sales and catalog management."""
 
 from __future__ import annotations
 
@@ -39,11 +39,14 @@ from Projeto_HarleyStore.services.motos import (
     MotoEstoqueDetalhe,
     MotoEstoqueUpdate,
     ReservaMotoCreate,
+    VendaMotoCreate,
 )
 from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
     XanoClient,
     XanoError,
+    XanoNotFoundError,
+    XanoPermissionError,
     XanoValidationError,
 )
 from Projeto_HarleyStore.ui_helpers import operation_is_blocked
@@ -71,6 +74,8 @@ FIELD_MESSAGES = {
     "cor": "Informe a cor.",
     "ano_modelo": "Ano do modelo inválido.",
     "preco_venda": "O preço de venda deve ser positivo, com até duas casas decimais.",
+    "valor_venda": "Informe o valor da venda: maior que zero, com até duas casas decimais.",
+    "placa": "Placa inválida: use ABC1234 ou ABC1D23, ou deixe em branco para moto 0 km.",
 }
 
 
@@ -108,6 +113,21 @@ def can_cancel_reservation(moto: MotoEstoque, role: str, employee_id: int, agora
     )
 
 
+def can_sell_unit(moto: MotoEstoque, role: str) -> bool:
+    """Seller or manager, unit with chassis and not sold yet (mirrors Xano).
+
+    A reserved unit stays sellable, but only to the reservation customer.
+    """
+    return can_sell(role) and moto.status in {"DISPONIVEL", "RESERVADA"} and bool(moto.chassi)
+
+
+def venda_ainda_possivel(row: dict[str, str] | None, cliente: str) -> bool:
+    """Whether a refreshed row may still be sold to the chosen customer (``option_label``)."""
+    if row is None or row["pode_vender"] != "true":
+        return False
+    return row["status"] == "DISPONIVEL" or (bool(cliente) and row["id_cliente"] == str(option_id(cliente)))
+
+
 def _cor_hex(moto: MotoEstoque) -> str:
     return next((cor.hex for cor in moto.variacoes_cor if cor.nome == moto.cor), "")
 
@@ -132,6 +152,7 @@ def moto_row(moto: MotoEstoque, role: str, employee_id: int, agora: datetime) ->
         "status": moto.status,
         "status_label": STATUS_MOTO_LABELS[moto.status],
         "cliente": moto.nome_cliente or EMPTY_VALUE,
+        "id_cliente": str(moto.clientes_id or ""),
         "vendedor": moto.nome_vendedor or EMPTY_VALUE,
         "validade": format_datetime(moto.reservada_ate) if reservada else EMPTY_VALUE,
         "vencida": "true" if reservada and reserva_vencida(moto.reservada_ate, agora) else "false",
@@ -139,6 +160,7 @@ def moto_row(moto: MotoEstoque, role: str, employee_id: int, agora: datetime) ->
             "true" if moto.status == "DISPONIVEL" and moto.id_modelo and can_sell(role) else "false"
         ),
         "pode_cancelar": "true" if can_cancel_reservation(moto, role, employee_id, agora) else "false",
+        "pode_vender": "true" if can_sell_unit(moto, role) else "false",
     }
 
 
@@ -246,6 +268,29 @@ def build_cancelamento_payload(motivo: str) -> CancelamentoReservaMoto:
         raise VendasFormError(validation_feedback(error, FIELD_MESSAGES)) from error
 
 
+def valor_inicial_venda(preco_valor: str) -> str:
+    """The unit price, typed like the form expects it (``189900,00``); blank without a price."""
+    return f"{parse_decimal(preco_valor):.2f}".replace(".", ",") if preco_valor else ""
+
+
+def build_venda_payload(
+    moto_id: str, cliente: str, valor: str, placa: str, observacao: str
+) -> VendaMotoCreate:
+    if not cliente:
+        raise VendasFormError(FIELD_MESSAGES["id_cliente"])
+    valor_venda = _parse_decimal(valor, "valor_venda")
+    try:
+        return VendaMotoCreate(
+            id_moto=int(moto_id),
+            id_cliente=option_id(cliente),
+            valor_venda=valor_venda,
+            placa=placa,
+            observacao=observacao,
+        )
+    except ValidationError as error:
+        raise VendasFormError(validation_feedback(error, FIELD_MESSAGES)) from error
+
+
 def build_modelo_payload(
     form: dict[str, str], cores: list[dict[str, str]], editing: bool
 ) -> ModeloMotoCreate | ModeloMotoUpdate:
@@ -315,6 +360,15 @@ class VendasState(AuthState):
     cancel_error: str = ""
     is_cancelling: bool = False
 
+    venda_moto_id: str = ""
+    venda_cliente: str = ""
+    venda_cliente_fixo: bool = False
+    venda_valor: str = ""
+    venda_placa: str = ""
+    venda_observacao: str = ""
+    venda_error: str = ""
+    is_selling: bool = False
+
     modelos: list[dict[str, str]] = []
     cores_por_modelo: dict[str, list[dict[str, str]]] = {}
     modelo_form_open: bool = False
@@ -363,10 +417,23 @@ class VendasState(AuthState):
         modelo_id = str(option_id(modelo)) if modelo else self.moto_dados.get("id_modelo", "")
         return [cor["nome"] for cor in self.cores_por_modelo.get(modelo_id, [])]
 
+    @rx.var
+    def venda_resumo(self) -> dict[str, str]:
+        """Row of the unit being sold, for the summary at the top of the sale modal."""
+        moto_id = self.venda_moto_id
+        return next((row for row in self.motos if row["id"] == moto_id), {})
+
+    def _row(self, moto_id: str) -> dict[str, str] | None:
+        return next((row for row in self.motos if row["id"] == moto_id), None)
+
     def _operation_blocked(self) -> bool:
         return operation_is_blocked(
             self.is_loading_list,
-            self.is_reserving or self.is_cancelling or self.is_saving_modelo or self.is_saving_moto,
+            self.is_reserving
+            or self.is_cancelling
+            or self.is_selling
+            or self.is_saving_modelo
+            or self.is_saving_moto,
             self.is_loading_detail,
         )
 
@@ -582,6 +649,109 @@ class VendasState(AuthState):
         finally:
             self.is_cancelling = False
 
+    # ----- sale -----
+
+    @rx.event
+    def open_venda(self, moto_id: str):
+        if not can_sell(self.employee_role):
+            return toast_error("Seu perfil não pode vender motos.")
+        row = self._row(moto_id)
+        if row is None or row["pode_vender"] != "true":
+            return toast_error("Esta moto não está disponível para venda.")
+        if row["status"] == "RESERVADA":
+            # A reserved unit is sold only to the reservation customer (mirrors Xano).
+            cliente = option_label(row["id_cliente"], row["cliente"])
+            self.cliente_options = [cliente]
+            self.venda_cliente = cliente
+            self.venda_cliente_fixo = True
+        else:
+            try:
+                with XanoClient(token=self.auth_token) as client:
+                    clientes = client.list_clientes()
+            except XanoError as error:
+                return self._xano_error_response(error)
+            self.cliente_options = [
+                option_label(cliente.id, cliente.nome_cliente) for cliente in clientes if cliente.ativo
+            ]
+            self.venda_cliente = ""
+            self.venda_cliente_fixo = False
+        self.venda_moto_id = moto_id
+        self.venda_valor = valor_inicial_venda(row["preco_valor"])
+        self.venda_placa = ""
+        self.venda_observacao = ""
+        self.venda_error = "" if self.cliente_options else "Cadastre um cliente ativo antes de vender."
+        return None
+
+    @rx.event
+    def close_venda(self) -> None:
+        self.venda_moto_id = ""
+        self.venda_error = ""
+
+    @rx.event
+    def set_venda_cliente(self, value: str) -> None:
+        if not self.venda_cliente_fixo:
+            self.venda_cliente = value
+        self.venda_error = ""
+
+    @rx.event
+    def set_venda_valor(self, value: str) -> None:
+        self.venda_valor = value
+        self.venda_error = ""
+
+    @rx.event
+    def set_venda_placa(self, value: str) -> None:
+        self.venda_placa = value
+        self.venda_error = ""
+
+    @rx.event
+    def set_venda_observacao(self, value: str) -> None:
+        self.venda_observacao = value
+        self.venda_error = ""
+
+    @rx.event
+    def confirm_venda(self):
+        if self._operation_blocked() or not self.venda_moto_id:
+            return None
+        try:
+            payload = build_venda_payload(
+                self.venda_moto_id,
+                self.venda_cliente,
+                self.venda_valor,
+                self.venda_placa,
+                self.venda_observacao,
+            )
+        except VendasFormError as error:
+            self.venda_error = str(error)
+            return None
+        self.is_selling = True
+        try:
+            with XanoClient(token=self.auth_token) as client:
+                client.vender_moto(payload)
+                catalogo_cache.invalidate()
+                self._refresh(client)
+            self.venda_moto_id = ""
+            return toast_success("Venda concluída: a moto foi registrada para o cliente.")
+        except (XanoValidationError, XanoNotFoundError) as error:
+            # Usually another employee changed the unit first: show its new status.
+            message = error_feedback(error)
+            try:
+                with XanoClient(token=self.auth_token) as client:
+                    self._refresh(client)
+            except XanoError:
+                pass
+            if venda_ainda_possivel(self._row(self.venda_moto_id), self.venda_cliente):
+                self.venda_error = message
+            else:
+                self.venda_moto_id = ""
+            return toast_error(message)
+        except XanoPermissionError as error:
+            self.venda_error = error_feedback(error)
+            return toast_error(self.venda_error)
+        except XanoError as error:
+            return self._xano_error_response(error)
+        finally:
+            self.is_selling = False
+
     # ----- catalog management (manager) -----
 
     @rx.event
@@ -705,7 +875,7 @@ class VendasState(AuthState):
     def open_moto_edit(self, moto_id: str) -> None:
         if not can_manage_catalog(self.employee_role):
             return
-        row = next((row for row in self.motos if row["id"] == moto_id), None)
+        row = self._row(moto_id)
         if row is None:
             return
         self.moto_editing_id = moto_id

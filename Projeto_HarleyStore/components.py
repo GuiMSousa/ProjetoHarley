@@ -40,11 +40,32 @@ NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] = (
 PUBLIC_ROUTES = frozenset({"/", "/catalogo"})
 MOBILE_BREAKPOINT = "md"
 
+LOGO_SRC = "/HARLEY_LOGO.png"
+LOGO_HEIGHT = "45px"
+# Shared height of the sidebar brand area and the top bars, so their bottom borders form one line.
+HEADER_HEIGHT = "4.5rem"
+# Left inset of the nav items (3px active border + 0.75rem padding); the logo aligns with their icons.
+NAV_INSET = "calc(0.75rem + 3px)"
 
-def brand_mark(size: str = "4") -> rx.Component:
-    """Text signature of the store (no trademark logo or proprietary font)."""
+
+def brand_logo() -> rx.Component:
+    """Store logo (assets/HARLEY_LOGO.png: shield cut from harley-davidson-logo.webp, transparent background)."""
+    return rx.image(
+        src=LOGO_SRC,
+        height=LOGO_HEIGHT,
+        width="auto",
+        alt="Harley-Davidson",
+        flex_shrink="0",
+    )
+
+
+def brand_mark(size: str = "4", subtitle_display: str | rx.breakpoints = "block") -> rx.Component:
+    """Logo followed by the store title, used by every shell (sidebar, drawer, public header, login).
+
+    Narrow places (sidebar, drawer, public header on phones) hide the subtitle so the title fits.
+    """
     return rx.hstack(
-        rx.box(width="6px", height="2.25rem", background=COLORS["orange"]),
+        brand_logo(),
         rx.vstack(
             rx.text(
                 "HARLEY STORE",
@@ -62,6 +83,7 @@ def brand_mark(size: str = "4") -> rx.Component:
                 text_transform="uppercase",
                 letter_spacing="0.12em",
                 white_space="nowrap",
+                display=subtitle_display,
             ),
             spacing="0",
             align="start",
@@ -183,11 +205,22 @@ def nav_sections(*, in_drawer: bool = False) -> rx.Component:
 
 def sidebar() -> rx.Component:
     return rx.vstack(
-        brand_mark(),
-        nav_sections(),
-        spacing="6",
+        # Top-left corner: logo + title, aligned with the nav icons and the top bar height.
+        rx.link(
+            brand_mark(subtitle_display="none"),
+            href="/",
+            underline="none",
+            display="flex",
+            align_items="center",
+            height=HEADER_HEIGHT,
+            min_height=HEADER_HEIGHT,
+            padding_left=f"calc(1rem + {NAV_INSET})",
+            padding_right="1rem",
+            border_bottom=f"1px solid {COLORS['border']}",
+        ),
+        rx.box(nav_sections(), padding="1.5rem 1rem"),
+        spacing="0",
         align="stretch",
-        padding="1.5rem 1rem",
         width="16.5rem",
         min_width="16.5rem",
         min_height="100vh",
@@ -208,7 +241,7 @@ def mobile_menu() -> rx.Component:
             rx.drawer.portal(
                 rx.drawer.content(
                     rx.vstack(
-                        brand_mark(),
+                        brand_mark(subtitle_display="none"),
                         nav_sections(in_drawer=True),
                         spacing="6",
                         align="stretch",
@@ -230,6 +263,12 @@ def mobile_menu() -> rx.Component:
 def top_bar() -> rx.Component:
     return rx.hstack(
         mobile_menu(),
+        # On narrow screens the sidebar is hidden, so the logo moves to the top-left of the bar.
+        rx.link(
+            brand_logo(),
+            href="/",
+            display=rx.breakpoints(initial="block", **{MOBILE_BREAKPOINT: "none"}),
+        ),
         rx.spacer(),
         rx.vstack(
             rx.text(AuthState.display_name, size="2", color=COLORS["text"], font_weight="600"),
@@ -247,7 +286,8 @@ def top_bar() -> rx.Component:
         width="100%",
         align="center",
         spacing="4",
-        padding="0.9rem 1.5rem",
+        min_height=HEADER_HEIGHT,
+        padding="0 1.5rem",
         background=COLORS["graphite"],
         border_bottom=f"1px solid {COLORS['border']}",
     )
@@ -278,7 +318,11 @@ def public_shell(content: rx.Component) -> rx.Component:
     """Shell of pages open to visitors (no sidebar, link to the staff area)."""
     return rx.vstack(
         rx.hstack(
-            rx.link(brand_mark(), href="/catalogo", underline="none"),
+            rx.link(
+                brand_mark(subtitle_display=rx.breakpoints(initial="none", sm="block")),
+                href="/catalogo",
+                underline="none",
+            ),
             rx.spacer(),
             rx.cond(
                 AuthState.is_authenticated,
@@ -295,7 +339,8 @@ def public_shell(content: rx.Component) -> rx.Component:
             ),
             width="100%",
             align="center",
-            padding="1rem 1.5rem",
+            min_height=HEADER_HEIGHT,
+            padding="0 1.5rem",
             background=COLORS["graphite"],
             border_bottom=f"1px solid {COLORS['border']}",
         ),

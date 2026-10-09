@@ -161,7 +161,7 @@ class CadastrosState(AuthState):
                 {
                     "id": str(item.id),
                     "primary": str(getattr(item, primary, "")),
-                    "secondary": str(getattr(item, secondary, "")),
+                    "secondary": str(getattr(item, secondary, "") or ""),
                     "tertiary": (
                         tertiary(item) if callable(tertiary) else str(getattr(item, tertiary, "") or "")
                     ),
@@ -334,6 +334,9 @@ class CadastrosState(AuthState):
         if self.active_section == "motos_clientes":
             payload = dict(data)
             payload["id_cliente"] = option_id(payload["id_cliente"])
+            # A blank plate means "no plate yet": absent on create, unchanged on edit.
+            if not payload.get("placa", "").strip():
+                payload.pop("placa", None)
             model = MotoClienteUpdate if self.editing_id else MotoClienteCreate
             return model(**payload), model
         if self.active_section == "produtos":

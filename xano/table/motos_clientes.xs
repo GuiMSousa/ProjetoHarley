@@ -8,7 +8,10 @@ table motos_clientes {
     }
   
     text modelo filters=trim
-    text placa filters=trim
+
+    // Anulável: moto 0 km vendida antes do emplacamento (Change 9). Única quando informada.
+    text? placa? filters=trim
+
     text chassi filters=trim
     bool ativo?=true
   }

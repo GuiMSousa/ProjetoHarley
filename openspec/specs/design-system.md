@@ -10,7 +10,7 @@ Todo par de texto e fundo declarado nos tokens (`TEXT_PAIRS`, incluindo as cores
 
 ## Requisito: tipografia e identidade
 
-Títulos (`rx.heading`) DEVEM aparecer em caixa alta com a fonte Oswald e o corpo em Inter, ambas de licença livre; a caixa alta DEVE ser aplicada por CSS, preservando o texto original. A aplicação NÃO DEVE usar o logotipo nem fontes proprietárias da marca; a assinatura é textual ("HARLEY STORE"). O acento do Radix (foco, abas, seleção) DEVE ser `#FF6600`.
+Títulos (`rx.heading`) DEVEM aparecer em caixa alta com a fonte Oswald e o corpo em Inter, ambas de licença livre; a caixa alta DEVE ser aplicada por CSS, preservando o texto original. A aplicação NÃO DEVE usar fontes proprietárias da marca. A identidade DEVE ser o logo fornecido pela loja (`assets/HARLEY_LOGO.png`, escudo recortado de `assets/harley-davidson-logo.webp` com fundo transparente, exibido com 45 px de altura) seguido do título "HARLEY STORE", no canto superior esquerdo de todas as rotas: topo da sidebar (alinhado aos ícones do menu), barra superior no celular, cabeçalho da vitrine pública e login. Onde o espaço é estreito (sidebar, menu móvel, vitrine no celular), o subtítulo "Concessionária e oficina" DEVE ser ocultado. O acento do Radix (foco, abas, seleção) DEVE ser `#FF6600`.
 
 ## Requisito: componentes compartilhados
 

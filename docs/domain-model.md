@@ -46,7 +46,8 @@ Representa os proprietários de motocicletas ou compradores da loja.
 Representa os veículos pertencentes a clientes e utilizados no fluxo da oficina para manutenção, revisão e histórico de serviços.
 - **Atributos:** Identificador (`id_moto_cliente`), Cliente Vinculado (`id_cliente`), Modelo (`modelo`), Placa (`placa`), Chassi (`chassi`), Ativo (`ativo`).
 - **Relacionamento:** Pertence a um **Cliente**.
-- **Regras:** Placa e Chassi devem ser únicos no sistema.
+- **Regras:** Placa e Chassi devem ser únicos no sistema. A placa é opcional desde a Change 9 (moto 0 km vendida antes do emplacamento); quando informada, continua única, e placa em branco vale como ausente.
+- **Origem:** além do cadastro manual, a venda de uma unidade do estoque cria a moto do cliente com o nome do modelo comercial e o chassi da unidade.
 - **Ciclo de vida:** A desativação é lógica e não remove o veículo do histórico.
 
 ### Modelos_Moto (catálogo)
@@ -59,10 +60,10 @@ Representa o modelo comercial exibido na vitrine (Change 8): o que o cliente esc
 Representa cada motocicleta física no estoque da loja, destinada à venda. É independente de `motos_clientes`, que representa o veículo atendido pela oficina.
 - **Atributos:** Identificador (`id`), Modelo (`id_modelo`), Chassi (`chassi`, VIN de 17 caracteres, em caixa alta e único), Cor (`cor`, uma das variações do modelo), Ano do Modelo (`ano_modelo`), Preço de Venda (`preco_venda`), Status (`status`: `DISPONIVEL`, `RESERVADA` ou `VENDIDA`), Cliente da Reserva (`clientes_id`), Vendedor da Reserva (`id_vendedor_reserva`), Validade da Reserva (`reservada_ate`), Versão do Status (`versao_status`), Última Alteração (`atualizado_em`), Marca e Modelo legados (`marca`, `modelo`).
 - **Cadastro:** somente o `GERENTE`, com modelo ativo, cor do modelo, ano entre 1990 e o ano seguinte e chassi único também contra `motos_clientes`. A unidade nasce `DISPONIVEL`, com uma linha de histórico.
-- **Status:** muda somente pelos endpoints de reserva (função `Vendas/transicionar_moto`); cadastro e edição nunca aceitam status, cliente ou vendedor. `PUT` e `DELETE motos/{id}` respondem `403`.
+- **Status:** muda somente pelos endpoints de reserva e de venda (função `Vendas/transicionar_moto`); cadastro e edição nunca aceitam status, cliente ou vendedor. `PUT` e `DELETE motos/{id}` respondem `403`.
 - **Reserva:** `VENDEDOR` ou `GERENTE` reserva uma unidade `DISPONIVEL` para um cliente ativo, com validade de 1 a 30 dias (padrão 7). Vendedor e validade são definidos pelo servidor. Pode cancelar quem reservou, um `GERENTE` ou, depois do vencimento, qualquer vendedor; o motivo é obrigatório. Não há expiração automática.
-- **Concorrência:** cada transição grava o histórico com `versao_anterior` antes de atualizar a unidade; o índice único `(id_moto, versao_anterior)` garante que duas reservas simultâneas da mesma unidade não sejam ambas aceitas.
-- **Venda:** a conclusão (`VENDIDA`, transação `MOTO` e criação da moto do cliente) será definida na Change 9, junto com o redesenho de `transacoes`.
+- **Concorrência:** cada transição grava o histórico com `versao_anterior` antes de atualizar a unidade; o índice único `(id_moto, versao_anterior)` garante que duas reservas ou vendas simultâneas da mesma unidade não sejam ambas aceitas.
+- **Venda (Change 9):** `VENDEDOR` ou `GERENTE` vende uma unidade `DISPONIVEL` a qualquer cliente ativo, ou uma `RESERVADA` somente ao cliente da reserva, por `POST vender_moto`. A unidade precisa de chassi; o valor da venda é livre e maior que zero (o preço da unidade é sugerido); a placa é opcional. Numa única transação o Xano cria a moto do cliente, registra a transação `MOTO` com o funcionário do JWT e passa a unidade a `VENDIDA` (com o comprador em `clientes_id`). `VENDIDA` é final: não há estorno.
 - **Legado:** unidades anteriores à Change 8 (sem modelo) ficam fora da vitrine, aparecem como "Sem modelo" em `/vendas` e não podem ser reservadas.
 
 ### Historico_Status_Moto
@@ -116,6 +117,7 @@ Registra o fluxo financeiro de vendas e movimentações comerciais do estabeleci
 - **Regras:** O tipo de transação deve ser restrito aos valores: `MOTO`, `PECAS`, `BALCAO`, `COMPRA`, `ORDEM_SERVICO`.
 - **Regras financeiras:** `valor_total` deve ser estritamente positivo (`> 0`).
 - **Autoria:** `id_funcionario` deve ser derivado do usuário autenticado e do vínculo `user.id_funcionario`. `POST`/`PUT` gravam o funcionário do JWT e o `PATCH` descarta `id_funcionario` do payload.
+- **Venda de moto:** a venda (`Vendas/vender_moto`) grava a transação `MOTO` com `valor_total` = valor da venda, o cliente comprador e a moto do cliente criada na mesma transação.
 - **Situação atual:** transações não possuem linhas de itens; vendas de peças com baixa de estoque dependem de uma decisão de modelagem ainda pendente. O `DELETE` físico está bloqueado (`403`); `PUT`/`PATCH` ainda são genéricos e serão revistos na Change de vendas.
 
 ---

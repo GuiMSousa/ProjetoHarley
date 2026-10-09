@@ -1,6 +1,6 @@
 // Venda de uma moto do estoque, em uma única transação:
 //   1. valida a disponibilidade (não vendida; se reservada, só para o cliente da reserva);
-//   2. cria a moto do cliente em motos_clientes;
+//   2. cria a moto do cliente em motos_clientes (placa opcional: moto 0 km sai sem placa);
 //   3. registra a transação financeira MOTO em transacoes;
 //   4-5. grava historico_status_moto e passa a unidade a VENDIDA por Vendas/transicionar_moto,
 //        cuja versão (índice único id_moto + versao_anterior) impede duas vendas simultâneas.
@@ -10,7 +10,7 @@ function "Vendas/vender_moto" {
     int id_moto filters=min:1
     int id_cliente filters=min:1
     int id_funcionario filters=min:1
-    text placa filters=trim|upper
+    text? placa? filters=trim|upper
     decimal valor_venda filters=min:0.01
     text? observacao? filters=trim|max:500
   }
@@ -20,7 +20,7 @@ function "Vendas/vender_moto" {
     db.get motos {
       field_name = "id"
       field_value = $input.id_moto
-      output = ["id", "status", "modelo", "marca", "chassi", "clientes_id"]
+      output = ["id", "status", "id_modelo", "modelo", "marca", "chassi", "clientes_id"]
     } as $moto
 
     precondition ($moto != null) {
@@ -59,13 +59,59 @@ function "Vendas/vender_moto" {
     }
 
     db.query motos_clientes {
-      where = $db.motos_clientes.placa == $input.placa || $db.motos_clientes.chassi == $moto.chassi
+      where = $db.motos_clientes.chassi == $moto.chassi
       return = {type: "exists"}
-    } as $ja_cadastrada
+    } as $chassi_cadastrado
 
-    precondition (!$ja_cadastrada) {
+    precondition (!$chassi_cadastrado) {
       error_type = "inputerror"
-      error = "Placa ou chassi já cadastrados em uma moto de cliente."
+      error = "Chassi já cadastrado em uma moto de cliente."
+    }
+
+    // Placa vazia vale como ausente; só uma placa informada é checada (nulos não colidem).
+    var $placa {
+      value = null
+    }
+
+    conditional {
+      if (($input.placa ?? "") != "") {
+        var.update $placa {
+          value = $input.placa
+        }
+
+        db.query motos_clientes {
+          where = $db.motos_clientes.placa == $placa
+          return = {type: "exists"}
+        } as $placa_cadastrada
+
+        precondition (!$placa_cadastrada) {
+          error_type = "inputerror"
+          error = "Placa já cadastrada em uma moto de cliente."
+        }
+      }
+    }
+
+    // Nome do modelo comercial (Change 8); unidades legadas mantêm modelo/marca.
+    var $nome_modelo {
+      value = ($moto.modelo ?? $moto.marca) ?? "Harley-Davidson"
+    }
+
+    conditional {
+      if ($moto.id_modelo != null) {
+        db.get modelos_moto {
+          field_name = "id"
+          field_value = $moto.id_modelo
+          output = ["nome_modelo"]
+        } as $modelo
+
+        conditional {
+          if ($modelo != null) {
+            var.update $nome_modelo {
+              value = $modelo.nome_modelo
+            }
+          }
+        }
+      }
     }
 
     try_catch {
@@ -76,8 +122,8 @@ function "Vendas/vender_moto" {
             db.add motos_clientes {
               data = {
                 id_cliente: $input.id_cliente
-                modelo    : ($moto.modelo ?? $moto.marca) ?? "Harley-Davidson"
-                placa     : $input.placa
+                modelo    : $nome_modelo
+                placa     : $placa
                 chassi    : $moto.chassi
                 ativo     : true
               }

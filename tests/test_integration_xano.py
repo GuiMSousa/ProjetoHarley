@@ -12,8 +12,10 @@ Settings (environment variables take precedence over ``.env``):
   receipts, service orders and stock movements are immutable, so those
   records stay in the database: point the suite at a test branch or workspace.
   Orders opened by the tests are cancelled at the end, returning their parts.
+  Sales are final: the sold units, customer bikes and MOTO transactions stay.
 - ``XANO_TEST_CONCURRENCY=true`` (with writes) runs the race scenarios of the
-  stock ledger and the order lock; they need two free customer bikes.
+  stock ledger, the order lock, reservations and sales; the order races need
+  two free customer bikes.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from Projeto_HarleyStore.services.motos import (
     CancelamentoReservaMoto,
     MotoEstoqueCreate,
     ReservaMotoCreate,
+    VendaMotoCreate,
 )
 from Projeto_HarleyStore.services.ordens_servico import (
     ItemOSCreate,
@@ -705,6 +708,19 @@ class XanoLiveCatalogReadTests(XanoLiveTestCase):
             with self.assertRaises(XanoPermissionError):
                 client.list_modelos_moto()
 
+    def test_only_sellers_close_sales_and_unknown_units_are_not_found(self):
+        """Writes nothing: the role check and the unit lookup come before any insert."""
+        venda = VendaMotoCreate(
+            id_moto=NONEXISTENT_ID,
+            id_cliente=NONEXISTENT_ID,
+            valor_venda=Decimal("1"),
+            placa="ZZZ9Z99",
+        )
+        with self.client_for("MECANICO") as client, self.assertRaises(XanoPermissionError):
+            client.vender_moto(venda)
+        with self.client_for("VENDEDOR") as client, self.assertRaises(XanoNotFoundError):
+            client.vender_moto(venda)
+
 
 class XanoLiveSalesWriteTestCase(XanoLiveWriteTestCase):
     """Creates a model and a unit of its own; they stay in the database (no deletion)."""
@@ -792,11 +808,60 @@ class XanoLiveSalesWriteTests(XanoLiveSalesWriteTestCase):
             with self.assertRaises(XanoPermissionError):
                 gerente.request("PUT", f"motos/{unidade.id}", json={"status": "VENDIDA"})
 
+    def test_sale_cycle_without_plate(self):
+        with self.client_for("GERENTE") as gerente:
+            modelo, disponivel = self.create_unit(gerente)
+            _, reservada = self.create_unit(gerente)
+            cliente_id = self.active_client_id(gerente)
+            outro_cliente = next(
+                (item.id for item in gerente.list_clientes() if item.ativo and item.id != cliente_id),
+                None,
+            )
+
+        with self.client_for("VENDEDOR") as vendedor:
+            venda = VendaMotoCreate(id_moto=disponivel.id, id_cliente=cliente_id, valor_venda=Decimal("47500"))
+            resultado = vendedor.vender_moto(venda)
+            self.assertEqual(resultado.status, "SUCESSO")
+            vendida = vendedor.get_moto_estoque(disponivel.id)
+            self.assertEqual((vendida.status, vendida.clientes_id), ("VENDIDA", cliente_id))
+            self.assertEqual([evento.status_novo for evento in vendida.historico], ["DISPONIVEL", "VENDIDA"])
+            moto_cliente = next(
+                item for item in vendedor.list_motos_clientes() if item.id == resultado.id_moto_cliente
+            )
+            self.assertEqual(
+                (moto_cliente.id_cliente, moto_cliente.chassi, moto_cliente.placa, moto_cliente.modelo),
+                (cliente_id, disponivel.chassi, None, modelo.nome_modelo),
+            )
+            with self.assertRaisesRegex(XanoValidationError, "já foi vendida"):
+                vendedor.vender_moto(venda)
+
+            # A reserved unit goes only to its customer; a second bike without plate does not collide.
+            vendedor.reservar_moto(reservada.id, ReservaMotoCreate(id_cliente=cliente_id))
+            if outro_cliente is not None:
+                with self.assertRaisesRegex(XanoValidationError, "reservada para outro cliente"):
+                    vendedor.vender_moto(
+                        VendaMotoCreate(id_moto=reservada.id, id_cliente=outro_cliente, valor_venda=Decimal("1"))
+                    )
+            segunda = vendedor.vender_moto(
+                VendaMotoCreate(
+                    id_moto=reservada.id,
+                    id_cliente=cliente_id,
+                    valor_venda=Decimal("46000"),
+                    observacao="Teste de integração",
+                )
+            )
+            self.assertNotEqual(segunda.id_moto_cliente, resultado.id_moto_cliente)
+            self.assertEqual(vendedor.get_moto_estoque(reservada.id).status, "VENDIDA")
+
+        with self.client_for("GERENTE") as gerente:
+            vitrine = next(item for item in gerente.list_catalogo() if item.id == modelo.id)
+            self.assertEqual(vitrine.disponiveis, 0)
+
 
 @unittest.skipUnless(
     CONCURRENCY, "XANO_TEST_CONCURRENCY desativado: cenários concorrentes ignorados."
 )
-class XanoLiveReservationConcurrencyTests(XanoLiveSalesWriteTestCase):
+class XanoLiveStockUnitConcurrencyTests(XanoLiveSalesWriteTestCase):
     def test_two_reservations_of_the_same_unit(self):
         with self.client_for("GERENTE") as client:
             _, unidade = self.create_unit(client)
@@ -814,6 +879,20 @@ class XanoLiveReservationConcurrencyTests(XanoLiveSalesWriteTestCase):
             self.assertEqual(detalhe.status, "RESERVADA")
             self.assertEqual(len(detalhe.historico), 2)
             client.cancelar_reserva_moto(unidade.id, CancelamentoReservaMoto(motivo="Limpeza do teste"))
+
+    def test_two_sales_of_the_same_unit(self):
+        with self.client_for("GERENTE") as client:
+            _, unidade = self.create_unit(client)
+            cliente_id = self.active_client_id(client)
+        venda = VendaMotoCreate(id_moto=unidade.id, id_cliente=cliente_id, valor_venda=Decimal("48000"))
+        results = self.race(*[lambda c: c.vender_moto(venda) for _ in range(2)])
+        errors = [result for result in results if isinstance(result, XanoValidationError)]
+        self.assertEqual(len(errors), 1, results)
+        with self.client_for("GERENTE") as client:
+            detalhe = client.get_moto_estoque(unidade.id)
+            self.assertEqual([evento.status_novo for evento in detalhe.historico], ["DISPONIVEL", "VENDIDA"])
+            motos_cliente = [item for item in client.list_motos_clientes() if item.chassi == unidade.chassi]
+            self.assertEqual(len(motos_cliente), 1)
 
 
 if __name__ == "__main__":

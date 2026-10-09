@@ -88,7 +88,7 @@ def cadastro_form() -> rx.Component:
                     width="100%",
                 ),
                 field("Modelo", "modelo"),
-                field("Placa", "placa"),
+                field("Placa (opcional)", "placa", "Vazia em moto 0 km ainda sem emplacamento"),
                 field("Chassi", "chassi"),
                 align="stretch",
                 spacing="3",
