@@ -9,9 +9,9 @@ table movimentacoes_estoque {
       table = "produtos"
     }
 
-    // O sentido vem do tipo; a quantidade é sempre positiva.
+    // O sentido vem do tipo; a quantidade é sempre positiva. SAIDA_VENDA: venda no balcão (Change 11).
     enum tipo {
-      values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS"]
+      values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS", "SAIDA_VENDA"]
     }
 
     int quantidade filters=min:1
@@ -39,6 +39,11 @@ table movimentacoes_estoque {
     // Sem vínculo de tabela: o item pode ser removido depois da movimentação.
     int? id_item_os?
 
+    // Origem SAIDA_VENDA (Change 11): a transação BALCAO da venda.
+    int? id_transacao? {
+      table = "transacoes"
+    }
+
     timestamp created_at?=now
   }
 
@@ -48,6 +53,7 @@ table movimentacoes_estoque {
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree", field: [{name: "id_os"}]}
+    {type: "btree", field: [{name: "id_transacao"}]}
 
     {
       type : "btree|unique"

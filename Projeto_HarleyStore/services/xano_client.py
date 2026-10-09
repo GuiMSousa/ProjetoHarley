@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from Projeto_HarleyStore.services.balcao import VendaBalcaoCreate, VendaBalcaoDetalhe
 from Projeto_HarleyStore.services.motos import (
     CancelamentoReservaMoto,
     MotoEstoque,
@@ -625,4 +626,17 @@ class XanoClient:
             "vender_moto",
             json=venda.model_dump(mode="json", exclude_none=True),
             response_model=VendaMotoResultado,
+        )
+
+    def vender_balcao(self, venda: VendaBalcaoCreate) -> VendaBalcaoDetalhe:
+        """Counter sale (GERENTE/VENDEDOR): transaction, items and stock exit in one call.
+
+        Prices come from the products in Xano; repeating ``chave_venda`` returns the sale
+        already registered instead of selling twice. Without a customer, the sale is to the
+        final consumer and ``id_cliente`` is not sent.
+        """
+        return self.post(
+            "balcao/vendas",
+            json=venda.model_dump(mode="json", exclude_none=True),
+            response_model=VendaBalcaoDetalhe,
         )

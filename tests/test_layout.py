@@ -2,6 +2,7 @@ import struct
 import unittest
 from pathlib import Path
 
+from Projeto_HarleyStore.balcao_pages import balcao_page
 from Projeto_HarleyStore.cadastros_pages import cadastro_page
 from Projeto_HarleyStore.catalogo_pages import catalogo_page
 from Projeto_HarleyStore.components import (
@@ -41,6 +42,7 @@ PAGES = {
     "/cadastros/funcionarios": lambda: cadastro_page("funcionarios"),
     "/estoque/entradas": entradas_page,
     "/vendas": vendas_page,
+    "/balcao": balcao_page,
     "/financeiro": financeiro_page,
 }
 

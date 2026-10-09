@@ -22,13 +22,13 @@ from Projeto_HarleyStore.formatting import (
 )
 from Projeto_HarleyStore.listing import (
     filter_rows,
-    normalize_text,
+    filtrar_produtos,
     option_id,
     option_label,
     page_count,
     paginate,
+    produto_row,
 )
-from Projeto_HarleyStore.services.cadastros import Produto
 from Projeto_HarleyStore.services.ordens_servico import (
     STATUS_EDITAVEIS_OS,
     TRANSICOES_OS,
@@ -66,7 +66,6 @@ TRANSITION_ACTIONS = {
     "CANCELADA": "Cancelar OS",
 }
 ITEM_TIPO_LABELS = {"PECA": "Peça", "SERVICO": "Serviço"}
-PRODUTO_SEARCH_LIMIT = 8
 
 
 class WorkshopFormError(ValueError):
@@ -183,32 +182,6 @@ def build_transicao_payload(
         )
     except ValidationError as error:
         raise WorkshopFormError(_first_error(error)) from error
-
-
-def produto_row(produto: Produto) -> dict[str, str]:
-    saldo = produto.estoque_qtd
-    return {
-        "id": str(produto.id),
-        "codigo": produto.codigo,
-        "nome": produto.nome_produto,
-        "saldo": str(saldo),
-        "preco": format_currency(produto.preco_venda),
-        "preco_valor": str(produto.preco_venda),
-        "disponivel": "true" if saldo > 0 else "false",
-    }
-
-
-def filtrar_produtos(
-    rows: list[dict[str, str]], busca: str, limite: int = PRODUTO_SEARCH_LIMIT
-) -> list[dict[str, str]]:
-    """Products whose code or name contain the search text, ignoring case and accents."""
-    termo = normalize_text(busca.strip())
-    matches = [
-        row
-        for row in rows
-        if not termo or termo in normalize_text(f"{row['codigo']} {row['nome']}")
-    ]
-    return matches[:limite]
 
 
 def _find_produto(catalogo: list[dict[str, str]], produto_id: str) -> dict[str, str] | None:

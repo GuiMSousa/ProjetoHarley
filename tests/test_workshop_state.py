@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from reflex.state import State
 
+from Projeto_HarleyStore.listing import filtrar_produtos, produto_row
 from Projeto_HarleyStore.services.cadastros import Cliente, MotoCliente, Produto
 from Projeto_HarleyStore.services.ordens_servico import (
     HistoricoStatusOS,
@@ -29,7 +30,6 @@ from Projeto_HarleyStore.workshop_state import (
     can_operate_os,
     detalhe_row,
     filter_by_status,
-    filtrar_produtos,
     historico_row,
     item_row,
     lancamento_texto,
@@ -37,7 +37,6 @@ from Projeto_HarleyStore.workshop_state import (
     nota_conclusao,
     os_row,
     preview_item_total,
-    produto_row,
     status_counts,
     totais_row,
 )

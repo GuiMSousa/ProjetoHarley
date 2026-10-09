@@ -45,6 +45,8 @@ O status DEVE mudar somente por `POST ordens_servico/{id}/status`, seguindo:
 
 `CANCELADA` DEVE exigir motivo. `data_inicio` DEVE ser preenchida ao iniciar e `data_encerramento` ao concluir ou cancelar.
 
+A transição para `CONCLUIDA` DEVE lançar a receita da OS em `transacoes` na mesma transação (spec `financeiro`, requisito "lançamento da OS na conclusão"); uma OS com total zero conclui sem lançamento. O cancelamento NÃO DEVE gerar transação.
+
 ### Cenário: transição inválida
 
 - **DADO** uma OS `ABERTA`
@@ -129,6 +131,10 @@ Cancelar a OS DEVE devolver ao estoque todas as peças baixadas na mesma transa�
 ## Requisito: totais da OS
 
 A cada inclusão ou remoção, o Xano DEVE gravar na OS `valor_pecas`, `valor_servicos` e `valor_total = valor_pecas + valor_servicos`, somados a partir dos itens. O detalhe DEVE recalcular os totais a partir dos itens (itens legados sem tipo contam como peça).
+
+## Requisito: faturamento visível na OS
+
+O detalhe de uma OS `CONCLUIDA` DEVE mostrar "Faturada · transação #N · data" quando houver lançamento, ou "Concluída sem lançamento financeiro (total zero)." / "Concluída sem lançamento financeiro registrado." quando não houver. O painel de confirmação da conclusão DEVE avisar "O total de R$ X será lançado como receita de serviço." ou, com total zero, "Total zero: a OS será concluída sem lançamento."
 
 ## Requisito: serialização das mutações da OS
 

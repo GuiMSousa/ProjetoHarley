@@ -34,6 +34,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
+from Projeto_HarleyStore.services.balcao import ItemVendaBalcaoCreate, VendaBalcaoCreate
 from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCor
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
 from Projeto_HarleyStore.services.financeiro import FUSO_LOJA, OPERACOES_LIMITE, PeriodoFinanceiro
@@ -1047,3 +1048,113 @@ class XanoLiveFinanceConcurrencyTests(XanoLiveWriteTestCase):
                 if operacao.id_os == ordem.id
             ]
             self.assertEqual(len(lancamentos), 1)
+
+
+def venda_balcao(linhas, id_cliente=None, ajuste=Decimal("0")):
+    """Counter sale of (product, quantity) lines with the total the seller would see.
+
+    ``ajuste`` simulates a cart built before a price change: the total no longer matches.
+    """
+    total = sum((produto.preco_venda * quantidade for produto, quantidade in linhas), Decimal("0"))
+    return VendaBalcaoCreate(
+        chave_venda=str(uuid.uuid4()),
+        id_cliente=id_cliente,
+        total_esperado=(total + ajuste).quantize(Decimal("0.01")),
+        itens=[ItemVendaBalcaoCreate(id_produto=produto.id, quantidade=quantidade) for produto, quantidade in linhas],
+    )
+
+
+class XanoLiveCounterReadTests(XanoLiveTestCase):
+    """Change 11 without writes: who sells at the counter and which carts are refused."""
+
+    def active_product(self, client: XanoClient):
+        produto = next((item for item in client.list_produtos() if item.ativo), None)
+        if produto is None:
+            self.skipTest("É necessário ao menos um produto ativo.")
+        return produto
+
+    def test_mechanic_cannot_sell_at_the_counter(self):
+        with self.client_for("MECANICO") as client:
+            produto = self.active_product(client)
+            with self.assertRaises(XanoPermissionError):
+                client.vender_balcao(venda_balcao([(produto, 1)]))
+
+    def test_invalid_carts_are_refused_before_any_write(self):
+        with self.client_for("VENDEDOR") as client:
+            item = {"id_produto": self.active_product(client).id, "quantidade": 1}
+            muitos = [{"id_produto": numero, "quantidade": 1} for numero in range(1, 32)]
+            for itens in ([], [item, item], muitos):
+                body = {"chave_venda": str(uuid.uuid4()), "total_esperado": "1.00", "itens": itens}
+                with self.subTest(itens=len(itens)), self.assertRaises(XanoValidationError):
+                    client.request("POST", "balcao/vendas", json=body)
+
+
+class XanoLiveCounterWriteTests(XanoLiveSalesWriteTestCase):
+    """Change 11 with writes: a counter sale moves stock and posts BALCAO revenue once."""
+
+    def test_final_consumer_sale_moves_stock_and_posts_revenue(self):
+        with self.client_for("GERENTE") as gerente:
+            filtro, pastilha = self.restocked_products(gerente, 2, 3)
+        esperado = (filtro.preco_venda * 2 + pastilha.preco_venda).quantize(Decimal("0.01"))
+        with self.client_for("VENDEDOR") as vendedor:
+            recibo = vendedor.vender_balcao(venda_balcao([(filtro, 2), (pastilha, 1)]))
+            self.assertEqual((recibo.valor_total, recibo.id_cliente), (esperado, None))
+            self.assertEqual(
+                sorted((item.id_produto, item.quantidade, item.valor_unitario) for item in recibo.itens),
+                sorted([(filtro.id, 2, filtro.preco_venda), (pastilha.id, 1, pastilha.preco_venda)]),
+            )
+            self.assertEqual(self.stock_of(vendedor, filtro.id), filtro.estoque_qtd - 2)
+            self.assertEqual(self.stock_of(vendedor, pastilha.id), pastilha.estoque_qtd - 1)
+        with self.client_for("GERENTE") as gerente:
+            (lancamento,) = [
+                operacao
+                for operacao in gerente.resumo_financeiro(periodo_de_hoje()).operacoes
+                if operacao.origem == "TRANSACAO" and operacao.id == recibo.id_transacao
+            ]
+            self.assertEqual(
+                (lancamento.tipo, lancamento.natureza, lancamento.valor, lancamento.contraparte),
+                ("BALCAO", "RECEITA", esperado, None),
+            )
+
+    def test_repeated_key_returns_the_same_sale_without_a_second_exit(self):
+        with self.client_for("GERENTE") as gerente:
+            (produto,) = self.restocked_products(gerente, 1, 2)
+            cliente_id = self.active_client_id(gerente)
+        venda = venda_balcao([(produto, 1)], id_cliente=cliente_id)
+        with self.client_for("VENDEDOR") as vendedor:
+            primeira = vendedor.vender_balcao(venda)
+            # Lost response followed by a new click: same cart, same key.
+            repetida = vendedor.vender_balcao(venda)
+            self.assertEqual(repetida.id_transacao, primeira.id_transacao)
+            self.assertEqual(primeira.id_cliente, cliente_id)
+            self.assertTrue(primeira.nome_cliente)
+            self.assertEqual(self.stock_of(vendedor, produto.id), produto.estoque_qtd - 1)
+
+    def test_insufficient_stock_and_changed_price_write_nothing(self):
+        with self.client_for("GERENTE") as gerente:
+            (produto,) = self.restocked_products(gerente, 1, 1)
+        with self.client_for("VENDEDOR") as vendedor:
+            saldo = self.stock_of(vendedor, produto.id)
+            with self.assertRaises(XanoValidationError) as falta:
+                vendedor.vender_balcao(venda_balcao([(produto, saldo + 1)]))
+            self.assertTrue(str(falta.exception).startswith(f"Saldo insuficiente para {produto.codigo}"))
+            with self.assertRaises(XanoValidationError) as preco:
+                vendedor.vender_balcao(venda_balcao([(produto, 1)], ajuste=Decimal("0.01")))
+            self.assertTrue(str(preco.exception).startswith("Os preços mudaram desde que o carrinho foi montado"))
+            self.assertEqual(self.stock_of(vendedor, produto.id), saldo)
+
+
+@unittest.skipUnless(
+    CONCURRENCY, "XANO_TEST_CONCURRENCY desativado: cenários concorrentes ignorados."
+)
+class XanoLiveCounterConcurrencyTests(XanoLiveWriteTestCase):
+    def test_two_sales_of_the_whole_balance_sell_once(self):
+        with self.client_for("GERENTE") as gerente:
+            (produto,) = self.restocked_products(gerente, 1, 1)
+            saldo = self.stock_of(gerente, produto.id)
+        vendas = [venda_balcao([(produto, saldo)]) for _ in range(2)]
+        results = self.race(*[lambda client, venda=venda: client.vender_balcao(venda) for venda in vendas])
+        errors = [result for result in results if isinstance(result, XanoValidationError)]
+        self.assertEqual(len(errors), 1, results)
+        with self.client_for("GERENTE") as gerente:
+            self.assertEqual(self.stock_of(gerente, produto.id), 0)

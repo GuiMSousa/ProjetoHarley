@@ -9,6 +9,7 @@ import inspect
 import unittest
 
 from Projeto_HarleyStore.auth import AuthState
+from Projeto_HarleyStore.balcao_state import BalcaoState
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_state import CatalogoState
 from Projeto_HarleyStore.entradas_state import EntradasState
@@ -19,6 +20,7 @@ from Projeto_HarleyStore.workshop_state import WorkshopState
 
 BUSY_HANDLERS = {
     AuthState: ("login",),
+    BalcaoState: ("load_balcao", "confirmar_venda"),
     CadastrosState: (
         "load_clientes",
         "load_motos_clientes",

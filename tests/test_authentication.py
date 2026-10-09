@@ -157,6 +157,8 @@ class AuthenticationTests(unittest.TestCase):
             "/cadastros/funcionarios": {"GERENTE"},
             "/estoque/entradas": {"GERENTE", "VENDEDOR", "MECANICO"},
             "/vendas": {"GERENTE", "VENDEDOR"},
+            # Change 11: counter sale; the mechanic's parts leave stock through the OS.
+            "/balcao": {"GERENTE", "VENDEDOR"},
         }
         for route, roles in expected.items():
             for role in ("GERENTE", "VENDEDOR", "MECANICO"):
@@ -180,6 +182,8 @@ class AuthenticationTests(unittest.TestCase):
             "Fixture", (), {"is_authenticated": True, "employee_role": "MECANICO"}
         )()
         self.assertNotIn("/vendas", AuthState.allowed_routes.fget(mechanic))
+        self.assertIn("/balcao", routes)
+        self.assertNotIn("/balcao", AuthState.allowed_routes.fget(mechanic))
         anonymous = type(
             "Fixture", (), {"is_authenticated": False, "employee_role": "GERENTE"}
         )()

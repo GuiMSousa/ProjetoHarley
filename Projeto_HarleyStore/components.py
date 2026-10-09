@@ -17,7 +17,13 @@ NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] = (
             ("Catálogo de motos", "/catalogo", "store"),
         ),
     ),
-    ("Vendas", (("Estoque e reservas de motos", "/vendas", "badge-dollar-sign"),)),
+    (
+        "Vendas",
+        (
+            ("Estoque e reservas de motos", "/vendas", "badge-dollar-sign"),
+            ("Balcão", "/balcao", "shopping-cart"),
+        ),
+    ),
     ("Oficina", (("Ordens de serviço", "/workshop", "wrench"),)),
     (
         "Estoque",

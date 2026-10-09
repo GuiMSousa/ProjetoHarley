@@ -88,9 +88,16 @@ class OperacaoRulesTests(unittest.TestCase):
             ),
             "Entrada NF-5521",
         )
+        # Counter sales (Change 11) are named by their transaction number.
+        self.assertEqual(descricao_operacao(operacao(tipo="BALCAO", id_os=None, id=7)), "Venda no balcão #7")
         # Rows created by the generic CRUD before Change 10 have no business reference.
-        self.assertEqual(descricao_operacao(operacao(tipo="BALCAO", id_os=None, id=7)), "Transação #7")
+        self.assertEqual(descricao_operacao(operacao(tipo="PECAS", id_os=None, id=9)), "Transação #9")
         self.assertEqual(descricao_operacao(operacao(id_os=None, id=8)), "Transação #8")
+
+    def test_counter_sale_without_customer_is_the_final_consumer(self):
+        venda = operacao(tipo="BALCAO", id_os=None, contraparte=None)
+        self.assertEqual(operacao_row(venda)["contraparte"], "Consumidor final")
+        self.assertEqual(operacao_row(operacao(tipo="BALCAO", id_os=None))["contraparte"], "Ana Souza")
 
     def test_rows_sign_expenses_and_keep_revenue_plain(self):
         receita = operacao_row(operacao())

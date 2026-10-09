@@ -14,6 +14,7 @@ from Projeto_HarleyStore.ui_helpers import card, page_header
 SHORTCUTS: tuple[tuple[str, str, str, str], ...] = (
     ("Catálogo de motos", "Vitrine com modelos, cores e preços.", "/catalogo", "store"),
     ("Estoque e reservas de motos", "Unidades disponíveis, reservas e catálogo.", "/vendas", "badge-dollar-sign"),
+    ("Balcão", "Venda de peças a clientes ou consumidor final.", "/balcao", "shopping-cart"),
     ("Ordens de serviço", "Abertura, andamento, peças e mão de obra.", "/workshop", "wrench"),
     ("Entradas de mercadoria", "Compras de fornecedores e estoque.", "/estoque/entradas", "package-plus"),
     ("Produtos e peças", "Catálogo de peças, preço e saldo.", "/cadastros/produtos", "boxes"),

@@ -94,7 +94,7 @@ Somente `auth/login` e a vitrine de leitura `GET catalogo` e `GET catalogo/{id}`
 
 ## Requisito: exclusão somente lógica
 
-O `DELETE` de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações DEVE responder `403`; a desativação é feita por `PATCH` com `ativo = false`. A única exclusão física permitida é a de item de OS `ABERTA` ou `EM_ANDAMENTO`, que devolve a peça ao estoque.
+O `DELETE` de clientes, motos de clientes, produtos, fornecedores, funcionários e motos da loja DEVE responder `403`; a desativação é feita por `PATCH` com `ativo = false`. O `DELETE` de transações também DEVE responder `403`, sem desativação: transações são imutáveis (spec `financeiro`). A única exclusão física permitida é a de item de OS `ABERTA` ou `EM_ANDAMENTO`, que devolve a peça ao estoque.
 
 ### Cenário: exclusão forjada
 
@@ -108,7 +108,7 @@ Componentes e regras repetidos entre páginas DEVEM viver em módulos compartilh
 
 ## Requisito: autoria imutável
 
-Nenhum endpoint DEVE gravar `id_funcionario` vindo do payload. Em `PATCH` de OS e transações, a chave DEVE ser descartada antes da gravação. Correções de transações (`PUT`/`PATCH`) NÃO DEVEM substituir o autor original, nem pelo payload nem por quem edita.
+Nenhum endpoint DEVE gravar `id_funcionario` vindo do payload. Transações não têm correção manual; o autor é sempre o funcionário do JWT da operação que as criou.
 
 ## Requisito: papel verificado em todo endpoint autenticado
 
@@ -122,13 +122,19 @@ Todo endpoint com `auth = "user"` DEVE chamar `Quick Start/enforce_role`, que ex
 
 ## Requisito: dados financeiros restritos
 
-`GET transacoes` e `GET transacoes/{id}` DEVEM exigir `GERENTE`. Lançamentos e correções manuais (`POST transacoes`, `PUT`/`PATCH transacoes/{id}`) DEVEM exigir `GERENTE`; as operações de negócio (venda de moto) gravam suas transações por funções próprias. A Change 10 (`fechamento-financeiro-operacoes`) proposta torna as transações imutáveis.
+`GET transacoes` e `GET transacoes/{id}` DEVEM exigir `GERENTE`. Lançamentos, correções e exclusões manuais (`POST transacoes`, `PUT`/`PATCH`/`DELETE transacoes/{id}`) DEVEM responder `403` para qualquer perfil: transações nascem somente das operações de negócio (venda de moto, conclusão de OS e lançamento retroativo) e são imutáveis (spec `financeiro`).
 
 ### Cenário: vendedor tenta lançar uma transação
 
 - **DADO** um `VENDEDOR` autenticado
 - **QUANDO** enviar `POST transacoes` com um `valor_total`
 - **ENTÃO** a resposta DEVE ser `403` e nada DEVE ser gravado
+
+### Cenário: gerente tenta corrigir uma transação
+
+- **DADO** um `GERENTE` autenticado
+- **QUANDO** enviar `PATCH transacoes/{id}` com outro `valor_total`
+- **ENTÃO** a resposta DEVE ser `403` "Transações são imutáveis." e a transação NÃO DEVE mudar
 
 ## Requisito: auditoria sem segredos
 

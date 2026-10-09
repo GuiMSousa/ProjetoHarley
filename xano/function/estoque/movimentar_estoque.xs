@@ -4,11 +4,13 @@
 // versao_anterior e só então o produto com versao_anterior + 1. O índice único
 // (id_produto, versao_anterior) de movimentacoes_estoque faz a segunda movimentação
 // concorrente do mesmo produto falhar e desfazer a transação inteira.
+// Saídas (SAIDA_OS e SAIDA_VENDA, Change 11) subtraem e exigem produto ativo; ENTRADA e
+// ESTORNO_OS somam.
 function "Estoque/movimentar_estoque" {
   input {
     int id_produto filters=min:1
     enum tipo {
-      values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS"]
+      values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS", "SAIDA_VENDA"]
     }
 
     int quantidade filters=min:1
@@ -16,6 +18,7 @@ function "Estoque/movimentar_estoque" {
     int? id_entrada?
     int? id_os?
     int? id_item_os?
+    int? id_transacao?
   }
 
   stack {
@@ -30,8 +33,8 @@ function "Estoque/movimentar_estoque" {
       error = "Produto inativo ou inexistente."
     }
 
-    // Devolver peça a um produto desativado depois da inclusão é permitido.
-    precondition ($input.tipo != "SAIDA_OS" || $produto.ativo != false) {
+    // Devolver peça a um produto desativado depois da inclusão é permitido; tirar, não.
+    precondition (($input.tipo != "SAIDA_OS" && $input.tipo != "SAIDA_VENDA") || $produto.ativo != false) {
       error_type = "inputerror"
       error = "Produto inativo ou inexistente."
     }
@@ -49,7 +52,7 @@ function "Estoque/movimentar_estoque" {
     }
 
     conditional {
-      if ($input.tipo == "SAIDA_OS") {
+      if ($input.tipo == "SAIDA_OS" || $input.tipo == "SAIDA_VENDA") {
         var.update $saldo_posterior {
           value = $saldo_anterior - $input.quantidade
         }
@@ -74,6 +77,7 @@ function "Estoque/movimentar_estoque" {
         id_entrada     : $input.id_entrada
         id_os          : $input.id_os
         id_item_os     : $input.id_item_os
+        id_transacao   : $input.id_transacao
         created_at     : now
       }
     } as $movimento

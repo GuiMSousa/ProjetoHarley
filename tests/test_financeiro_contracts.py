@@ -88,6 +88,7 @@ class ImutabilidadeTests(unittest.TestCase):
         self.assertEqual(
             writers,
             [
+                f"{API}/balcao/vendas_POST.xs",
                 f"{API}/ordens_servico/ordens_servico_id_status_POST.xs",
                 "function/financeiro/lancar_os_concluidas_legadas.xs",
                 "function/vendas/vender_moto.xs",

@@ -86,6 +86,8 @@ def descricao_operacao(operacao: OperacaoFinanceira) -> str:
         return " · ".join(parte for parte in (f"OS #{operacao.id_os}", operacao.modelo) if parte)
     if operacao.tipo == "MOTO":
         return " · ".join(parte for parte in ("Venda de moto", operacao.modelo, operacao.placa) if parte)
+    if operacao.tipo == "BALCAO":
+        return f"Venda no balcão #{operacao.id}"
     # Transactions created by the generic CRUD before Change 10.
     return f"Transação #{operacao.id}"
 
@@ -99,7 +101,8 @@ def operacao_row(operacao: OperacaoFinanceira) -> dict[str, str]:
         "natureza": operacao.natureza,
         "natureza_label": NATUREZA_LABELS[operacao.natureza],
         "descricao": descricao_operacao(operacao),
-        "contraparte": operacao.contraparte or EMPTY_VALUE,
+        "contraparte": operacao.contraparte
+        or ("Consumidor final" if operacao.tipo == "BALCAO" else EMPTY_VALUE),
         "funcionario": operacao.funcionario or EMPTY_VALUE,
         "valor": valor_com_sinal(operacao.valor, operacao.natureza == "DESPESA"),
     }

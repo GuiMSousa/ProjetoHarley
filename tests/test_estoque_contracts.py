@@ -82,11 +82,15 @@ class EstoqueContractTests(unittest.TestCase):
         self.assertIn('"Saldo insuficiente para "', content)
         self.assertIn("versao_anterior: $versao", content)
         self.assertIn("versao_estoque: $versao + 1", content)
-        self.assertIn('$input.tipo != "SAIDA_OS" || $produto.ativo != false', content)
+        # Both exits (OS and counter sale, Change 11) require an active product.
+        self.assertIn(
+            '($input.tipo != "SAIDA_OS" && $input.tipo != "SAIDA_VENDA") || $produto.ativo != false',
+            content,
+        )
 
     def test_ledger_serializes_movements_per_product(self):
         content = self.read("xano/table/movimentacoes_estoque.xs")
-        self.assertIn('values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS"]', content)
+        self.assertIn('values = ["ENTRADA", "SAIDA_OS", "ESTORNO_OS", "SAIDA_VENDA"]', content)
         self.assertIn("int saldo_posterior filters=min:0", content)
         self.assertRegex(
             content,

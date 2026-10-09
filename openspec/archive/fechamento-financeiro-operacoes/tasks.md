@@ -171,7 +171,7 @@ Ordem de execução: 0 → 1 → 2 → 3 → 4 → 5. Cada bloco termina com a s
 - [x] `docs/xano-api-client.md`: `resumo_financeiro`, DTOs, matriz, checklist de deploy da Change 10 e testes.
 - [x] `docs/project-structure.md`: novos módulos.
 - [x] Deltas escritos em `specs/` desta change (`financeiro.md` nova, `oficina-ordens-servico.md` e `arquitetura-e-contratos.md`).
-- [ ] Aplicar os deltas em `openspec/specs/` no arquivamento.
+- [x] Aplicar os deltas em `openspec/specs/` no arquivamento (aplicados em 2026-10-09, como P0 da Change 11).
 - [ ] Arquivar a change em `openspec/archive/` depois do push e da integração.
 
 ## Fora do repositório (usuário)

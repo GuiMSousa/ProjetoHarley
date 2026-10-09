@@ -3,6 +3,8 @@
 import reflex as rx
 
 from Projeto_HarleyStore.auth import AuthState
+from Projeto_HarleyStore.balcao_pages import balcao_page
+from Projeto_HarleyStore.balcao_state import BALCAO_ROUTE, BalcaoState
 from Projeto_HarleyStore.cadastros_pages import cadastro_page
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_pages import catalogo_page
@@ -98,6 +100,12 @@ app.add_page(
     route=VENDAS_ROUTE,
     title="Vendas de motos | Harley Store",
     on_load=[AuthState.restore_session, VendasState.load_vendas],
+)
+app.add_page(
+    balcao_page,
+    route=BALCAO_ROUTE,
+    title="Venda no balcão | Harley Store",
+    on_load=[AuthState.restore_session, BalcaoState.load_balcao],
 )
 app.add_page(
     financeiro_page,
