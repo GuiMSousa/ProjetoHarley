@@ -9,8 +9,9 @@ Transações DEVEM nascer somente das operações de negócio, com `valor_total 
 | `MOTO` | `POST vender_moto` (`Vendas/vender_moto`) | Valor da venda, cliente comprador e moto do cliente criada na mesma transação (spec `catalogo-vendas-motos`). |
 | `ORDEM_SERVICO` | Conclusão da OS (`POST ordens_servico/{id}/status`) | Requisito "lançamento da OS na conclusão". |
 | `ORDEM_SERVICO` | `Financeiro/lancar_os_concluidas_legadas` | Requisito "lançamento retroativo". |
+| `BALCAO` | `POST balcao/vendas` (Change 11) | Total dos itens com preço fotografado, cliente opcional (consumidor final) e itens em `itens_transacao` (spec `vendas-balcao`). |
 
-`PECAS`, `BALCAO` e `COMPRA` existem no domínio, mas nenhuma operação os grava. A entrada de mercadoria NÃO DEVE gerar transação `COMPRA`.
+`PECAS` e `COMPRA` existem no domínio, mas nenhuma operação os grava. A entrada de mercadoria NÃO DEVE gerar transação `COMPRA`.
 
 ## Requisito: transações imutáveis
 
@@ -125,7 +126,7 @@ A rota `/financeiro` DEVE ser exclusiva do `GERENTE` e aparecer na navegação e
 - **Período:** datas e atalhos "Este mês", "Mês anterior" e "Últimos 30 dias". O Reflex DEVE validar ordem e limite de 366 dias antes da chamada e enviar os limites do dia em UTC−3 fixo (00:00:00.000 do primeiro dia e 23:59:59.999 do último).
 - **Cartões:** receitas, despesas e saldo; o saldo negativo DEVE ser destacado.
 - **Totais por tipo.**
-- **Operações:** filtro por tipo e busca locais, sem nova chamada ao Xano.
+- **Operações:** filtro por tipo e busca locais, sem nova chamada ao Xano. Vendas no balcão aparecem como "Venda no balcão #N" e, sem cliente, com a contraparte "Consumidor final".
 - **Aviso de lista truncada:** "Mostrando as N operações mais recentes de M; os totais cobrem o período inteiro."
 
 Erros, `429` e sessão expirada DEVEM ser tratados como nas demais telas.
@@ -135,6 +136,7 @@ Erros, `429` e sessão expirada DEVEM ser tratados como nas demais telas.
 | Operação | GERENTE | VENDEDOR | MECANICO |
 | --- | --- | --- | --- |
 | Concluir OS (gera lançamento) | sim | não | sim |
+| Vender no balcão (gera lançamento `BALCAO`) | sim | sim | não |
 | Consultar transações (`GET transacoes`, `GET transacoes/{id}`) | sim | não | não |
 | Criar, editar ou excluir transação manualmente | não | não | não |
 | Visão consolidada (`/financeiro`, `GET financeiro/resumo`) | sim | não | não |

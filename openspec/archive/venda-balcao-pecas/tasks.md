@@ -125,10 +125,10 @@ Validar trechos mínimos antes de escrever os arquivos:
 
 ### 1.7 Publicação (usuário)
 
-- [ ] `--dry-run` final revisado com o usuário: só objetos da Change 11 e nenhuma exclusão.
-- [ ] Segundo OK do usuário e push feito por ele: `xano workspace push -d ./xano`, com `--sync` (sem `--delete`) somente se 1.4 indicar.
-- [ ] Atualizar nos arquivos novos os `guid` atribuídos pelo push, como na Change 10.
-- [ ] Depois do push, `xano workspace pull` numa pasta temporária e conferir que `movimentacoes_estoque.tipo` tem `SAIDA_VENDA` e que `id_transacao` existe. Se o enum não tiver sido aplicado, publicar com `--sync`, sem `--delete`.
+- [x] `--dry-run` final revisado com o usuário: só objetos da Change 11 e nenhuma exclusão.
+- [x] Segundo OK do usuário e push feito por ele: `xano workspace push -d ./xano`, com `--sync` (sem `--delete`) somente se 1.4 indicar. Publicado pelo usuário (commit `c29bfa5`).
+- [x] Atualizar nos arquivos novos os `guid` atribuídos pelo push, como na Change 10.
+- [x] Depois do push, `xano workspace pull` numa pasta temporária e conferir que `movimentacoes_estoque.tipo` tem `SAIDA_VENDA` e que `id_transacao` existe. Se o enum não tiver sido aplicado, publicar com `--sync`, sem `--delete`. Confirmado em 2026-10-11: `SAIDA_VENDA` e `id_transacao` no remoto; sem `--sync`.
 
 ## 2. Frontend Reflex
 
@@ -271,36 +271,36 @@ Opt-in como os demais cenários; sem credenciais, os testes são ignorados com o
 - [x] `python -m py_compile` em todos os módulos.
 - [x] `reflex compile --dry`.
 - [x] Validador XanoScript em todos os `.xs` novos e alterados, e `--dry-run` repetido depois dos ajustes.
-- [ ] Verificação visual de `/balcao` em desktop e em 500 px: busca, carrinho, confirmação, recibo e erros. Usar dados de demonstração e remover ao final qualquer rota temporária.
-- [ ] Navegação: `VENDEDOR` e `GERENTE` veem "Venda no balcão"; `MECANICO` não.
+- [ ] Verificação visual de `/balcao` em desktop e em 500 px: busca, carrinho, confirmação, recibo e erros. Usar dados de demonstração e remover ao final qualquer rota temporária. Parcial em 2026-10-11: app em produção capturado a 500 e 1440 px nas rotas públicas e em `/balcao` sem sessão (mostra o login). A tela autenticada não foi renderizada, porque não há credenciais de teste no navegador.
+- [x] Navegação: `VENDEDOR` e `GERENTE` veem "Venda no balcão"; `MECANICO` não. Coberto por `tests/test_authentication.py` (`allowed_routes`).
 
 ### 4.2 Documentação
 
-- [ ] `docs/domain-model.md`:
+- [x] `docs/domain-model.md`:
   - seção nova *Itens_Transacao*;
   - *Transacoes*: origem `BALCAO` e itens; remover "transações não possuem linhas de itens";
   - *Movimentacoes_Estoque*: `SAIDA_VENDA` e `id_transacao`.
-- [ ] `docs/xano-api-client.md`: `vender_balcao`, DTOs, matriz de acesso, checklist de deploy da Change 11 (com o resultado de D10) e testes.
-- [ ] `docs/project-structure.md`: `balcao_state.py`, `balcao_pages.py`, `services/balcao.py` e os helpers de produto em `listing.py`.
+- [x] `docs/xano-api-client.md`: `vender_balcao`, DTOs, matriz de acesso, checklist de deploy da Change 11 (com o resultado de D10) e testes.
+- [x] `docs/project-structure.md`: `balcao_state.py`, `balcao_pages.py`, `services/balcao.py` e os helpers de produto em `listing.py`.
 
 ### 4.3 Deltas de spec (`specs/` desta change)
 
-- [ ] `vendas-balcao.md` (nova): requisitos e cenários da proposta (venda com e sem cliente, saldo, preço, repetição, concorrência, limites e acesso).
-- [ ] `estoque-entradas.md`: saída `SAIDA_VENDA` e origem `id_transacao` no livro.
-- [ ] `financeiro.md`: `BALCAO` como origem de transação (venda no balcão) e descrição no `/financeiro`.
-- [ ] `arquitetura-e-contratos.md`: rota `/balcao`, matriz e itens de transação sem rotas genéricas.
+- [x] `vendas-balcao.md` (nova): requisitos e cenários da proposta (venda com e sem cliente, saldo, preço, repetição, concorrência, limites e acesso). Aplicados diretamente em `openspec/specs/` no arquivamento (2026-10-11), sem cópia em `specs/` desta pasta.
+- [x] `estoque-entradas.md`: saída `SAIDA_VENDA` e origem `id_transacao` no livro.
+- [x] `financeiro.md`: `BALCAO` como origem de transação (venda no balcão) e descrição no `/financeiro`.
+- [x] `arquitetura-e-contratos.md`: rota `/balcao`, matriz e itens de transação sem rotas genéricas.
 
 ## 5. Arquivamento
 
-- [ ] Conferir que a implementação corresponde exatamente às specs e ao design (`openspec/config.yaml`, `archive`).
-- [ ] Aplicar os deltas de 4.3 em `openspec/specs/` **no mesmo passo** do arquivamento, para não repetir a pendência da Change 10.
-- [ ] Atualizar a "Situação" do design e o "Status" da proposta.
-- [ ] Mover `openspec/changes/venda-balcao-pecas/` para `openspec/archive/venda-balcao-pecas/`, depois do push e da integração.
+- [x] Conferir que a implementação corresponde exatamente às specs e ao design (`openspec/config.yaml`, `archive`). Auditoria de 2026-10-11.
+- [x] Aplicar os deltas de 4.3 em `openspec/specs/` **no mesmo passo** do arquivamento, para não repetir a pendência da Change 10.
+- [x] Atualizar a "Situação" do design e o "Status" da proposta.
+- [x] Mover `openspec/changes/venda-balcao-pecas/` para `openspec/archive/venda-balcao-pecas/`, depois do push e da integração. Movida pelo usuário.
 - [ ] Commit feito pelo usuário.
 
 ## Fora do repositório (usuário)
 
-- [ ] `xano auth`, se o token do CLI tiver expirado.
-- [ ] Revisar o `--dry-run` e publicar (bloco 1.7).
+- [x] `xano auth`, se o token do CLI tiver expirado.
+- [x] Revisar o `--dry-run` e publicar (bloco 1.7).
 - [ ] Rodar a integração com `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true`.
 - [ ] Fazer uma venda real no `/balcao` e conferi-la no `/financeiro`.

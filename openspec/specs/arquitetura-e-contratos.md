@@ -136,6 +136,17 @@ Todo endpoint com `auth = "user"` DEVE chamar `Quick Start/enforce_role`, que ex
 - **QUANDO** enviar `PATCH transacoes/{id}` com outro `valor_total`
 - **ENTÃO** a resposta DEVE ser `403` "Transações são imutáveis." e a transação NÃO DEVE mudar
 
+## Requisito: itens de transação imutáveis
+
+`itens_transacao` (Change 11) DEVE ser gravada somente por `POST balcao/vendas`, na mesma transação da transação `BALCAO`; NÃO DEVEM existir rotas genéricas de leitura ou escrita para a tabela. O preço do item DEVE ser a fotografia de `produtos.preco_venda` lida pelo Xano, nunca do payload. A rota `/balcao` e o `POST balcao/vendas` DEVEM aceitar somente `GERENTE` e `VENDEDOR` (spec `vendas-balcao`).
+
+### Cenário: mecânico tenta vender no balcão
+
+- **DADO** um `MECANICO` autenticado
+- **QUANDO** enviar `POST balcao/vendas`
+- **ENTÃO** a resposta DEVE ser `403` e nada DEVE ser gravado
+- **E** `/balcao` NÃO DEVE aparecer na navegação dele
+
 ## Requisito: auditoria sem segredos
 
 Registros de `event_log` NÃO DEVEM conter senha, hash ou token; `metadata` DEVE ser composto por campos explícitos, nunca pelo registro `user` completo.

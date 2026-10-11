@@ -40,6 +40,19 @@ Regras importantes:
 3. Conferir que não há produtos antigos com `codigo` vazio repetido; o índice único de `produtos.codigo` falharia na criação.
 4. Rodar a suíte de integração (seção "Testes de integração").
 
+### Checklist de deploy da Change 11 (venda de balcão)
+
+1. Revisar o `--dry-run`. Esperado, sem exclusões e sem `--sync`:
+   - `itens_transacao` criada;
+   - `movimentacoes_estoque` com `ADD_FIELD` (`id_transacao`) e `UPDATE_FIELD` (enum `tipo` com `SAIDA_VENDA`);
+   - `Balcao/detalhe_venda` criada; `Estoque/movimentar_estoque` atualizada;
+   - `balcao/vendas POST` criado.
+2. Publicar com `xano workspace push -d ./xano` (publicado em 2026-10-11).
+3. Conferir com um `pull` que o enum do livro tem `SAIDA_VENDA` (confirmado em 2026-10-11).
+4. Rodar a integração: `XANO_TEST_LIVE=true` (mecânico barrado e carrinhos inválidos), `XANO_TEST_ALLOW_WRITES=true` (consumidor final, cliente com repetição da chave, saldo insuficiente e preço alterado) e `XANO_TEST_CONCURRENCY=true` (duas vendas pelo saldo inteiro).
+
+O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz. Nenhum push parcial alinha isso, e a diferença é só cosmética.
+
 ### Checklist de deploy da Change 10 (fechamento financeiro)
 
 1. Revisar `xano workspace push -d ./xano --dry-run`. Esperado, sem exclusões e sem `--sync`:
@@ -262,6 +275,22 @@ Os DTOs ficam em `Projeto_HarleyStore.services.financeiro`:
 - **Retroativo:** a função `Financeiro/lancar_os_concluidas_legadas` (Run & Debug, nunca chamada por endpoint) lança as OS concluídas antes da Change 10.
 - **Tela `/financeiro`:** período com atalhos, cartões de receitas, despesas e saldo, totais por tipo e lista de operações com filtro por tipo e busca locais (sem nova chamada ao Xano).
 
+## Venda no balcão (Change 11)
+
+Os DTOs ficam em `Projeto_HarleyStore.services.balcao`:
+
+- `VendaBalcaoCreate` — `chave_venda` (UUID do carrinho), `id_cliente` opcional, `total_esperado` (2 casas) e de 1 a 30 `itens` (`ItemVendaBalcaoCreate`: `id_produto` sem repetição e `quantidade`). Preço, total por item e vendedor nunca vão no payload;
+- `VendaBalcaoDetalhe` — recibo: `id_transacao`, `data_transacao`, `valor_total`, cliente e vendedor (com nomes) e `itens` (`ItemVendaBalcao`, com código, nome e preço fotografado).
+
+| Método | Endpoint | Perfil |
+| --- | --- | --- |
+| `vender_balcao(venda)` | `POST balcao/vendas` | `GERENTE`, `VENDEDOR` |
+
+- **Atomicidade:** transação `BALCAO`, itens em `itens_transacao` e uma saída `SAIDA_VENDA` por item, numa única `db.transaction`, em ordem crescente de produto.
+- **Validações (`400`, sem gravar):** carrinho vazio ou com mais de 30 itens, produto repetido ou inativo, cliente inativo, saldo insuficiente e total diferente do recalculado ("Os preços mudaram…"). Uma corrida dentro da transação responde a mensagem de conflito.
+- **Idempotência:** a mesma `chave_venda` devolve a venda já registrada. O Reflex mantém a chave nas novas tentativas (timeout, resposta perdida) e só a renova após uma venda concluída ou ao limpar o carrinho.
+- **Tela `/balcao`:** filtro por categoria e busca local, carrinho, cliente opcional ("Consumidor final"), confirmação com o botão travado durante o envio e recibo.
+
 ## Erros
 
 | Status HTTP | Exceção | Mensagem da exceção | Mensagem exibida (`feedback.error_feedback`) | Efeito no Reflex |
@@ -312,6 +341,7 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Lançar, corrigir ou excluir transação manualmente (`POST`/`PUT`/`PATCH`/`DELETE transacoes`) | não | não | não |
 | Visão consolidada (`/financeiro`, `GET financeiro/resumo`) | sim | não | não |
 | Concluir OS (gera a receita `ORDEM_SERVICO`) | sim | não | sim |
+| Vender no balcão (`/balcao`, `POST balcao/vendas`; gera a receita `BALCAO`) | sim | sim | não |
 
 No Reflex, `ROUTE_ROLES` em `Projeto_HarleyStore/auth.py` espelha essa matriz por rota e alimenta o guard `guarded_page` e os links da sidebar. As rotas protegidas restauram a sessão no `on_load` antes de carregar dados.
 
@@ -335,6 +365,7 @@ XANO_TEST_ALLOW_WRITES=true python -m pytest -m integration  # integração comp
 - `XANO_TEST_CONCURRENCY=true` (junto com as escritas) roda as corridas: duas OS disputando todo o saldo de um produto e uma inclusão simultânea ao cancelamento. Exige duas motos de cliente sem OS em aberto.
 - A leitura pública do catálogo roda sem credenciais (com a integração ativada) e é ignorada, com aviso, enquanto a Change 8 não estiver publicada. O ciclo de reserva (`ALLOW_WRITES`) cria um modelo e uma unidade próprios e retira o modelo do catálogo ao final; a corrida de duas reservas da mesma unidade exige `XANO_TEST_CONCURRENCY`.
 - O financeiro (Change 10) tem testes sem escrita (`VENDEDOR` e `MECANICO` recebem `403` no resumo e em `GET transacoes`; escrita manual `403` até para o `GERENTE`; período inválido `400`), o ciclo com escrita (conclusão gera um único lançamento visível no resumo; OS vazia e cancelada não geram) e a corrida de duas conclusões (`XANO_TEST_CONCURRENCY`).
+- O balcão (Change 11) tem testes sem escrita (`MECANICO` recebe `403`; carrinho vazio, com produto repetido ou com mais de 30 itens recebe `400`), com escrita (consumidor final baixa o estoque e aparece no resumo; a mesma `chave_venda` devolve a mesma venda com uma única baixa; saldo insuficiente e preço alterado não gravam nada) e a disputa de duas vendas pelo saldo inteiro (`XANO_TEST_CONCURRENCY`).
 - A venda (Change 9) tem um teste sem escrita (`MECANICO` recebe `403`, unidade inexistente `404`), o ciclo com escrita (venda sem placa, venda repetida, unidade reservada para outro cliente, segunda moto sem placa) e a corrida de duas vendas da mesma unidade (`XANO_TEST_CONCURRENCY`). Vendas são finais: unidades vendidas, motos de clientes e transações de teste ficam no banco.
 - O workspace do Xano limita a taxa de requisições (`429` após cerca de 6 chamadas seguidas): a suíte completa com credenciais pode falhar de forma intermitente por isso.
 - Os testes de cada Change exigem o respectivo push; antes dele, os endpoints novos respondem `404`.

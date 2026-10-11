@@ -251,6 +251,7 @@ def peca_fields() -> rx.Component:
             rx.input(
                 rx.input.slot(rx.icon("search", size=16)),
                 placeholder="Buscar peça por código ou nome…",
+                aria_label="Buscar peça por código ou nome",
                 value=WorkshopState.produto_busca,
                 on_change=WorkshopState.set_produto_busca,
                 width="100%",

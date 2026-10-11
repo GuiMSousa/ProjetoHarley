@@ -172,4 +172,4 @@ Detalhadas em `design.md` §3.
 
 ## Status
 
-Propose concluída em 2026-10-09: decisões aprovadas e `tasks.md` criado. O Apply ainda não começou. Os deltas em `specs/` são escritos no Bloco 4 do `tasks.md` e aplicados no Bloco 5.
+Arquivada em 2026-10-11: implementada, publicada e com as specs aplicadas (`vendas-balcao.md` nova; deltas em `financeiro.md`, `estoque-entradas.md` e `arquitetura-e-contratos.md`).

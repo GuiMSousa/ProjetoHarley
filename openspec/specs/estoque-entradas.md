@@ -65,7 +65,13 @@ Entradas e itens registrados NÃO DEVEM ser alterados ou removidos. `PUT`, `PATC
 
 ## Requisito: livro de movimentações
 
-Toda alteração de saldo DEVE gravar uma linha em `movimentacoes_estoque` com tipo (`ENTRADA`, `SAIDA_OS`, `ESTORNO_OS`), quantidade positiva, saldo anterior e posterior, funcionário autenticado e origem (entrada, OS e item), na mesma transação da operação de origem. `saldo_posterior` NÃO PODE ser negativo.
+Toda alteração de saldo DEVE gravar uma linha em `movimentacoes_estoque` com tipo (`ENTRADA`, `SAIDA_OS`, `ESTORNO_OS`, `SAIDA_VENDA`), quantidade positiva, saldo anterior e posterior, funcionário autenticado e origem (entrada, OS e item, ou a transação `BALCAO` em `id_transacao`), na mesma transação da operação de origem. `saldo_posterior` NÃO PODE ser negativo. As saídas (`SAIDA_OS` e `SAIDA_VENDA`, Change 11) DEVEM exigir produto ativo; a devolução (`ESTORNO_OS`) a produto desativado continua permitida.
+
+### Cenário: venda no balcão registrada no livro
+
+- **DADO** o produto P1 com estoque 5
+- **QUANDO** uma venda no balcão de P1 × 2 for fechada
+- **ENTÃO** DEVE existir uma movimentação `SAIDA_VENDA` de 2 com saldo anterior 5, posterior 3 e o `id_transacao` da venda
 
 ### Cenário: entrada registrada no livro
 

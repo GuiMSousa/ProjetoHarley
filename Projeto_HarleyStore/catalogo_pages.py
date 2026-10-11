@@ -231,6 +231,7 @@ def catalogo_page() -> rx.Component:
                     rx.input(
                         rx.input.slot(rx.icon("search", size=16)),
                         placeholder="Buscar modelo…",
+                        aria_label="Buscar modelo",
                         value=CatalogoState.busca,
                         on_change=CatalogoState.set_busca,
                         width=rx.breakpoints(initial="100%", md="18rem"),

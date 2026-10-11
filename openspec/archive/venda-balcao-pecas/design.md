@@ -1,6 +1,6 @@
 # Design: venda de balcão de peças (Change 11)
 
-> **Situação:** Propose concluída em 2026-10-09. P0 aplicada e decisões D1 a D10 aprovadas como recomendadas. Apply em andamento: os Blocos 0 a 3 do `tasks.md` foram concluídos em 2026-10-09. Faltam o push (1.7, usuário), a verificação visual, a documentação e os deltas de spec (Bloco 4) e o arquivamento.
+> **Situação:** arquivada em 2026-10-11. Decisões D1 a D10 aprovadas e implementadas; publicada no Xano (commit `c29bfa5`, enum `SAIDA_VENDA` confirmado no remoto); specs e docs atualizados. Pendentes do usuário: integração real com credenciais e verificação visual autenticada.
 
 ## 1. Origem do escopo
 

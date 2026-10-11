@@ -85,7 +85,7 @@ Representa a nota/registro de compra efetuada junto a um fornecedor para abastec
 
 ### Movimentacoes_Estoque
 Livro de movimentações de estoque (kardex), somente inserção.
-- **Atributos:** Identificador (`id`), Produto (`id_produto`), Tipo (`tipo`: `ENTRADA`, `SAIDA_OS` ou `ESTORNO_OS`), Quantidade (`quantidade`, sempre positiva), Saldo Anterior (`saldo_anterior`), Saldo Posterior (`saldo_posterior`), Versão Anterior (`versao_anterior`), Funcionário (`id_funcionario`), Origem (`id_entrada`, `id_os`, `id_item_os`), Data (`created_at`).
+- **Atributos:** Identificador (`id`), Produto (`id_produto`), Tipo (`tipo`: `ENTRADA`, `SAIDA_OS`, `ESTORNO_OS` ou `SAIDA_VENDA`), Quantidade (`quantidade`, sempre positiva), Saldo Anterior (`saldo_anterior`), Saldo Posterior (`saldo_posterior`), Versão Anterior (`versao_anterior`), Funcionário (`id_funcionario`), Origem (`id_entrada`, `id_os`, `id_item_os` ou `id_transacao` da venda no balcão, Change 11), Data (`created_at`). As saídas (`SAIDA_OS`, `SAIDA_VENDA`) exigem produto ativo.
 - **Regras:** toda alteração de saldo depois da criação do produto gera exatamente uma linha, gravada pela função `Estoque/movimentar_estoque` dentro da transação da operação de origem. `saldo_posterior >= 0`: uma saída acima do saldo é rejeitada ("Saldo insuficiente…").
 - **Concorrência:** a função lê saldo e `produtos.versao_estoque` na mesma leitura, grava o livro com `versao_anterior` e o produto com a versão seguinte. O índice único `(id_produto, versao_anterior)` impede que duas movimentações concorrentes partam da mesma versão.
 - **Invariante:** para produtos movimentados a partir da Change 7, `estoque_qtd` é igual ao `saldo_posterior` da última movimentação.
@@ -116,12 +116,18 @@ Registra o fluxo financeiro de vendas e movimentações comerciais do estabeleci
 - **Atributos:** Identificador (`id_transacao`), Tipo da Transação (`tipo_transacao`), Funcionário (`id_funcionario`), Cliente (`id_cliente`), Moto do Cliente (`id_moto_cliente`), OS faturada (`id_os`, Change 10), Data (`data_transacao`), Valor Total (`valor_total`).
 - **Regras:** O tipo de transação deve ser restrito aos valores: `MOTO`, `PECAS`, `BALCAO`, `COMPRA`, `ORDEM_SERVICO`.
 - **Regras financeiras:** `valor_total` deve ser estritamente positivo (`> 0`).
-- **Origem e imutabilidade (Change 10):** transações nascem somente das operações de negócio: a venda de moto (`MOTO`), a conclusão de OS (`ORDEM_SERVICO`) e o lançamento retroativo das OS concluídas antes da Change 10. `POST`, `PUT`, `PATCH` e `DELETE` manuais respondem `403` para qualquer perfil; correções serão feitas por estorno numa Change futura.
+- **Origem e imutabilidade (Change 10):** transações nascem somente das operações de negócio: a venda de moto (`MOTO`), a conclusão de OS (`ORDEM_SERVICO`), o lançamento retroativo das OS concluídas antes da Change 10 e a venda no balcão (`BALCAO`, Change 11). `PECAS` e `COMPRA` não têm uso automático. `POST`, `PUT`, `PATCH` e `DELETE` manuais respondem `403` para qualquer perfil; correções serão feitas por estorno numa Change futura.
 - **Autoria:** `id_funcionario` é sempre o usuário autenticado (`$auth.id → user.id_funcionario`): o vendedor na venda e quem concluiu a OS no faturamento.
-- **Acesso:** dados financeiros são do `GERENTE`: somente ele consulta transações e a visão consolidada.
+- **Acesso:** dados financeiros são do `GERENTE`: somente ele consulta transações e a visão consolidada. `GERENTE` e `VENDEDOR` vendem no balcão.
 - **Venda de moto:** a venda (`Vendas/vender_moto`) grava a transação `MOTO` com `valor_total` = valor da venda, o cliente comprador e a moto do cliente criada na mesma transação.
 - **Faturamento da OS (Change 10):** concluir uma OS grava, na mesma transação, a receita `ORDEM_SERVICO` com o total recalculado dos itens, o `id_os`, o cliente e a moto da OS. OS com total zero (garantia, cortesia) conclui sem lançamento. Como a OS sai de `EM_ANDAMENTO` uma única vez, há no máximo um lançamento por OS (`id_os` tem índice simples, não único).
-- **Situação atual:** transações não possuem linhas de itens; a venda no balcão (`BALCAO`/`PECAS`) com baixa de estoque depende de uma decisão de modelagem e fica para a Change 11.
+- **Venda no balcão (Change 11):** `POST balcao/vendas` grava, na mesma transação, a transação `BALCAO` (cliente opcional; sem ele, consumidor final), os itens em `itens_transacao` e uma saída `SAIDA_VENDA` por item. O preço é a fotografia de `produtos.preco_venda`; o Xano recusa a venda se o total recalculado diferir do total exibido ao vendedor (`total_esperado`). De 1 a 30 itens, cada produto uma vez.
+
+### Itens_Transacao
+Itens de uma transação comercial (Change 11); hoje só a venda no balcão.
+- **Atributos:** Identificador (`id`), Transação (`id_transacao`), Produto (`id_produto`), Quantidade (`quantidade`), Valor Unitário (`valor_unitario`, fotografia do preço), Valor Total do Item (`valor_total_item`), Chave da Venda (`chave_venda`, UUID do carrinho), Data (`created_at`).
+- **Regras:** `quantidade` e valores positivos; imutáveis e sem rotas genéricas (nascem só em `POST balcao/vendas`).
+- **Idempotência:** o índice único `(chave_venda, id_produto)` garante um produto por venda e uma venda por carrinho; repetir a chave devolve a venda já registrada, sem nova baixa nem receita.
 
 ---
 
