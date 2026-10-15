@@ -2,7 +2,7 @@
 
 ## Requisito: tokens centralizados
 
-Toda cor usada pela aplicação DEVE estar em `Projeto_HarleyStore/styles/theme.py` ou em `assets/harley.css`; nenhum outro módulo DEVE conter literais `#RRGGBB` ou `rgba(`. A paleta base DEVE ser preto asfalto `#000000`, preto fosco `#121212`, cinza industrial `#1A1A1A`, laranja Harley `#FF6600`, branco `#FFFFFF` e cinza metálico `#A0A0A0`.
+Toda cor usada pela aplicação DEVE estar em `Projeto_HarleyStore/styles/theme.py` ou em `assets/harley.css`; nenhum outro módulo DEVE conter literais `#RRGGBB` ou `rgba(`. A paleta base (Change 12, Dark Industrial Premium) DEVE ser obsidiana `#0D0D0D` (fundo), preto fosco `#121212` (barras e molduras), cinza industrial `#161616` com borda `#262626` (cartões e painéis), laranja Harley `#FF6600`, branco `#FFFFFF` e cinza metálico `#A0A0A0`.
 
 ## Requisito: contraste
 
@@ -14,13 +14,48 @@ Títulos (`rx.heading`) DEVEM aparecer em caixa alta com a fonte Oswald e o corp
 
 ## Requisito: componentes compartilhados
 
-Páginas DEVEM usar os componentes de `ui_helpers.py` (`page_header`, `card`, `primary_button`, `metal_button`, `danger_button`, `data_table`, `toolbar`, `pager`, `empty_state`, `stat_tile`, `swatch`, `status_badge`, `labeled`, `error_callout`) e o shell de `components.py` (`app_shell`, `public_shell`, `modal_panel`, `page_body`). Um único `status_badge` DEVE cobrir os status de OS, de motos e de cadastros.
+Páginas DEVEM usar os componentes de `ui_helpers.py` (`page_header`, `card`, `primary_button`, `metal_button`, `danger_button`, `data_table`, `toolbar`, `pager`, `empty_state`, `stat_tile`, `swatch`, `status_badge`, `labeled`, `error_callout`) e o shell de `components.py` (`app_shell`, `public_shell`, `modal_panel`, `page_body`). Um único `status_badge` DEVE cobrir os status de OS, de motos e de cadastros. O selo DEVE ser fosco: fundo escuro, texto e borda finos na cor do status (motos: `DISPONIVEL` esmeralda `#34D399`, `RESERVADA` âmbar `#FBBF24`, `VENDIDA` grafite `#A3A3A3`); status desconhecidos (ex.: "Sob consulta" na vitrine) usam o grafite do fallback.
 
 ### Cenário: badge de status
 
 - **DADO** uma OS `EM_ANDAMENTO` e uma moto `RESERVADA`
 - **QUANDO** forem exibidas em qualquer tela
 - **ENTÃO** ambas DEVEM usar o mesmo componente, com as cores fixas do mapa `STATUS_COLORS`
+
+## Requisito: brilho no hover
+
+O botão primário e os cartões interativos (atalhos da visão geral e cartões da vitrine) DEVEM ganhar, no hover, a borda laranja e a sombra `0 0 15px rgba(255, 102, 0, 0.25)` (`SHADOWS["glow"]`, `CARD_HOVER`).
+
+## Requisito: fotos das motos
+
+As fotos locais DEVEM ficar numa pasta por modelo: `assets/motos/<slug>/1.<slug>.jpg` a `4.<slug>.jpg` e a arte padrão `assets/motos/<slug>/default_<slug com _>.png` (slug sem acentos, ex.: `pan-america`). Em `ui_helpers.py`:
+
+- `get_foto_moto(moto, imagem_url=None)` DEVE devolver a imagem do Xano (ou a da cor), se não for vazia nem placeholder; senão a primeira foto local; senão a arte padrão. Um modelo sem nenhuma arte local DEVE manter o placeholder remoto, em vez de uma imagem quebrada.
+- `get_lista_fotos_moto(moto, imagem_url=None)` (Change 13) DEVE devolver a `galeria` do Xano, só com URLs reais; senão as fotos locais existentes, em ordem; senão a foto única de `get_foto_moto`. Uma foto de cor real ausente da galeria DEVE abrir a lista.
+
+### Cenário: placeholder no Xano
+
+- **DADO** o modelo "Fat Boy" com `imagem_principal` em `placehold.co` e quatro fotos locais
+- **QUANDO** a vitrine for exibida
+- **ENTÃO** o cartão DEVE mostrar `/motos/fat-boy/1.fat-boy.jpg` e o detalhe DEVE oferecer as quatro fotos
+
+## Requisito: visão geral executiva
+
+A rota `/` DEVE mostrar cartões de indicadores filtrados pelo perfil, carregados com `yield` antes do Xano: Faturamento do mês e Vendas de balcão só para `GERENTE`; Motos em estoque (disponíveis e reservadas) para `GERENTE` e `VENDEDOR`; OS ativas (abertas e em andamento) para todos. Abaixo, os atalhos das áreas que o perfil pode abrir.
+
+## Requisito: detalhes em duas colunas com carrossel
+
+O modal de detalhe da vitrine e o de detalhe da unidade em `/vendas` DEVEM ter duas colunas a partir de 768 px (abaixo disso, empilhadas): à esquerda, o carrossel de fotos em moldura escura com sombra; à direita, a ficha e as ações. O modal da vitrine NÃO DEVE mostrar chassi. O carrossel (`carrossel_fotos`, Change 13) DEVE:
+
+- mostrar a foto de `foto_index`, que volta a 0 ao abrir um detalhe e ao escolher uma cor (a foto da cor passa a ser a primeira);
+- ter setas `chevron-left` e `chevron-right` sobre a foto, com `aria-label`, quando houver mais de uma foto; a navegação DEVE dar a volta nas pontas;
+- ter miniaturas clicáveis abaixo, a ativa com borda `2px solid #FF6600`, opacidade 100% e `aria-current="true"`.
+
+### Cenário: navegar pelas fotos
+
+- **DADO** o detalhe de um modelo com quatro fotos, na primeira
+- **QUANDO** o visitante clicar na seta da esquerda
+- **ENTÃO** DEVE ver a quarta foto, com a quarta miniatura destacada
 
 ## Requisito: responsividade
 

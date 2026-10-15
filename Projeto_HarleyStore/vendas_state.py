@@ -49,7 +49,12 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoPermissionError,
     XanoValidationError,
 )
-from Projeto_HarleyStore.ui_helpers import get_foto_moto, operation_is_blocked
+from Projeto_HarleyStore.ui_helpers import (
+    get_foto_moto,
+    get_lista_fotos_moto,
+    indice_carrossel,
+    operation_is_blocked,
+)
 
 
 VENDAS_ROUTE = "/vendas"
@@ -132,9 +137,13 @@ def _cor_hex(moto: MotoEstoque) -> str:
     return next((cor.hex for cor in moto.variacoes_cor if cor.nome == moto.cor), "")
 
 
+def _imagem_cor(moto: MotoEstoque) -> str | None:
+    return next((cor.imagem_url for cor in moto.variacoes_cor if cor.nome == moto.cor), None)
+
+
 def _foto(moto: MotoEstoque) -> str:
     """Photo of the unit's color when the model has one, else the model photo (Change 12)."""
-    return get_foto_moto(moto, next((cor.imagem_url for cor in moto.variacoes_cor if cor.nome == moto.cor), None))
+    return get_foto_moto(moto, _imagem_cor(moto))
 
 
 def moto_row(moto: MotoEstoque, role: str, employee_id: int, agora: datetime) -> dict[str, str]:
@@ -351,6 +360,8 @@ class VendasState(AuthState):
     detail_open: bool = False
     detalhe: dict[str, str] = {}
     detalhe_historico: list[dict[str, str]] = []
+    detalhe_fotos: list[str] = []
+    foto_index: int = 0
     is_loading_detail: bool = False
 
     reserva_moto_id: str = ""
@@ -511,6 +522,26 @@ class VendasState(AuthState):
     def _apply_detail(self, detalhe: MotoEstoqueDetalhe) -> None:
         self.detalhe = moto_row(detalhe, self.employee_role, self.employee_id, agora_utc())
         self.detalhe_historico = [historico_moto_row(evento) for evento in detalhe.historico]
+        self.detalhe_fotos = get_lista_fotos_moto(detalhe, _imagem_cor(detalhe))
+        self.foto_index = 0
+
+    @rx.var
+    def foto_atual(self) -> str:
+        fotos = self.detalhe_fotos
+        return fotos[self.foto_index] if 0 <= self.foto_index < len(fotos) else (fotos[0] if fotos else "")
+
+    @rx.event
+    def proxima_foto(self) -> None:
+        self.foto_index = indice_carrossel(self.foto_index, 1, len(self.detalhe_fotos))
+
+    @rx.event
+    def foto_anterior(self) -> None:
+        self.foto_index = indice_carrossel(self.foto_index, -1, len(self.detalhe_fotos))
+
+    @rx.event
+    def selecionar_foto(self, index: int) -> None:
+        if 0 <= index < len(self.detalhe_fotos):
+            self.foto_index = index
 
     @rx.event
     def open_detail(self, moto_id: str):

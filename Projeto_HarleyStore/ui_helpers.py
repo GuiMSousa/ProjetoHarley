@@ -22,9 +22,11 @@ from Projeto_HarleyStore.styles.theme import (
 )
 
 
-# ----- motorcycle media (Change 12) -----
+# ----- motorcycle media (Changes 12 and 13) -----
 
+# One folder per model: assets/motos/fat-boy/1.fat-boy.jpg … 4.fat-boy.jpg and default_fat_boy.png.
 MOTOS_DIR = Path(__file__).resolve().parents[1] / "assets" / "motos"
+GALERIA_LOCAL = range(1, 5)
 # Remote images that only stand in for a real photo (the catalog seed uses placehold.co).
 PLACEHOLDER_HOSTS = ("placehold.co", "placeholder.com", "dummyimage.com")
 
@@ -34,25 +36,59 @@ def _campo(moto: object, nome: str) -> str:
     return str(valor or "").strip()
 
 
+def _real(url: str) -> bool:
+    return bool(url) and not any(host in url for host in PLACEHOLDER_HOSTS)
+
+
+def _slug(moto: object) -> str:
+    nome = _campo(moto, "nome_modelo") or _campo(moto, "modelo")
+    return "-".join(re.findall(r"[a-z0-9]+", normalize_text(nome)))
+
+
+def _galeria_local(slug: str) -> list[str]:
+    return [f"/motos/{slug}/{n}.{slug}.jpg" for n in GALERIA_LOCAL if (MOTOS_DIR / slug / f"{n}.{slug}.jpg").is_file()]
+
+
 def get_foto_moto(moto: object, imagem_url: str | None = None) -> str:
-    """URL of a motorcycle photo: the Xano image, else the local photo, else the default art.
+    """URL of a motorcycle photo: the Xano image, else the first local photo, else the default art.
 
     ``moto`` is a catalog model, a stock unit or a dict with ``nome_modelo`` (and optionally
-    ``imagem_principal``); ``imagem_url`` (the photo of a color) replaces the main image. Local
-    files live in ``assets/motos``: ``fat-boy.jpg`` (real photo) and ``default_fat_boy.png``.
+    ``imagem_principal``); ``imagem_url`` (the photo of a color) replaces the main image.
     """
     remota = (imagem_url if imagem_url is not None else _campo(moto, "imagem_principal")).strip()
-    if remota and not any(host in remota for host in PLACEHOLDER_HOSTS):
+    if _real(remota):
         return remota
-    slug = "-".join(re.findall(r"[a-z0-9]+", normalize_text(_campo(moto, "nome_modelo") or _campo(moto, "modelo"))))
+    slug = _slug(moto)
     if slug:
-        if (MOTOS_DIR / f"{slug}.jpg").is_file():
-            return f"/motos/{slug}.jpg"
+        locais = _galeria_local(slug)
+        if locais:
+            return locais[0]
         padrao = f"default_{slug.replace('-', '_')}.png"
-        if (MOTOS_DIR / padrao).is_file() or not remota:
-            return f"/motos/{padrao}"
+        if (MOTOS_DIR / slug / padrao).is_file() or not remota:
+            return f"/motos/{slug}/{padrao}"
     # A model without local art keeps the remote placeholder rather than a broken image.
     return remota
+
+
+def get_lista_fotos_moto(moto: object, imagem_url: str | None = None) -> list[str]:
+    """Photos of the detail carousel: the Xano gallery, else the local gallery, else one photo.
+
+    A real ``imagem_url`` (the chosen color) leads the list when the gallery does not have it.
+    """
+    galeria = moto.get("galeria") if isinstance(moto, Mapping) else getattr(moto, "galeria", None)
+    fotos = [url.strip() for url in galeria or [] if isinstance(url, str) and _real(url.strip())]
+    if not fotos:
+        fotos = _galeria_local(_slug(moto)) if _slug(moto) else []
+    if not fotos:
+        return [get_foto_moto(moto, imagem_url)]
+    if imagem_url and _real(imagem_url) and imagem_url not in fotos:
+        fotos.insert(0, imagem_url)
+    return fotos
+
+
+def indice_carrossel(atual: int, passo: int, total: int) -> int:
+    """Next carousel position, wrapping at both ends; 0 without photos."""
+    return (atual + passo) % total if total else 0
 
 
 # ----- form and feedback -----
@@ -321,3 +357,77 @@ def swatch(hex_color: rx.Var | str, name: rx.Var | str, *, selected: rx.Var | bo
     if on_click is None:
         return rx.box(**style)
     return rx.button(on_click=on_click, cursor="pointer", **style)
+
+
+# ----- photo carousel (Change 13) -----
+
+
+def _seta(icon: str, label: str, on_click, lado: str) -> rx.Component:
+    return rx.icon_button(
+        rx.icon(icon, size=20, aria_hidden="true"),
+        on_click=on_click,
+        aria_label=label,
+        radius="full",
+        size="2",
+        position="absolute",
+        top="50%",
+        transform="translateY(-50%)",
+        background=COLORS["overlay"],
+        color=COLORS["text"],
+        cursor="pointer",
+        _hover={"background": COLORS["orange"], "color": COLORS["on_orange"]},
+        **{lado: "0.5rem"},
+    )
+
+
+def carrossel_fotos(
+    fotos: rx.Var, foto_atual: rx.Var, indice: rx.Var, alt: rx.Var | str, on_anterior, on_proxima, on_selecionar
+) -> rx.Component:
+    """Hero photo with side arrows and clickable thumbnails (the active one framed in orange)."""
+    varias = fotos.length() > 1
+    return rx.vstack(
+        rx.box(
+            rx.image(
+                src=foto_atual,
+                alt=alt,
+                width="100%",
+                aspect_ratio="16 / 9",
+                object_fit="cover",
+                display="block",
+                border_radius=RADII["sm"],
+            ),
+            rx.cond(varias, _seta("chevron-left", "Foto anterior", on_anterior, "left")),
+            rx.cond(varias, _seta("chevron-right", "Próxima foto", on_proxima, "right")),
+            position="relative",
+            width="100%",
+        ),
+        rx.cond(
+            varias,
+            rx.hstack(
+                rx.foreach(
+                    fotos,
+                    lambda foto, i: rx.el.button(
+                        rx.image(src=foto, alt="", width="4.5rem", aspect_ratio="16 / 9", object_fit="cover", display="block"),
+                        on_click=on_selecionar(i),
+                        aria_label=f"Ver foto {i + 1}",
+                        custom_attrs={"aria-current": rx.cond(i == indice, "true", "false")},
+                        border=rx.cond(i == indice, f"2px solid {COLORS['orange']}", "2px solid transparent"),
+                        opacity=rx.cond(i == indice, "1", "0.55"),
+                        _hover={"opacity": "1"},
+                        padding="0",
+                        background="none",
+                        border_radius=RADII["sm"],
+                        overflow="hidden",
+                        cursor="pointer",
+                        flex_shrink="0",
+                    ),
+                ),
+                spacing="2",
+                width="100%",
+                overflow_x="auto",
+                padding_bottom="0.25rem",
+            ),
+        ),
+        spacing="2",
+        width="100%",
+    )

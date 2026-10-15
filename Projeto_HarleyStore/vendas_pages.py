@@ -7,6 +7,7 @@ import reflex as rx
 from Projeto_HarleyStore.components import guarded_page, modal_panel, page_body
 from Projeto_HarleyStore.styles.theme import COLORS, PANEL, RADII, SHADOWS
 from Projeto_HarleyStore.ui_helpers import (
+    carrossel_fotos,
     danger_button,
     data_table,
     error_callout,
@@ -428,16 +429,16 @@ def detail_modal() -> rx.Component:
     return modal_panel(
         modal_header(detalhe["modelo"], on_close=VendasState.close_detail),
         rx.grid(
-            # Left: the unit's photo (its color when the model has one) in a dark frame.
+            # Left: photo carousel (the unit's color first when the model has one) in a dark frame.
             rx.box(
-                rx.image(
-                    src=detalhe["foto"],
-                    alt=detalhe["modelo"],
-                    width="100%",
-                    aspect_ratio="16 / 9",
-                    object_fit="cover",
-                    display="block",
-                    border_radius=RADII["sm"],
+                carrossel_fotos(
+                    VendasState.detalhe_fotos,
+                    VendasState.foto_atual,
+                    VendasState.foto_index,
+                    detalhe["modelo"],
+                    VendasState.foto_anterior,
+                    VendasState.proxima_foto,
+                    VendasState.selecionar_foto,
                 ),
                 padding="0.5rem",
                 background=COLORS["graphite"],

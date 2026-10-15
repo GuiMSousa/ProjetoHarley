@@ -34,6 +34,6 @@
 
 ## 6. Arquivamento
 
-- [ ] Aplicar o delta de `specs/design-system.md` em `openspec/specs/`.
+- [x] Aplicar o delta de `specs/design-system.md` em `openspec/specs/` (aplicado em 2026-10-15, com a Change 13).
 - [ ] Atualizar `docs/project-structure.md` (`dashboard_state.py`, `assets/motos/`).
 - [ ] Mover para `openspec/archive/` e commit (usuário).

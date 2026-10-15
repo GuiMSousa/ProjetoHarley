@@ -9,6 +9,7 @@ from Projeto_HarleyStore.catalogo_state import FAMILIA_TABS, CatalogoState, Mode
 from Projeto_HarleyStore.components import modal_panel, page_body, public_shell
 from Projeto_HarleyStore.styles.theme import CARD, CARD_HOVER, COLORS, GRADIENTS, RADII, SHADOWS
 from Projeto_HarleyStore.ui_helpers import (
+    carrossel_fotos,
     empty_state,
     error_callout,
     metal_button,
@@ -180,16 +181,16 @@ def detail_modal() -> rx.Component:
     return modal_panel(
         modal_header(modelo.nome, on_close=CatalogoState.close_detail),
         rx.grid(
-            # Left: hero photo in a dark frame with a deep shadow.
+            # Left: photo carousel in a dark frame with a deep shadow.
             rx.box(
-                rx.image(
-                    src=_imagem(modelo),
-                    alt=modelo.nome,
-                    width="100%",
-                    aspect_ratio="16 / 9",
-                    object_fit="cover",
-                    display="block",
-                    border_radius=RADII["sm"],
+                carrossel_fotos(
+                    CatalogoState.fotos_detalhe,
+                    CatalogoState.foto_atual,
+                    CatalogoState.foto_index,
+                    modelo.nome,
+                    CatalogoState.foto_anterior,
+                    CatalogoState.proxima_foto,
+                    CatalogoState.selecionar_foto,
                 ),
                 padding="0.5rem",
                 background=COLORS["graphite"],

@@ -17,7 +17,7 @@ from Projeto_HarleyStore.services.catalogo import (
     catalogo_cache,
 )
 from Projeto_HarleyStore.services.xano_client import XanoClient, XanoError, XanoNotFoundError
-from Projeto_HarleyStore.ui_helpers import get_foto_moto
+from Projeto_HarleyStore.ui_helpers import get_foto_moto, get_lista_fotos_moto, indice_carrossel
 
 
 CATALOGO_ROUTE = "/catalogo"
@@ -45,6 +45,7 @@ class ModeloCard:
     disponivel: bool = False
     destaque: bool = False
     cores: list[CorCard] = dataclasses.field(default_factory=list)
+    fotos: list[str] = dataclasses.field(default_factory=list)
 
 
 def preco_label(valor: Decimal) -> str:
@@ -73,7 +74,13 @@ def modelo_card(modelo: ModeloCatalogo) -> ModeloCard:
             CorCard(nome=cor.nome, hex=cor.hex, imagem_url=get_foto_moto(modelo, cor.imagem_url))
             for cor in modelo.variacoes_cor
         ],
+        fotos=get_lista_fotos_moto(modelo),
     )
+
+
+def fotos_com_cor(fotos: list[str], foto_cor: str | None) -> list[str]:
+    """Carousel of the detail: the chosen color's photo first, then the rest of the gallery."""
+    return [foto_cor, *[foto for foto in fotos if foto != foto_cor]] if foto_cor else fotos
 
 
 def filtrar_catalogo(cards: list[ModeloCard], familia: str, busca: str) -> list[ModeloCard]:
@@ -106,6 +113,7 @@ class CatalogoState(AuthState):
     imagem_por_modelo: dict[str, str] = {}
     cor_por_modelo: dict[str, str] = {}
     detalhe_id: str = ""
+    foto_index: int = 0
     is_loading_catalogo: bool = False
     # False until the first load ends, so the empty state never flashes before the data.
     carregado: bool = False
@@ -126,6 +134,15 @@ class CatalogoState(AuthState):
     @rx.var
     def detalhe(self) -> ModeloCard:
         return next((card for card in self.cards if card.id == self.detalhe_id), ModeloCard())
+
+    @rx.var
+    def fotos_detalhe(self) -> list[str]:
+        return fotos_com_cor(self.detalhe.fotos, self.imagem_por_modelo.get(self.detalhe_id))
+
+    @rx.var
+    def foto_atual(self) -> str:
+        fotos = self.fotos_detalhe
+        return fotos[self.foto_index] if 0 <= self.foto_index < len(fotos) else (fotos[0] if fotos else "")
 
     @rx.event
     def load_catalogo(self):
@@ -160,10 +177,25 @@ class CatalogoState(AuthState):
         """Swap the card photo for the chosen color (no Xano call)."""
         self.imagem_por_modelo = {**self.imagem_por_modelo, modelo_id: imagem_url}
         self.cor_por_modelo = {**self.cor_por_modelo, modelo_id: nome}
+        self.foto_index = 0  # the chosen color's photo leads the carousel
 
     @rx.event
     def open_detail(self, modelo_id: str) -> None:
         self.detalhe_id = modelo_id
+        self.foto_index = 0
+
+    @rx.event
+    def proxima_foto(self) -> None:
+        self.foto_index = indice_carrossel(self.foto_index, 1, len(self.fotos_detalhe))
+
+    @rx.event
+    def foto_anterior(self) -> None:
+        self.foto_index = indice_carrossel(self.foto_index, -1, len(self.fotos_detalhe))
+
+    @rx.event
+    def selecionar_foto(self, index: int) -> None:
+        if 0 <= index < len(self.fotos_detalhe):
+            self.foto_index = index
 
     @rx.event
     def close_detail(self) -> None:
