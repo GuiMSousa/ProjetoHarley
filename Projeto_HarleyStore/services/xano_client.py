@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -170,7 +170,7 @@ class XanoClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> XanoClient:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:

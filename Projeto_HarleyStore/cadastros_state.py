@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable
+from typing import Any
 
 import reflex as rx
 from pydantic import ValidationError
@@ -402,7 +403,7 @@ class CadastrosState(AuthState):
             self.form_open = False
             self._refresh_after_mutation(section)
             return toast_success("Cadastro salvo com sucesso.")
-        except (ValidationError, ValueError, InvalidOperation) as error:
+        except (ValidationError, ValueError, InvalidOperation):
             self.form_error = "Revise os campos obrigatórios e os valores informados."
             return toast_error(self.form_error)
         except XanoValidationError as error:

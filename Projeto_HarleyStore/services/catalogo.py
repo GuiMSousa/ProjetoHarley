@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from decimal import Decimal
-from typing import Callable, Generic, Literal, TypeVar
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -119,10 +120,7 @@ class ModeloCatalogo(BaseModel):
         return False if value is None else value
 
 
-T = TypeVar("T")
-
-
-class TtlCache(Generic[T]):
+class TtlCache[T]:
     """Process-wide value with a time to live, shared by every Reflex session.
 
     The public showroom goes through the same Reflex backend for every visitor;

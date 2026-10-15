@@ -75,6 +75,13 @@ Todo botão que envia um formulário ou confirma um modal DEVE trocar o rótulo 
 
 - Campos de formulário DEVEM ter rótulo associado (`labeled` renderiza `<label>`); campos sem rótulo visível (busca, login) DEVEM ter `aria-label`, e o login DEVE declarar `autocomplete` (`username`, `current-password`).
 - O shell DEVE oferecer um link "Pular para o conteúdo", primeiro item do Tab, que leva o foco ao `<main id="conteudo">`.
-- Modais DEVEM declarar `role="dialog"` e `aria-modal`; erros DEVEM ser anunciados (`role="alert"`); ícones decorativos DEVEM ter `aria-hidden`.
+- Erros DEVEM ser anunciados (`role="alert"`); ícones decorativos DEVEM ter `aria-hidden`.
+- Todo modal DEVE usar o `modal_panel` (Change 14), um `rx.dialog` com `role="dialog"`, `aria-modal="true"`, `aria-labelledby` no título do `modal_header` e `aria-describedby` numa descrição para leitores de tela. Ao abrir, o foco DEVE ir para o primeiro controle (o botão "Fechar"); o `Tab` DEVE ficar preso no diálogo; o Esc DEVE executar o mesmo handler do "Fechar"; um clique fora NÃO DEVE fechar; ao fechar, o foco DEVE voltar ao controle que o abriu.
 - A folha global DEVE declarar `color-scheme: dark`, respeitar `prefers-reduced-motion`, usar algarismos tabulares nas tabelas e a página DEVE declarar `theme-color` igual ao fundo.
 - O logo DEVE ter no máximo 45 px de altura, caixa reservada (`width`/`height`) e texto alternativo "Harley-Davidson", que substitui a imagem se o arquivo faltar.
+
+### Cenário: fechar um modal pelo teclado
+
+- **DADO** o detalhe de um modelo aberto na vitrine pelo botão "Detalhes"
+- **QUANDO** o usuário navega com `Tab` e `Shift+Tab` e depois pressiona Esc
+- **ENTÃO** o foco DEVE permanecer dentro do diálogo enquanto ele estiver aberto, o diálogo DEVE fechar com o Esc e o foco DEVE voltar ao botão "Detalhes"

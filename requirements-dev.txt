@@ -2,3 +2,7 @@
 
 # Test runner (python -m pytest); the suite is unittest-compatible.
 pytest==9.1.1
+# Lint (python -m ruff check .).
+ruff==0.17.0
+# Opt-in browser smoke with the installed Edge (no browser download); see docs/quality.md.
+playwright==1.64.0

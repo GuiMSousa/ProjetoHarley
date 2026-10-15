@@ -464,4 +464,5 @@ def detail_modal() -> rx.Component:
             ),
         ),
         width="min(100%, 56rem)",
+        on_close=WorkshopState.close_detail,
     )

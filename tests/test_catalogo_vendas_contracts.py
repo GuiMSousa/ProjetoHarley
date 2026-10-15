@@ -29,7 +29,7 @@ class CatalogoContractTests(unittest.TestCase):
         for relative_path in (f"{API}/catalogo_GET.xs", f"{API}/catalogo/catalogo_id_GET.xs"):
             with self.subTest(path=relative_path):
                 content = read(relative_path)
-                self.assertIsNone(re.search(r'^\s*auth = "user"', content, re.M))
+                self.assertIsNone(re.search(r'^\s*auth = "user"', content, re.MULTILINE))
                 self.assertNotIn("enforce_role", content)
                 self.assertIn('function.run "Catalogo/vitrine"', content)
                 self.assertNotRegex(content, r"db\.(add|edit|patch|del) ")
@@ -42,7 +42,7 @@ class CatalogoContractTests(unittest.TestCase):
         # One query for all units, aggregated per model (no N+1).
         self.assertEqual(content.count("db.query motos"), 1)
         card = content[content.index("var.update $card"):content.index("var.update $vitrine")]
-        fields = set(re.findall(r"^\s+(\w+)\s*:", card, re.M))
+        fields = set(re.findall(r"^\s+(\w+)\s*:", card, re.MULTILINE))
         self.assertEqual(
             fields,
             {
@@ -238,7 +238,7 @@ class VendaContractTests(unittest.TestCase):
         defined = {
             match
             for path in (XANO / "function").rglob("*.xs")
-            for match in re.findall(r'^function "([^"]+)"', path.read_text(encoding="utf-8"), re.M)
+            for match in re.findall(r'^function "([^"]+)"', path.read_text(encoding="utf-8"), re.MULTILINE)
         }
         for path in (XANO / "api").rglob("*.xs"):
             for called in re.findall(r'function\.run "([^"]+)"', path.read_text(encoding="utf-8")):

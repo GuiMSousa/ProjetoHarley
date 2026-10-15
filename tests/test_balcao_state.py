@@ -192,7 +192,7 @@ class BalcaoStateTests(unittest.TestCase):
         return state
 
     def test_seller_loads_active_products_and_customers(self):
-        _, client = self.patched_client()
+        self.patched_client()
         state = self.make_state()
         run_event(BalcaoState.load_balcao, state)
         self.assertEqual([row["id"] for row in state.catalogo], ["7", "12"])

@@ -9,4 +9,4 @@ assets/external/
 .env.*
 !.env.example
 graphify-out/
-.agents/skills/
+reflex.log

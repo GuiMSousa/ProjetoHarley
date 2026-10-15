@@ -9,7 +9,7 @@ from Projeto_HarleyStore.cadastros_pages import cadastro_page
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_pages import catalogo_page
 from Projeto_HarleyStore.catalogo_state import CATALOGO_ROUTE, CatalogoState
-from Projeto_HarleyStore.components import app_shell, guarded_page, login_page
+from Projeto_HarleyStore.components import MODAL_FOCUS_SCRIPT, app_shell, guarded_page, login_page
 from Projeto_HarleyStore.dashboard_pages import admin_placeholder, dashboard
 from Projeto_HarleyStore.dashboard_state import DashboardState
 from Projeto_HarleyStore.entradas_pages import entradas_page
@@ -38,7 +38,7 @@ def login() -> rx.Component:
 app = rx.App(
     stylesheets=[GOOGLE_FONTS_URL, "/harley.css"],
     # Mobile browser chrome matches the app background.
-    head_components=[rx.el.meta(name="theme-color", content=COLORS["black"])],
+    head_components=[rx.el.meta(name="theme-color", content=COLORS["black"]), rx.script(MODAL_FOCUS_SCRIPT)],
 )
 app.add_page(
     index,

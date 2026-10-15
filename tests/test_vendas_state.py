@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -39,7 +39,7 @@ from Projeto_HarleyStore.vendas_state import (
 from tests.event_runner import run_event
 
 
-AGORA = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+AGORA = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
 COR = VariacaoCor(nome="Vivid Black", hex="#0B0B0B", imagem_url="https://img.test/a.jpg")
 
 
@@ -247,7 +247,7 @@ class VendasStateTests(unittest.TestCase):
         self.assertEqual(state.aba, "DISPONIVEL")
 
     def test_manager_also_loads_the_catalog_models(self):
-        _, client = self.patched_client()
+        self.patched_client()
         state = self.make_state(role="GERENTE")
         run_event(VendasState.load_vendas, state)
         self.assertEqual([row["nome"] for row in state.modelos], ["Street Glide"])

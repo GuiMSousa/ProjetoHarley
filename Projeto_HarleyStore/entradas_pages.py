@@ -74,6 +74,7 @@ def detail_modal() -> rx.Component:
             empty_text="Entrada sem itens.",
         ),
         width="min(100%, 48rem)",
+        on_close=EntradasState.close_detail,
     )
 
 
@@ -177,6 +178,7 @@ def entrada_form_modal() -> rx.Component:
             color=COLORS["muted"],
         ),
         width="min(100%, 52rem)",
+        on_close=EntradasState.close_form,
     )
 
 

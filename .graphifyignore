@@ -1,0 +1,29 @@
+# Exclusões do Graphify: nunca indexar segredos, dependências, skills copiadas ou arquivos gerados.
+.git/
+.venv/
+.web/
+.states/
+__pycache__/
+.pytest_cache/
+reflex.lock/
+graphify-out/
+.agents/
+.aider-desk/
+.claude/
+.codex/
+.gemini/
+.vscode/
+.env
+.env.*
+*.pem
+*.key
+*.log
+# Grupo de API com o token do Swagger (hoje um placeholder; o valor real fica no histórico do Git).
+xano/api/harley/harley.xs
+# Binários e PDFs não são código e encareceriam uma extração semântica.
+assets/motos/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.pdf

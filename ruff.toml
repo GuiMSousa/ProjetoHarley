@@ -1,0 +1,14 @@
+# Lint: regras padrão do ruff, todas como erro. Medição e regras fora do gate: docs/quality.md.
+target-version = "py312"  # requisito mínimo do projeto (genéricos PEP 695); o runtime usa 3.14
+
+[lint]
+ignore = [
+    "I001",    # ordem de imports: adotar reformataria 52 arquivos sem efeito em comportamento
+    "FURB157", # Decimal("120000"): a forma em string é a convenção do projeto para valores monetários
+    "SIM117",  # with aninhados nos testes deixam cada patch legível
+    "N999",    # o nome do pacote vem do app_name do Reflex
+]
+
+[lint.per-file-ignores]
+# O Reflex declara as variáveis de State como atributos de classe e as copia por sessão.
+"Projeto_HarleyStore/*_state.py" = ["RUF012"]

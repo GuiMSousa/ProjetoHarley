@@ -207,7 +207,7 @@ class FinanceiroStateTests(unittest.TestCase):
         client.resumo_financeiro.assert_called_once()
 
     def test_filter_resets_when_the_type_disappears(self):
-        _, client = self.patched_client()
+        self.patched_client()
         state = self.make_state()
         state.inicio, state.fim = "2026-10-01", "2026-10-09"
         state.filtro_tipo = "BALCAO"

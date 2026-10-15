@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -49,7 +49,7 @@ def resumo(os_id=31, status="ABERTA", **extra):
         "id": os_id,
         "status": status,
         "id_moto_cliente": 12,
-        "data_abertura": datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc),
+        "data_abertura": datetime(2026, 9, 25, 12, 0, tzinfo=UTC),
         "tipo_servico": "CORRETIVA",
         "descricao_problema": "Ruído na embreagem",
         "nome_cliente": "Ana Souza",
@@ -74,7 +74,7 @@ class FaturamentoOSTests(unittest.TestCase):
             status="CONCLUIDA",
             valor_total=Decimal("1250"),
             id_transacao=41,
-            data_lancamento=datetime(2026, 10, 9, 15, 30, tzinfo=timezone.utc),
+            data_lancamento=datetime(2026, 10, 9, 15, 30, tzinfo=UTC),
         )
         texto = lancamento_texto(faturada)
         self.assertTrue(texto.startswith("Faturada · transação #41 · "))
@@ -566,7 +566,7 @@ class WorkshopItemEventTests(WorkshopStateTestCase):
         self.assertEqual(state.item_tipo, "SERVICO")
 
     def test_local_balance_check_does_not_call_xano(self):
-        state, client_class, client = self.open_state()
+        state, _client_class, client = self.open_state()
         state.item_produto_id = "3"
         state.item_quantidade = "9"
         run_event(WorkshopState.save_item, state)

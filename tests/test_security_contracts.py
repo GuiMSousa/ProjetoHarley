@@ -99,7 +99,7 @@ class SecurityContractTests(unittest.TestCase):
             if not content.lstrip().startswith(("query", "//")) or "query " not in content:
                 continue
             blocked = "precondition (false)" in content
-            if not re.search(r'^\s*auth = "user"', content, re.M) and not blocked:
+            if not re.search(r'^\s*auth = "user"', content, re.MULTILINE) and not blocked:
                 public.append(path.relative_to(XANO).as_posix())
         self.assertEqual(
             sorted(public),
@@ -124,7 +124,7 @@ class SecurityContractTests(unittest.TestCase):
         for path in (XANO / "api").rglob("*.xs"):
             content = path.read_text(encoding="utf-8")
             relative = path.relative_to(XANO).as_posix()
-            if relative in identity_only or not re.search(r'^\s*auth = "user"', content, re.M):
+            if relative in identity_only or not re.search(r'^\s*auth = "user"', content, re.MULTILINE):
                 continue
             checked += 1
             with self.subTest(path=relative):
@@ -135,7 +135,7 @@ class SecurityContractTests(unittest.TestCase):
         for path in (XANO / "api").rglob("*.xs"):
             content = path.read_text(encoding="utf-8")
             with self.subTest(path=path.relative_to(XANO).as_posix()):
-                self.assertIsNone(re.search(r"metadata:\s*\$user\d*\s*$", content, re.M))
+                self.assertIsNone(re.search(r"metadata:\s*\$user\d*\s*$", content, re.MULTILINE))
 
     def test_signup_does_not_issue_tokens_for_other_users(self):
         content = self.read("api/authentication/auth/signup_POST.xs")

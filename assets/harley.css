@@ -60,6 +60,25 @@ a,
   top: 1rem;
 }
 
+/* Read by screen readers only (e.g. the modal description behind aria-describedby). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Modal backdrop (Radix dialog): darkened and blurred, same as COLORS["overlay"] in theme.py. */
+.rt-BaseDialogOverlay::before {
+  background-color: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+}
+
 /* Module titles: robust uppercase; the text itself keeps its case for screen readers. */
 .rt-Heading {
   text-transform: uppercase;

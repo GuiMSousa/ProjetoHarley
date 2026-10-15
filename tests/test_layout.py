@@ -53,7 +53,7 @@ class LogoTests(unittest.TestCase):
         self.assertEqual(LOGO_HEIGHT, "45px")
         data = (ROOT / "assets" / "HARLEY_LOGO.png").read_bytes()
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
-        width, height = struct.unpack(">II", data[16:24])
+        _width, height = struct.unpack(">II", data[16:24])
         self.assertGreaterEqual(height, 90)  # sharp at 45px on 2x screens
         self.assertEqual(data[25], 6)  # IHDR colour type 6 = RGBA: transparent background
         self.assertLess(len(data), 100_000)

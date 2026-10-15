@@ -2,7 +2,7 @@
 
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -150,7 +150,7 @@ class FotoNasTelasTests(unittest.TestCase):
             cor="Vivid Black",
             variacoes_cor=[VariacaoCor(nome="Vivid Black", hex="#0B0B0B", imagem_url=PLACEHOLDER)],
         )
-        row = moto_row(unidade, "VENDEDOR", 2, datetime(2026, 10, 14, tzinfo=timezone.utc))
+        row = moto_row(unidade, "VENDEDOR", 2, datetime(2026, 10, 14, tzinfo=UTC))
         self.assertEqual(row["foto"], "/motos/street-glide/1.street-glide.jpg")
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from decimal import InvalidOperation
 
 import reflex as rx
@@ -100,7 +100,7 @@ def can_manage_catalog(role: str) -> bool:
 
 
 def agora_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def reserva_vencida(reservada_ate: datetime | None, agora: datetime) -> bool:

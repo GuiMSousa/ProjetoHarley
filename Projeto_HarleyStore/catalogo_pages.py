@@ -230,6 +230,7 @@ def detail_modal() -> rx.Component:
             align_items="start",
         ),
         width="min(100%, 56rem)",
+        on_close=CatalogoState.close_detail,
     )
 
 

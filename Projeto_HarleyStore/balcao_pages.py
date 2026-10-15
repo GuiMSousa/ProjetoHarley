@@ -230,6 +230,7 @@ def confirmacao_modal() -> rx.Component:
             width="100%",
         ),
         width="min(100%, 32rem)",
+        on_close=BalcaoState.fechar_confirmacao,
     )
 
 
@@ -268,6 +269,7 @@ def recibo_modal() -> rx.Component:
             align="center",
         ),
         width="min(100%, 40rem)",
+        on_close=BalcaoState.fechar_recibo,
     )
 
 

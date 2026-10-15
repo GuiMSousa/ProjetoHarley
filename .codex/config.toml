@@ -1,0 +1,4 @@
+# Configuração do Codex para este projeto (carregada só com o projeto marcado como confiável).
+# Autenticação, modelo e permissões ficam na configuração pessoal, fora do repositório.
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"

@@ -163,6 +163,7 @@ def create_modal() -> rx.Component:
             width="100%",
         ),
         width="min(100%, 40rem)",
+        on_close=WorkshopState.close_form,
     )
 
 

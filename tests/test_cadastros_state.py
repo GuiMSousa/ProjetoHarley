@@ -25,13 +25,13 @@ class CadastrosStateTests(unittest.TestCase):
 
     def test_manager_can_write_every_registration(self):
         state = self.make_state("GERENTE")
-        for section in {
+        for section in (
             "clientes",
             "motos_clientes",
             "produtos",
             "fornecedores",
             "funcionarios",
-        }:
+        ):
             with self.subTest(section=section):
                 self.assertTrue(CadastrosState._can_write(state, section))
 
@@ -45,13 +45,13 @@ class CadastrosStateTests(unittest.TestCase):
 
     def test_mechanic_is_read_only_for_basic_registrations(self):
         state = self.make_state("MECANICO")
-        for section in {
+        for section in (
             "clientes",
             "motos_clientes",
             "produtos",
             "fornecedores",
             "funcionarios",
-        }:
+        ):
             with self.subTest(section=section):
                 self.assertFalse(CadastrosState._can_write(state, section))
 

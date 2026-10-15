@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -108,7 +108,7 @@ class EntradaFormRulesTests(unittest.TestCase):
                 id=7,
                 id_fornecedor=3,
                 numero_documento=None,
-                data_entrada=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc),
+                data_entrada=datetime(2026, 9, 24, 12, 0, tzinfo=UTC),
                 valor_total=Decimal("834.5"),
                 nome_fornecedor="Moto Parts",
                 quantidade_itens=2,

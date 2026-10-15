@@ -448,16 +448,36 @@ def page_body(*children: rx.Component, **props) -> rx.Component:
     )
 
 
-def modal_panel(*children: rx.Component, width: str = "min(100%, 34rem)") -> rx.Component:
-    """Centered overlay panel with a blurred backdrop, shared by forms and detail views."""
-    return rx.box(
-        rx.vstack(
-            *children,
-            role="dialog",
+# Radix returns focus only to a Dialog.Trigger, and these modals open from page state: the app head
+# remembers the last control focused while no modal is open, and modal_panel focuses it again on close.
+# Checking "no modal open" (not "outside the dialog") skips rx.select options, rendered in a portal.
+MODAL_FOCUS_SCRIPT = (
+    "document.addEventListener('focusin', (e) => {"
+    " if (!document.querySelector('[role=dialog][aria-modal=true]')) window.harleyLastFocus = e.target; });"
+)
+RESTORE_FOCUS_SCRIPT = (
+    "setTimeout(() => { const el = window.harleyLastFocus; if (el && el.isConnected) el.focus(); }, 0)"
+)
+
+
+def modal_panel(*children: rx.Component, on_close: rx.EventHandler, width: str = "min(100%, 34rem)") -> rx.Component:
+    """Modal shared by forms and detail views (Radix dialog, rendered while its page state says so).
+
+    The dialog keeps Tab inside, focuses its first control (the "Fechar" of ``modal_header``), gives
+    focus back to the control that opened it and names itself from the ``modal_header`` title
+    (aria-labelledby) and the hidden description (aria-describedby). Esc runs ``on_close``, the same
+    handler as "Fechar"; a click outside never closes it, so a half-filled form is not discarded.
+    """
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.description("Pressione Esc para fechar.", class_name="sr-only"),
+            rx.vstack(*children, align="stretch", spacing="4", width="100%"),
             aria_modal="true",
-            align="stretch",
-            spacing="4",
+            on_escape_key_down=on_close,
+            on_interact_outside=rx.prevent_default,
+            on_close_auto_focus=rx.call_script(RESTORE_FOCUS_SCRIPT),
             width=width,
+            max_width="100%",
             max_height="90vh",
             overflow_y="auto",
             # Scrolling a long form never scrolls the page behind the overlay.
@@ -466,13 +486,5 @@ def modal_panel(*children: rx.Component, width: str = "min(100%, 34rem)") -> rx.
             border_top=f"3px solid {COLORS['orange']}",
             **CARD,
         ),
-        position="fixed",
-        inset="0",
-        z_index="20",
-        display="flex",
-        align_items="center",
-        justify_content="center",
-        padding="1rem",
-        background=COLORS["overlay"],
-        backdrop_filter="blur(8px)",
+        open=True,
     )

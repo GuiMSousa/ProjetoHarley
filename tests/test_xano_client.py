@@ -6,7 +6,6 @@ import httpx
 from pydantic import BaseModel, TypeAdapter
 
 from Projeto_HarleyStore.services.xano_client import (
-    AuthTokenResponse,
     CurrentUserResponse,
     XanoAuthenticationError,
     XanoClient,

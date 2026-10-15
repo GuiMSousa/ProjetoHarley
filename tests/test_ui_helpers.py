@@ -27,7 +27,7 @@ PACKAGE = Path(__file__).parents[1] / "Projeto_HarleyStore"
 
 
 def toast_expression(spec) -> str:
-    return str(dict((str(name), value) for name, value in spec.args)["function"])
+    return str({str(name): value for name, value in spec.args}["function"])
 
 
 class SharedHelpersTests(unittest.TestCase):
@@ -77,7 +77,7 @@ class SharedHelpersTests(unittest.TestCase):
             with self.subTest(path=relative):
                 if relative != "ui_helpers.py":
                     self.assertIsNone(
-                        re.search(r"^def status_badge\(", path.read_text(encoding="utf-8"), re.M)
+                        re.search(r"^def status_badge\(", path.read_text(encoding="utf-8"), re.MULTILINE)
                     )
 
     def test_helpers_are_defined_once_and_toasts_go_through_feedback(self):
@@ -87,7 +87,7 @@ class SharedHelpersTests(unittest.TestCase):
             with self.subTest(path=relative):
                 if relative != "ui_helpers.py":
                     self.assertIsNone(
-                        re.search(r"^def (labeled|error_callout|operation_is_blocked)\(", content, re.M)
+                        re.search(r"^def (labeled|error_callout|operation_is_blocked)\(", content, re.MULTILINE)
                     )
                 if relative != "feedback.py":
                     self.assertNotIn("rx.toast(", content)

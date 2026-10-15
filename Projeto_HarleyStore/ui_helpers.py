@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Callable
 
 import reflex as rx
 
@@ -192,8 +191,9 @@ def card(*children: rx.Component, **props) -> rx.Component:
 
 
 def modal_header(*title: rx.Component | str, on_close) -> rx.Component:
+    """Title row of ``modal_panel``: the title names the dialog, "Fechar" runs ``on_close``."""
     return rx.hstack(
-        rx.heading(*title, size="5"),
+        rx.dialog.title(*title, margin_bottom="0"),
         rx.spacer(),
         metal_button("Fechar", on_click=on_close, size="2"),
         width="100%",

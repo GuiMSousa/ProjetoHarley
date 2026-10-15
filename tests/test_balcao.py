@@ -3,7 +3,7 @@
 import json
 import os
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -118,7 +118,7 @@ class VendaBalcaoDtoTests(unittest.TestCase):
         self.assertEqual(detalhe.id_transacao, 128)
         self.assertEqual(detalhe.valor_total, Decimal("389.7"))
         # Xano sends milliseconds since the epoch.
-        self.assertEqual(detalhe.data_transacao, datetime.fromtimestamp(1791990000, tz=timezone.utc))
+        self.assertEqual(detalhe.data_transacao, datetime.fromtimestamp(1791990000, tz=UTC))
         self.assertEqual([item.codigo for item in detalhe.itens], ["FLT0001", "PST0102"])
         self.assertEqual(detalhe.itens[0].valor_total_item, Decimal("179.8"))
         anonimo = VendaBalcaoDetalhe(**{**RECIBO, "id_cliente": None, "nome_cliente": None})
@@ -182,8 +182,10 @@ class VendaBalcaoClientTests(unittest.TestCase):
         for message in (
             "Saldo insuficiente para FLT0001: disponível 3, solicitado 5.",
             "Os preços mudaram desde que o carrinho foi montado: o total agora é R$ 399,70. Revise o carrinho.",
-            "A venda não foi registrada: o estoque ou os preços mudaram durante o fechamento. "
-            "Revise o carrinho e tente novamente.",
+            (
+                "A venda não foi registrada: o estoque ou os preços mudaram durante o fechamento. "
+                "Revise o carrinho e tente novamente."
+            ),
         ):
             _, handler = self.capture(httpx.Response(400, json={"message": message}))
             with self.subTest(message=message), self.make_client(handler) as client:

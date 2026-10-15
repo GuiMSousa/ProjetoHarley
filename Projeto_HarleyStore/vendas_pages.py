@@ -252,6 +252,7 @@ def reserva_modal() -> rx.Component:
             ),
             width="100%",
         ),
+        on_close=VendasState.close_reserva,
     )
 
 
@@ -279,6 +280,7 @@ def cancelamento_modal() -> rx.Component:
             ),
             width="100%",
         ),
+        on_close=VendasState.close_cancelamento,
     )
 
 
@@ -381,6 +383,7 @@ def venda_modal() -> rx.Component:
             width="100%",
         ),
         width="min(100%, 36rem)",
+        on_close=VendasState.close_venda,
     )
 
 
@@ -480,6 +483,7 @@ def detail_modal() -> rx.Component:
         section_title("Linha do tempo"),
         rx.foreach(VendasState.detalhe_historico, timeline_row),
         width="min(100%, 56rem)",
+        on_close=VendasState.close_detail,
     )
 
 
@@ -625,6 +629,7 @@ def modelo_form_modal() -> rx.Component:
             width="100%",
         ),
         width="min(100%, 52rem)",
+        on_close=VendasState.close_modelo_form,
     )
 
 
@@ -717,6 +722,7 @@ def moto_form_modal() -> rx.Component:
             width="100%",
         ),
         width="min(100%, 36rem)",
+        on_close=VendasState.close_moto_form,
     )
 
 

@@ -151,6 +151,7 @@ def cadastro_modal() -> rx.Component:
             ),
             width="100%",
         ),
+        on_close=CadastrosState.close_form,
     )
 
 

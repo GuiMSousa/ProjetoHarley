@@ -32,6 +32,7 @@ Regras importantes:
 - Para testar antes de publicar no live, use um branch: `xano workspace push -d ./xano -b <branch>`.
 - O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
 - Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (configurado em `.vscode/mcp.json`).
+- Desde 2026-10-15, o token do Swagger em `xano/api/harley/harley.xs` é o placeholder `YOUR_XANO_SWAGGER_TOKEN`; o valor real continua no histórico do Git. Antes de qualquer push, desligue o Swagger público (`xano workspace edit --no-swagger`) ou gere um token novo, e confira se o `--dry-run` lista o grupo `HARLEY`: publicar o placeholder pode trocar o token do Swagger por um valor conhecido. Um `xano workspace pull` traz o token real de volta ao arquivo.
 
 ### Checklist pós-deploy da Change 5 e do saneamento
 

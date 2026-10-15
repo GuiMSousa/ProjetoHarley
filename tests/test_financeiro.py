@@ -2,7 +2,7 @@
 
 import os
 import unittest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, UTC
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -67,7 +67,7 @@ class PeriodoTests(unittest.TestCase):
         self.assertEqual(inicio, datetime(2026, 10, 1, 0, 0, tzinfo=FUSO_LOJA))
         self.assertEqual(fim, datetime(2026, 10, 9, 23, 59, 59, 999000, tzinfo=FUSO_LOJA))
         # UTC-3 fixed: 00:00 in the store is 03:00 UTC.
-        self.assertEqual(datetime.fromtimestamp(params["inicio"] / 1000, timezone.utc).hour, 3)
+        self.assertEqual(datetime.fromtimestamp(params["inicio"] / 1000, UTC).hour, 3)
 
     def test_single_day_and_the_366_day_limit(self):
         dia = PeriodoFinanceiro(inicio=date(2026, 2, 28), fim=date(2026, 2, 28)).params()

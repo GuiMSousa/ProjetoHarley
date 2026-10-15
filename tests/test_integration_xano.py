@@ -32,6 +32,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import patch
 
 from Projeto_HarleyStore.services.balcao import ItemVendaBalcaoCreate, VendaBalcaoCreate
@@ -105,7 +106,7 @@ LIVE_SKIP_REASON = (
 
 @unittest.skipUnless(LIVE, LIVE_SKIP_REASON)
 class XanoLiveTestCase(unittest.TestCase):
-    tokens: dict[str, str] = {}
+    tokens: ClassVar[dict[str, str]] = {}  # shared by every live test: one login per role
 
     @classmethod
     def setUpClass(cls):

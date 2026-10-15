@@ -9,7 +9,7 @@ Esta página explica onde cada tipo de arquivo deve ficar. A ideia é permitir q
 3. Crie uma mudança pequena em `openspec/changes/` antes de implementar uma alteração significativa.
 4. Escreva ou altere o código da aplicação em `Projeto_HarleyStore/`.
 5. Coloque imagens e arquivos estáticos em `assets/`.
-6. Valide com `python -m pytest` (ou `python -m unittest discover -s tests`), `python -m py_compile`, `reflex compile --dry` e o validador XanoScript; publique o backend com `xano workspace push -d ./xano` (ver `docs/xano-api-client.md`).
+6. Valide com os checks de `docs/quality.md` (`ruff check .`, `compileall`, `python -m pytest` e `reflex compile --dry`) e o validador XanoScript; publique o backend com `xano workspace push -d ./xano` (ver `docs/xano-api-client.md`).
 7. Atualize a documentação e os artefatos da mudança quando o comportamento estiver concluído.
 
 ## Pastas principais
