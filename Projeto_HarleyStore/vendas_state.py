@@ -49,7 +49,7 @@ from Projeto_HarleyStore.services.xano_client import (
     XanoPermissionError,
     XanoValidationError,
 )
-from Projeto_HarleyStore.ui_helpers import operation_is_blocked
+from Projeto_HarleyStore.ui_helpers import get_foto_moto, operation_is_blocked
 
 
 VENDAS_ROUTE = "/vendas"
@@ -132,6 +132,11 @@ def _cor_hex(moto: MotoEstoque) -> str:
     return next((cor.hex for cor in moto.variacoes_cor if cor.nome == moto.cor), "")
 
 
+def _foto(moto: MotoEstoque) -> str:
+    """Photo of the unit's color when the model has one, else the model photo (Change 12)."""
+    return get_foto_moto(moto, next((cor.imagem_url for cor in moto.variacoes_cor if cor.nome == moto.cor), None))
+
+
 def moto_row(moto: MotoEstoque, role: str, employee_id: int, agora: datetime) -> dict[str, str]:
     reservada = moto.status == "RESERVADA"
     return {
@@ -142,6 +147,7 @@ def moto_row(moto: MotoEstoque, role: str, employee_id: int, agora: datetime) ->
         "cor": moto.cor or EMPTY_VALUE,
         "cor_valor": moto.cor or "",
         "cor_hex": _cor_hex(moto),
+        "foto": _foto(moto),
         "chassi": moto.chassi or EMPTY_VALUE,
         "chassi_valor": moto.chassi or "",
         "chassi_curto": f"…{moto.chassi[-6:]}" if moto.chassi else EMPTY_VALUE,
@@ -532,14 +538,21 @@ class VendasState(AuthState):
     def open_reserva(self, moto_id: str):
         if not can_sell(self.employee_role):
             return toast_error("Seu perfil não pode reservar motos.")
+        if self._operation_blocked():
+            return None
+        self.is_loading_detail = True
+        yield  # render the busy state before the Xano call
         try:
             with XanoClient(token=self.auth_token) as client:
                 clientes = client.list_clientes()
         except XanoError as error:
             return self._xano_error_response(error)
+        finally:
+            self.is_loading_detail = False
         self.cliente_options = [
             option_label(cliente.id, cliente.nome_cliente) for cliente in clientes if cliente.ativo
         ]
+        self.detail_open = False  # opened from the detail panel: the form takes its place
         self.reserva_moto_id = moto_id
         self.reserva_cliente = ""
         self.reserva_dias = str(DIAS_RESERVA_PADRAO)
@@ -669,16 +682,23 @@ class VendasState(AuthState):
             self.venda_cliente = cliente
             self.venda_cliente_fixo = True
         else:
+            if self._operation_blocked():
+                return None
+            self.is_loading_detail = True
+            yield  # render the busy state before the Xano call
             try:
                 with XanoClient(token=self.auth_token) as client:
                     clientes = client.list_clientes()
             except XanoError as error:
                 return self._xano_error_response(error)
+            finally:
+                self.is_loading_detail = False
             self.cliente_options = [
                 option_label(cliente.id, cliente.nome_cliente) for cliente in clientes if cliente.ativo
             ]
             self.venda_cliente = ""
             self.venda_cliente_fixo = False
+        self.detail_open = False  # opened from the detail panel: the form takes its place
         self.venda_moto_id = moto_id
         self.venda_valor = valor_inicial_venda(row["preco_valor"])
         self.venda_placa = ""

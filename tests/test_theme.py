@@ -3,9 +3,11 @@ import unittest
 from pathlib import Path
 
 from Projeto_HarleyStore.styles.theme import (
+    CARD_HOVER,
     COLORS,
     GOOGLE_FONTS_URL,
     PRIMARY_BUTTON,
+    SHADOWS,
     STATUS_COLORS,
     TEXT_PAIRS,
     contrast_ratio,
@@ -19,17 +21,35 @@ COLOR_LITERAL = re.compile(r"#[0-9A-Fa-f]{6}\b|#[0-9A-Fa-f]{3}\b|rgba?\(")
 
 class ThemeTests(unittest.TestCase):
     def test_brand_palette(self):
+        # Change 12 (Dark Industrial Premium): obsidian background, #161616 cards with a thin edge.
         self.assertEqual(
-            {key: COLORS[key] for key in ("black", "graphite", "surface", "orange", "text", "muted")},
+            {key: COLORS[key] for key in ("black", "graphite", "surface", "border", "orange", "text", "muted")},
             {
-                "black": "#000000",
+                "black": "#0D0D0D",
                 "graphite": "#121212",
-                "surface": "#1A1A1A",
+                "surface": "#161616",
+                "border": "#262626",
                 "orange": "#FF6600",
                 "text": "#FFFFFF",
                 "muted": "#A0A0A0",
             },
         )
+
+    def test_primary_actions_glow_orange_on_hover(self):
+        self.assertEqual(SHADOWS["glow"], "0 0 15px rgba(255, 102, 0, 0.25)")
+        self.assertEqual(PRIMARY_BUTTON["_hover"]["box_shadow"], SHADOWS["glow"])
+        self.assertEqual(CARD_HOVER["_hover"], {"border_color": COLORS["orange"], "box_shadow": SHADOWS["glow"]})
+
+    def test_motorcycle_badges_are_matte_with_their_own_edge(self):
+        # Dark background, text and border in the status color: emerald, amber and graphite.
+        self.assertEqual(STATUS_COLORS["DISPONIVEL"][1], "#34D399")
+        self.assertEqual(STATUS_COLORS["RESERVADA"][1], "#FBBF24")
+        self.assertEqual(STATUS_COLORS["VENDIDA"][1], "#A3A3A3")
+        for status in ("DISPONIVEL", "RESERVADA", "VENDIDA"):
+            background, text = STATUS_COLORS[status]
+            with self.subTest(status=status):
+                self.assertLess(contrast_ratio(background, COLORS["black"]), 1.5)  # matte, not a solid fill
+                self.assertGreaterEqual(contrast_ratio(text, COLORS["surface"]), 4.5)
 
     def test_contrast_ratio_matches_wcag_reference_values(self):
         self.assertAlmostEqual(contrast_ratio("#FFFFFF", "#000000"), 21.0, places=2)

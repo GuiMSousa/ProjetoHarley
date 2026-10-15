@@ -10,11 +10,11 @@ import reflex as rx
 
 
 COLORS = {
-    "black": "#000000",  # asphalt: app background
+    "black": "#0D0D0D",  # obsidian dark: app background (Change 12)
     "graphite": "#121212",  # matte black: sidebar, top bar, sections
-    "surface": "#1A1A1A",  # industrial gray: cards, tables, modals
+    "surface": "#161616",  # industrial gray: cards, tables, modals
     "surface_alt": "#232323",  # alternate rows and hover
-    "border": "#2E2E2E",
+    "border": "#262626",  # thin edge of cards and panels
     "metal_edge": "#3A3A3A",
     "orange": "#FF6600",  # Harley orange: accent and primary action
     "orange_hover": "#FF7A1F",
@@ -25,7 +25,7 @@ COLORS = {
     "danger": "#F87171",
     "overlay": "rgba(0, 0, 0, 0.72)",
     "shadow": "rgba(0, 0, 0, 0.45)",
-    "glow": "rgba(255, 102, 0, 0.35)",
+    "glow": "rgba(255, 102, 0, 0.25)",
 }
 
 FONTS = {
@@ -43,7 +43,8 @@ SPACING = {"xs": "0.5rem", "sm": "0.75rem", "md": "1rem", "lg": "1.5rem", "xl": 
 RADII = {"sm": "4px", "md": "8px", "pill": "999px"}
 SHADOWS = {
     "card": f"0 8px 24px {COLORS['shadow']}",
-    "glow": f"0 0 0 1px {COLORS['orange']}, 0 0 18px {COLORS['glow']}",
+    # Orange glow of the premium hover: primary buttons, action cards and showroom cards.
+    "glow": f"0 0 15px {COLORS['glow']}",
 }
 
 GRADIENTS = {
@@ -69,6 +70,12 @@ PANEL = {
 
 CARD = {**PANEL, "box_shadow": SHADOWS["card"]}
 
+# Interactive cards (dashboard actions, showroom): orange edge and glow on hover.
+CARD_HOVER = {
+    "transition": "border-color 0.15s ease, box-shadow 0.15s ease",
+    "_hover": {"border_color": COLORS["orange"], "box_shadow": SHADOWS["glow"]},
+}
+
 _BUTTON_BASE = {
     "font_weight": "700",
     "text_transform": "uppercase",
@@ -82,7 +89,7 @@ PRIMARY_BUTTON = {
     **_BUTTON_BASE,
     "background": COLORS["orange"],
     "color": COLORS["on_orange"],
-    "_hover": {"background": COLORS["orange_hover"]},
+    "_hover": {"background": COLORS["orange_hover"], "box_shadow": SHADOWS["glow"]},
     "_active": {"background": COLORS["orange_active"]},
 }
 
@@ -102,25 +109,28 @@ DANGER_BUTTON = {
     "_hover": {"background": COLORS["surface_alt"]},
 }
 
-# Badge palette for every status in the system: (background, text).
+# Matte badge palette for every status (Change 12): (dark background, text and border).
+_EMERALD = ("#0B2018", "#34D399")
+_AMBER = ("#241A06", "#FBBF24")
+_GRAPHITE = ("#1C1C1C", "#A3A3A3")
 STATUS_COLORS: dict[str, tuple[str, str]] = {
     # Service orders
-    "ABERTA": ("#FF6600", "#000000"),
-    "EM_ANDAMENTO": ("#1E3A5F", "#BFDBFE"),
-    "CONCLUIDA": ("#14532D", "#BBF7D0"),
-    "CANCELADA": ("#2E2E2E", "#D4D4D4"),
+    "ABERTA": ("#2A1405", "#FF8A3D"),
+    "EM_ANDAMENTO": ("#0C1A2E", "#60A5FA"),
+    "CONCLUIDA": _EMERALD,
+    "CANCELADA": _GRAPHITE,
     # Stock motorcycles
-    "DISPONIVEL": ("#14532D", "#BBF7D0"),
-    "RESERVADA": ("#78350F", "#FDE68A"),
-    "VENDIDA": ("#2E2E2E", "#D4D4D4"),
+    "DISPONIVEL": _EMERALD,
+    "RESERVADA": _AMBER,
+    "VENDIDA": _GRAPHITE,
     # Registration records (soft delete)
-    "ATIVO": ("#14532D", "#BBF7D0"),
-    "INATIVO": ("#2E2E2E", "#D4D4D4"),
+    "ATIVO": _EMERALD,
+    "INATIVO": _GRAPHITE,
     # Financial operations (Change 10)
-    "RECEITA": ("#14532D", "#BBF7D0"),
-    "DESPESA": ("#7F1D1D", "#FECACA"),
+    "RECEITA": _EMERALD,
+    "DESPESA": ("#2A0F0F", "#F87171"),
 }
-STATUS_FALLBACK = ("#2E2E2E", "#D4D4D4")
+STATUS_FALLBACK = _GRAPHITE
 
 # Text/background pairs used by the components; each must reach WCAG AA (4.5:1).
 TEXT_PAIRS: dict[str, tuple[str, str]] = {

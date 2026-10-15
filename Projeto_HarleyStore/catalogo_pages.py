@@ -7,13 +7,14 @@ import reflex as rx
 from Projeto_HarleyStore.auth import AuthState
 from Projeto_HarleyStore.catalogo_state import FAMILIA_TABS, CatalogoState, ModeloCard
 from Projeto_HarleyStore.components import modal_panel, page_body, public_shell
-from Projeto_HarleyStore.styles.theme import CARD, COLORS, GRADIENTS, RADII
+from Projeto_HarleyStore.styles.theme import CARD, CARD_HOVER, COLORS, GRADIENTS, RADII, SHADOWS
 from Projeto_HarleyStore.ui_helpers import (
     empty_state,
     error_callout,
     metal_button,
     modal_header,
     primary_button,
+    status_badge,
     swatch,
 )
 from Projeto_HarleyStore.vendas_state import VENDAS_ROUTE
@@ -29,14 +30,8 @@ def _imagem(modelo: ModeloCard) -> rx.Var:
 
 
 def _disponibilidade_badge(modelo: ModeloCard) -> rx.Component:
-    return rx.badge(
-        modelo.disponibilidade,
-        variant="solid",
-        radius="small",
-        color_scheme=rx.cond(modelo.disponivel, "green", "gray"),
-        font_weight="700",
-        text_transform="uppercase",
-    )
+    # Same matte badge as the stock units: emerald when available, graphite on request.
+    return status_badge(rx.cond(modelo.disponivel, "DISPONIVEL", "SOB_CONSULTA"), modelo.disponibilidade)
 
 
 def _swatches(modelo: ModeloCard) -> rx.Component:
@@ -128,7 +123,7 @@ def modelo_card(modelo: ModeloCard) -> rx.Component:
                 src=_imagem(modelo),
                 alt=modelo.nome,
                 width="100%",
-                aspect_ratio="16 / 10",
+                aspect_ratio="16 / 9",
                 object_fit="cover",
                 display="block",
             ),
@@ -159,9 +154,8 @@ def modelo_card(modelo: ModeloCard) -> rx.Component:
             padding="1.25rem",
         ),
         overflow="hidden",
-        transition="border-color 0.15s ease",
-        _hover={"border_color": COLORS["orange"]},
         **CARD,
+        **CARD_HOVER,
     )
 
 
@@ -185,38 +179,56 @@ def detail_modal() -> rx.Component:
     modelo = CatalogoState.detalhe
     return modal_panel(
         modal_header(modelo.nome, on_close=CatalogoState.close_detail),
-        rx.image(
-            src=_imagem(modelo),
-            alt=modelo.nome,
-            width="100%",
-            aspect_ratio="16 / 9",
-            object_fit="cover",
-            border_radius=RADII["md"],
-        ),
-        rx.hstack(
-            rx.vstack(
-                rx.text(modelo.familia_label, color=COLORS["muted"], text_transform="uppercase", letter_spacing="0.12em", size="1"),
-                rx.text(modelo.preco_label, color=COLORS["orange"], font_weight="700", size="5"),
-                spacing="1",
-                align="start",
+        rx.grid(
+            # Left: hero photo in a dark frame with a deep shadow.
+            rx.box(
+                rx.image(
+                    src=_imagem(modelo),
+                    alt=modelo.nome,
+                    width="100%",
+                    aspect_ratio="16 / 9",
+                    object_fit="cover",
+                    display="block",
+                    border_radius=RADII["sm"],
+                ),
+                padding="0.5rem",
+                background=COLORS["graphite"],
+                border=f"1px solid {COLORS['border']}",
+                border_radius=RADII["md"],
+                box_shadow=SHADOWS["card"],
             ),
-            rx.spacer(),
-            _disponibilidade_badge(modelo),
-            width="100%",
-            align="center",
-        ),
-        _swatches(modelo),
-        rx.cond(modelo.descricao != "", rx.text(modelo.descricao, color=COLORS["text"])),
-        rx.cond(
-            _can_sell(),
-            rx.hstack(rx.spacer(), _cta(modelo), width="100%"),
-            rx.callout(
-                "Para reservar esta moto, procure um de nossos vendedores na loja.",
-                icon="info",
+            # Right: model sheet and actions (the public showroom never shows chassis or units).
+            rx.vstack(
+                rx.hstack(
+                    rx.text(modelo.familia_label, color=COLORS["muted"], text_transform="uppercase", letter_spacing="0.12em", size="1"),
+                    rx.spacer(),
+                    _disponibilidade_badge(modelo),
+                    width="100%",
+                    align="center",
+                ),
+                rx.text(modelo.preco_label, color=COLORS["orange"], font_weight="700", size="5"),
+                rx.text("Cores", size="1", color=COLORS["muted"], text_transform="uppercase", letter_spacing="0.08em"),
+                _swatches(modelo),
+                rx.cond(modelo.descricao != "", rx.text(modelo.descricao, color=COLORS["text"], size="2")),
+                rx.cond(
+                    _can_sell(),
+                    _cta(modelo),
+                    rx.callout(
+                        "Para reservar esta moto, procure um de nossos vendedores na loja.",
+                        icon="info",
+                        width="100%",
+                    ),
+                ),
+                align="start",
+                spacing="3",
                 width="100%",
             ),
+            columns=rx.breakpoints(initial="1", md="2"),
+            spacing="5",
+            width="100%",
+            align_items="start",
         ),
-        width="min(100%, 48rem)",
+        width="min(100%, 56rem)",
     )
 
 

@@ -12,6 +12,7 @@ from Projeto_HarleyStore.auth import AuthState
 from Projeto_HarleyStore.balcao_state import BalcaoState
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_state import CatalogoState
+from Projeto_HarleyStore.dashboard_state import DashboardState
 from Projeto_HarleyStore.entradas_state import EntradasState
 from Projeto_HarleyStore.financeiro_state import FinanceiroState
 from Projeto_HarleyStore.vendas_state import VendasState
@@ -31,11 +32,14 @@ BUSY_HANDLERS = {
         "deactivate",
     ),
     CatalogoState: ("load_catalogo",),
+    DashboardState: ("load_dashboard",),
     EntradasState: ("load_entradas", "open_detail", "save_entrada"),
     FinanceiroState: ("load_financeiro", "aplicar_periodo", "usar_atalho"),
     VendasState: (
         "load_vendas",
         "open_detail",
+        "open_reserva",
+        "open_venda",
         "confirm_reserva",
         "confirm_cancelamento",
         "confirm_venda",

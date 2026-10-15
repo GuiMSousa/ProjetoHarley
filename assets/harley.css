@@ -13,8 +13,8 @@ html [data-accent-color='orange'] {
 }
 
 html .radix-themes {
-  --color-background: #000000;
-  --color-panel-solid: #1A1A1A;
+  --color-background: #0D0D0D;
+  --color-panel-solid: #161616;
   --default-font-family: 'Inter', Arial, sans-serif;
   --heading-font-family: 'Oswald', 'Arial Narrow', Arial, sans-serif;
 }
@@ -25,7 +25,7 @@ html {
 }
 
 body {
-  background: #000000;
+  background: #0D0D0D;
 }
 
 /* Money and quantity columns line up digit by digit. */

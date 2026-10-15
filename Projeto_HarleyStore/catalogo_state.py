@@ -17,6 +17,7 @@ from Projeto_HarleyStore.services.catalogo import (
     catalogo_cache,
 )
 from Projeto_HarleyStore.services.xano_client import XanoClient, XanoError, XanoNotFoundError
+from Projeto_HarleyStore.ui_helpers import get_foto_moto
 
 
 CATALOGO_ROUTE = "/catalogo"
@@ -63,12 +64,15 @@ def modelo_card(modelo: ModeloCatalogo) -> ModeloCard:
         familia=modelo.familia,
         familia_label=FAMILIA_LABELS[modelo.familia],
         descricao=modelo.descricao or "",
-        imagem=modelo.imagem_principal,
+        imagem=get_foto_moto(modelo),
         preco_label=preco_label(modelo.preco_a_partir),
         disponibilidade=disponibilidade_label(modelo.disponiveis),
         disponivel=modelo.disponiveis > 0,
         destaque=modelo.destaque,
-        cores=[CorCard(nome=cor.nome, hex=cor.hex, imagem_url=cor.imagem_url) for cor in modelo.variacoes_cor],
+        cores=[
+            CorCard(nome=cor.nome, hex=cor.hex, imagem_url=get_foto_moto(modelo, cor.imagem_url))
+            for cor in modelo.variacoes_cor
+        ],
     )
 
 

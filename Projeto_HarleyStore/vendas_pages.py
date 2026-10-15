@@ -5,7 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from Projeto_HarleyStore.components import guarded_page, modal_panel, page_body
-from Projeto_HarleyStore.styles.theme import COLORS, PANEL
+from Projeto_HarleyStore.styles.theme import COLORS, PANEL, RADII, SHADOWS
 from Projeto_HarleyStore.ui_helpers import (
     danger_button,
     data_table,
@@ -399,26 +399,86 @@ def timeline_row(evento: rx.Var) -> rx.Component:
     )
 
 
+def _detail_actions(detalhe: rx.Var) -> rx.Component:
+    """Reserve / Sell from the detail: the busy label shows while the customers load."""
+    return rx.hstack(
+        rx.cond(
+            detalhe["pode_reservar"] == "true",
+            metal_button(
+                rx.cond(VendasState.is_loading_detail, "Carregando…", "Reservar"),
+                on_click=VendasState.open_reserva(detalhe["id"]),
+                disabled=VendasState.is_busy,
+            ),
+        ),
+        rx.cond(
+            detalhe["pode_vender"] == "true",
+            primary_button(
+                rx.cond(VendasState.is_loading_detail, "Carregando…", "Vender"),
+                on_click=VendasState.open_venda(detalhe["id"]),
+                disabled=VendasState.is_busy,
+            ),
+        ),
+        spacing="2",
+        wrap="wrap",
+    )
+
+
 def detail_modal() -> rx.Component:
     detalhe = VendasState.detalhe
     return modal_panel(
         modal_header(detalhe["modelo"], on_close=VendasState.close_detail),
-        status_badge(detalhe["status"], detalhe["status_label"]),
         rx.grid(
-            labeled("Chassi", rx.text(detalhe["chassi"], font_family="monospace")),
-            labeled("Cor", rx.text(detalhe["cor"])),
-            labeled("Ano", rx.text(detalhe["ano"])),
-            labeled("Preço", rx.text(detalhe["preco"], color=COLORS["orange"], font_weight="700")),
-            labeled("Cliente", rx.text(detalhe["cliente"])),
-            labeled("Vendedor", rx.text(detalhe["vendedor"])),
-            labeled("Validade da reserva", rx.text(detalhe["validade"])),
-            columns=rx.breakpoints(initial="1", sm="2"),
-            spacing="4",
+            # Left: the unit's photo (its color when the model has one) in a dark frame.
+            rx.box(
+                rx.image(
+                    src=detalhe["foto"],
+                    alt=detalhe["modelo"],
+                    width="100%",
+                    aspect_ratio="16 / 9",
+                    object_fit="cover",
+                    display="block",
+                    border_radius=RADII["sm"],
+                ),
+                padding="0.5rem",
+                background=COLORS["graphite"],
+                border=f"1px solid {COLORS['border']}",
+                border_radius=RADII["md"],
+                box_shadow=SHADOWS["card"],
+            ),
+            # Right: unit sheet and actions.
+            rx.vstack(
+                rx.hstack(
+                    rx.text(detalhe["familia"], color=COLORS["muted"], text_transform="uppercase", letter_spacing="0.12em", size="1"),
+                    rx.spacer(),
+                    status_badge(detalhe["status"], detalhe["status_label"]),
+                    width="100%",
+                    align="center",
+                ),
+                rx.text(detalhe["preco"], color=COLORS["orange"], font_weight="700", size="6"),
+                rx.grid(
+                    labeled("Cor", rx.text(detalhe["cor"])),
+                    labeled("Ano", rx.text(detalhe["ano"])),
+                    labeled("Chassi", rx.text(detalhe["chassi"], font_family="monospace", word_break="break-all")),
+                    labeled("Cliente", rx.text(detalhe["cliente"])),
+                    labeled("Vendedor", rx.text(detalhe["vendedor"])),
+                    labeled("Validade da reserva", rx.text(detalhe["validade"])),
+                    columns="2",
+                    spacing="3",
+                    width="100%",
+                ),
+                _detail_actions(detalhe),
+                align="start",
+                spacing="3",
+                width="100%",
+            ),
+            columns=rx.breakpoints(initial="1", md="2"),
+            spacing="5",
             width="100%",
+            align_items="start",
         ),
         section_title("Linha do tempo"),
         rx.foreach(VendasState.detalhe_historico, timeline_row),
-        width="min(100%, 40rem)",
+        width="min(100%, 56rem)",
     )
 
 

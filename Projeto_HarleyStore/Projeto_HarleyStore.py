@@ -11,6 +11,7 @@ from Projeto_HarleyStore.catalogo_pages import catalogo_page
 from Projeto_HarleyStore.catalogo_state import CATALOGO_ROUTE, CatalogoState
 from Projeto_HarleyStore.components import app_shell, guarded_page, login_page
 from Projeto_HarleyStore.dashboard_pages import admin_placeholder, dashboard
+from Projeto_HarleyStore.dashboard_state import DashboardState
 from Projeto_HarleyStore.entradas_pages import entradas_page
 from Projeto_HarleyStore.entradas_state import ENTRADAS_ROUTE, EntradasState
 from Projeto_HarleyStore.financeiro_pages import financeiro_page
@@ -39,7 +40,12 @@ app = rx.App(
     # Mobile browser chrome matches the app background.
     head_components=[rx.el.meta(name="theme-color", content=COLORS["black"])],
 )
-app.add_page(index, route="/", title="Harley Store", on_load=AuthState.restore_session)
+app.add_page(
+    index,
+    route="/",
+    title="Harley Store",
+    on_load=[AuthState.restore_session, DashboardState.load_dashboard],
+)
 app.add_page(login, route="/login", title="Entrar | Harley Store")
 app.add_page(
     catalogo_page,

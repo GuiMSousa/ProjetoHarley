@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Callable
 
 import reflex as rx
 
+from Projeto_HarleyStore.listing import normalize_text
 from Projeto_HarleyStore.styles.theme import (
     CARD,
     COLORS,
@@ -16,6 +20,39 @@ from Projeto_HarleyStore.styles.theme import (
     STATUS_COLORS,
     STATUS_FALLBACK,
 )
+
+
+# ----- motorcycle media (Change 12) -----
+
+MOTOS_DIR = Path(__file__).resolve().parents[1] / "assets" / "motos"
+# Remote images that only stand in for a real photo (the catalog seed uses placehold.co).
+PLACEHOLDER_HOSTS = ("placehold.co", "placeholder.com", "dummyimage.com")
+
+
+def _campo(moto: object, nome: str) -> str:
+    valor = moto.get(nome) if isinstance(moto, Mapping) else getattr(moto, nome, None)
+    return str(valor or "").strip()
+
+
+def get_foto_moto(moto: object, imagem_url: str | None = None) -> str:
+    """URL of a motorcycle photo: the Xano image, else the local photo, else the default art.
+
+    ``moto`` is a catalog model, a stock unit or a dict with ``nome_modelo`` (and optionally
+    ``imagem_principal``); ``imagem_url`` (the photo of a color) replaces the main image. Local
+    files live in ``assets/motos``: ``fat-boy.jpg`` (real photo) and ``default_fat_boy.png``.
+    """
+    remota = (imagem_url if imagem_url is not None else _campo(moto, "imagem_principal")).strip()
+    if remota and not any(host in remota for host in PLACEHOLDER_HOSTS):
+        return remota
+    slug = "-".join(re.findall(r"[a-z0-9]+", normalize_text(_campo(moto, "nome_modelo") or _campo(moto, "modelo"))))
+    if slug:
+        if (MOTOS_DIR / f"{slug}.jpg").is_file():
+            return f"/motos/{slug}.jpg"
+        padrao = f"default_{slug.replace('-', '_')}.png"
+        if (MOTOS_DIR / padrao).is_file() or not remota:
+            return f"/motos/{padrao}"
+    # A model without local art keeps the remote placeholder rather than a broken image.
+    return remota
 
 
 # ----- form and feedback -----
@@ -244,10 +281,12 @@ def data_table(
 
 
 def _badge(label: rx.Var | str, background: str, color: str) -> rx.Component:
+    """Matte badge: dark background with text and thin border in the status color."""
     return rx.badge(
         label,
         background=background,
         color=color,
+        border=f"1px solid {color}",
         variant="solid",
         radius="small",
         font_weight="700",

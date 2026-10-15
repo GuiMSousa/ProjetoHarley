@@ -99,13 +99,16 @@ class ModeloCatalogo(BaseModel):
     nome_modelo: str
     familia: FamiliaMoto
     descricao: str | None = None
-    imagem_principal: str
+    # Optional: without it (or with a placeholder) the page shows the local photo (get_foto_moto).
+    imagem_principal: str | None = None
+    # Prepared for a future photo gallery; Xano does not send it yet.
+    galeria: list[str] = []
     variacoes_cor: list[VariacaoCor] = []
     destaque: bool = False
     preco_a_partir: Decimal
     disponiveis: int = 0
 
-    @field_validator("variacoes_cor", mode="before")
+    @field_validator("variacoes_cor", "galeria", mode="before")
     @classmethod
     def _null_cores(cls, value: object) -> object:
         return [] if value is None else value
