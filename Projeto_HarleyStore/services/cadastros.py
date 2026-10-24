@@ -1,4 +1,9 @@
-"""DTOs for the basic registration resources."""
+"""DTOs for the basic registration resources.
+
+Read DTOs (Cliente, MotoCliente, Produto, Fornecedor, Funcionario) are tolerant on display
+fields since Change 15: a record created outside the app must not break a whole list. The
+*Create/*Update DTOs keep every rule for what the app writes.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +12,20 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from Projeto_HarleyStore.services.leitura import TextoLido
+
 
 class CadastroModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: int
     ativo: bool = True
+
+    @field_validator("ativo", mode="before")
+    @classmethod
+    def _ativo_nulo(cls, value: object) -> object:
+        # A row created outside the app may leave the flag empty; Xano's default is active.
+        return True if value is None else value
 
 
 class ClienteCreate(BaseModel):
@@ -32,8 +45,12 @@ class ClienteUpdate(BaseModel):
     ativo: bool | None = None
 
 
-class Cliente(CadastroModel, ClienteCreate):
-    pass
+class Cliente(CadastroModel):
+    nome_cliente: TextoLido = ""
+    cpf_cnpj: TextoLido = ""
+    telefone: str | None = None
+    email: str | None = None
+    endereco: str | None = None
 
 
 class MotoClienteCreate(BaseModel):
@@ -52,8 +69,11 @@ class MotoClienteUpdate(BaseModel):
     ativo: bool | None = None
 
 
-class MotoCliente(CadastroModel, MotoClienteCreate):
-    pass
+class MotoCliente(CadastroModel):
+    id_cliente: int = Field(gt=0)
+    modelo: TextoLido = ""
+    placa: str | None = None
+    chassi: TextoLido = ""
 
 
 class ProdutoCreate(BaseModel):
@@ -76,7 +96,16 @@ class ProdutoUpdate(BaseModel):
     ativo: bool | None = None
 
 
-class Produto(CadastroModel, ProdutoCreate):
+class Produto(CadastroModel):
+    """Part as read from Xano: free texts are tolerant; stock and price stay business rules."""
+
+    codigo: TextoLido = ""
+    nome_produto: TextoLido = ""
+    descricao: str | None = None
+    categoria: TextoLido = ""
+    estoque_qtd: int = Field(default=0, ge=0)
+    preco_venda: Decimal = Field(gt=0)
+
     @field_validator("estoque_qtd", mode="before")
     @classmethod
     def null_stock_is_zero(cls, value: object) -> object:
@@ -97,8 +126,10 @@ class FornecedorUpdate(BaseModel):
     ativo: bool | None = None
 
 
-class Fornecedor(CadastroModel, FornecedorCreate):
-    pass
+class Fornecedor(CadastroModel):
+    nome_fornecedor: TextoLido = ""
+    cnpj: TextoLido = ""
+    contato: str | None = None
 
 
 FuncionarioTipo = Literal["GERENTE", "VENDEDOR", "MECANICO"]
@@ -119,5 +150,8 @@ class FuncionarioUpdate(BaseModel):
     ativo: bool | None = None
 
 
-class Funcionario(CadastroModel, FuncionarioCreate):
-    pass
+class Funcionario(CadastroModel):
+    nome_funcionario: TextoLido = ""
+    cargo: TextoLido = ""
+    tipo: FuncionarioTipo
+    contato: str | None = None

@@ -15,7 +15,7 @@ from Projeto_HarleyStore.services.catalogo import (
     ModeloMotoCreate,
     ModeloMotoUpdate,
     TtlCache,
-    VariacaoCor,
+    VariacaoCorCreate,
 )
 from Projeto_HarleyStore.services.xano_client import XanoClient, XanoRateLimitError
 
@@ -60,7 +60,7 @@ class CatalogoDtoTests(unittest.TestCase):
             {**COR, "nome": ""},
         ):
             with self.subTest(cor=invalid), self.assertRaises(ValidationError):
-                VariacaoCor(**invalid)
+                VariacaoCorCreate(**invalid)
 
     def test_model_rejects_invalid_fields(self):
         invalid = (

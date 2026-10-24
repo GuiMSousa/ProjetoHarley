@@ -342,12 +342,14 @@ def status_badge(status: rx.Var, label: rx.Var | str) -> rx.Component:
 
 def swatch(hex_color: rx.Var | str, name: rx.Var | str, *, selected: rx.Var | bool = False, on_click=None, size: str = "1.5rem") -> rx.Component:
     """Round color sample; a button when clickable, with the color name for screen readers."""
+    hex_var = rx.Var.create(hex_color)
     style = {
         "width": size,
         "height": size,
         "min_width": size,
         "border_radius": RADII["pill"],
-        "background": hex_color,
+        # An unreadable color is read as "" (Change 15): an empty ring, never the button's accent color.
+        "background": rx.cond(hex_var == "", "transparent", hex_var),
         "border": rx.cond(selected, f"2px solid {COLORS['orange']}", f"2px solid {COLORS['metal_edge']}"),
         "box_shadow": rx.cond(selected, f"0 0 0 2px {COLORS['black']} inset", "none"),
         "padding": "0",

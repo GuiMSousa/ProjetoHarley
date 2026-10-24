@@ -63,6 +63,13 @@ class SharedHelpersTests(unittest.TestCase):
             with self.subTest(component=type(component).__name__):
                 self.assertIsInstance(component, rx.Component)
 
+    def test_swatch_without_a_readable_color_is_an_empty_ring(self):
+        # A color typed in the Xano panel with an invalid hex is read as "": not the orange accent.
+        for hex_color in ("", rx.Var.create("")):
+            with self.subTest(hex_color=hex_color):
+                rendered = str(swatch(hex_color, "Preto", on_click=rx.console_log("x")))
+                self.assertIn("transparent", rendered)
+
     def test_status_badge_covers_every_status_with_its_palette(self):
         rendered = str(status_badge(rx.Var.create("RESERVADA"), "Reservada"))
         for name, (background, color) in STATUS_COLORS.items():

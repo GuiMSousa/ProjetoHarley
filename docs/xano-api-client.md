@@ -33,6 +33,7 @@ Regras importantes:
 - O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
 - Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (configurado em `.vscode/mcp.json`).
 - Desde 2026-10-15, o token do Swagger em `xano/api/harley/harley.xs` é o placeholder `YOUR_XANO_SWAGGER_TOKEN`; o valor real continua no histórico do Git. Antes de qualquer push, desligue o Swagger público (`xano workspace edit --no-swagger`) ou gere um token novo, e confira se o `--dry-run` lista o grupo `HARLEY`: publicar o placeholder pode trocar o token do Swagger por um valor conhecido. Um `xano workspace pull` traz o token real de volta ao arquivo.
+- Não rode `xano workspace pull` dentro de `xano/`. Além de trazer o token, a CLI 1.3.x grava 6 endpoints em pastas aninhadas (por exemplo, `motos/motos_id/reserva_POST.xs` no lugar de `motos/motos_id_reserva_POST.xs`) e não apaga os arquivos que já existem (conferido em 2026-10-22): esses endpoints ficariam em dobro no próximo push. Para conferir mudanças feitas no painel, puxe numa pasta temporária fora do projeto, compare com `xano/` e apague a pasta, porque ela contém o token.
 
 ### Checklist pós-deploy da Change 5 e do saneamento
 
@@ -302,8 +303,18 @@ Os DTOs ficam em `Projeto_HarleyStore.services.balcao`:
 | `404` | `XanoNotFoundError` | genérica | "O registro solicitado não foi encontrado." | toast |
 | `429` | `XanoRateLimitError` | genérica | "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente." | toast ou erro da lista; a vitrine usa cache de 60 s |
 | `400` / `422` | `XanoValidationError` | `message` do Xano, se texto com até 200 caracteres; senão genérica | a própria mensagem de negócio | mantém o formulário aberto com a mensagem |
-| demais / transporte | `XanoError` | genérica | "Não foi possível comunicar com o Xano. Tente novamente." | toast ou erro da lista |
-| `2xx` fora do DTO | `XanoResponseError` | genérica | idem `XanoError` | idem |
+| transporte (timeout, conexão) | `XanoConnectionError` | genérica | "Sem conexão com o Xano. Verifique a internet e tente novamente." | toast ou erro da lista; log `WARNING` |
+| `5xx` | `XanoError` | genérica | "O Xano teve um erro interno. O problema foi registrado; tente novamente em instantes." | toast ou erro da lista; log `ERROR` |
+| demais | `XanoError` | genérica | "Não foi possível comunicar com o Xano. Tente novamente." | toast ou erro da lista |
+| `2xx` fora do DTO | `XanoResponseError` | genérica | "O Xano enviou dados fora do formato esperado. O problema foi registrado; avise o responsável pelo sistema." | toast ou erro da lista; log `WARNING` |
+
+**Leitura tolerante (Change 15).** As listas (`XanoClient._list`) são validadas registro a registro.
+
+- Um registro fora do contrato de leitura é descartado e gera um log `WARNING` com endpoint, índice, `id` e os campos e tipos do erro, nunca os valores.
+- Uma resposta que não é lista, ou sem nenhum registro válido, continua sendo `XanoResponseError`.
+- Os DTOs de leitura são separados dos de escrita. Campos de exibição (textos, imagens, cores, preço de vitrine) aceitam nulo e formatos fora do padrão com valor padrão; uma `imagem_url` que não seja `http(s)` ou caminho local vira vazio.
+- Identidade, vínculo e regras de negócio continuam estritos: ids, chaves, enums, saldo ≥ 0 e preço de peça > 0.
+- Os logs saem pelo logger `Projeto_HarleyStore.services.xano_client` na saída do backend do Reflex.
 
 Somente o campo `message` de respostas `400`/`422` é propagado; nenhum outro conteúdo do corpo, token ou payload chega às exceções. Os estados Reflex usam `AuthState._xano_error_response` para aplicar a tabela acima de forma uniforme. Quando uma gravação é concluída mas o recarregamento da lista falha, a UI confirma a gravação e mostra o erro apenas na lista.
 

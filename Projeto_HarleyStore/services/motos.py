@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from Projeto_HarleyStore.services.catalogo import FamiliaMoto, VariacaoCor
+from Projeto_HarleyStore.services.leitura import lista_lida
 
 
 StatusMoto = Literal["DISPONIVEL", "RESERVADA", "VENDIDA"]
@@ -168,7 +169,8 @@ class MotoEstoque(BaseModel):
     @field_validator("variacoes_cor", mode="before")
     @classmethod
     def _null_cores(cls, value: object) -> object:
-        return [] if value is None else value
+        # Colors of the unit's model: free JSON in Xano, so only well-formed items are read.
+        return lista_lida(value, (dict, BaseModel))
 
 
 class MotoEstoqueDetalhe(MotoEstoque):

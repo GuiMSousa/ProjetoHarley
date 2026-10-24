@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from Projeto_HarleyStore.services.leitura import TextoLido
+
 
 StatusOS = Literal["ABERTA", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"]
 TipoServico = Literal["PREVENTIVA", "CORRETIVA"]
@@ -167,4 +169,4 @@ class Mecanico(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: int
-    nome_funcionario: str
+    nome_funcionario: TextoLido = ""

@@ -8,10 +8,12 @@ from reflex.event import EventSpec
 
 from Projeto_HarleyStore.services.xano_client import (
     XanoAuthenticationError,
+    XanoConnectionError,
     XanoError,
     XanoNotFoundError,
     XanoPermissionError,
     XanoRateLimitError,
+    XanoResponseError,
     XanoValidationError,
 )
 
@@ -31,6 +33,13 @@ def error_feedback(error: XanoError) -> str:
         return str(error)
     if isinstance(error, XanoRateLimitError):
         return "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente."
+    if isinstance(error, XanoConnectionError):
+        return "Sem conexão com o Xano. Verifique a internet e tente novamente."
+    # Contract breaks are logged by the client (Change 15), so the message can say so.
+    if isinstance(error, XanoResponseError):
+        return "O Xano enviou dados fora do formato esperado. O problema foi registrado; avise o responsável pelo sistema."
+    if error.status_code is not None and error.status_code >= 500:
+        return "O Xano teve um erro interno. O problema foi registrado; tente novamente em instantes."
     return "Não foi possível comunicar com o Xano. Tente novamente."
 
 

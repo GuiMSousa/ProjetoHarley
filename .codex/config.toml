@@ -2,3 +2,8 @@
 # Autenticação, modelo e permissões ficam na configuração pessoal, fora do repositório.
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
+
+# Xano Developer MCP: documentação e validação de XanoScript, sem token. No Windows, o npx roda via cmd.
+[mcp_servers.xano-developer]
+command = "cmd"
+args = ["/c", "npx", "-y", "@xano/developer-mcp"]

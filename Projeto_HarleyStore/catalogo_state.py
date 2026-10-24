@@ -48,8 +48,9 @@ class ModeloCard:
     fotos: list[str] = dataclasses.field(default_factory=list)
 
 
-def preco_label(valor: Decimal) -> str:
-    return f"A partir de {format_currency(valor)}"
+def preco_label(valor: Decimal | None) -> str:
+    # A model with neither an available unit nor a base price (created outside the app).
+    return "Preço sob consulta" if valor is None else f"A partir de {format_currency(valor)}"
 
 
 def disponibilidade_label(disponiveis: int) -> str:

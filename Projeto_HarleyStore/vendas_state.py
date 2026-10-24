@@ -238,7 +238,7 @@ def modelo_form(modelo: ModeloMoto | None = None) -> dict[str, str]:
         "nome_modelo": modelo.nome_modelo,
         "familia": FAMILIA_LABELS[modelo.familia],
         "descricao": modelo.descricao or "",
-        "preco_base": str(modelo.preco_base),
+        "preco_base": "" if modelo.preco_base is None else str(modelo.preco_base),
         "imagem_principal": modelo.imagem_principal,
         "destaque": "true" if modelo.destaque else "false",
     }
@@ -467,7 +467,14 @@ class VendasState(AuthState):
             for moto in client.list_motos_estoque()
         ]
         if can_manage_catalog(self.employee_role):
-            modelos = client.list_modelos_moto()
+            try:
+                modelos = client.list_modelos_moto()
+            except XanoAuthenticationError:
+                raise
+            except XanoError as error:
+                # The models feed only the manager's catalog tab: their failure keeps the units (Change 15).
+                self.list_error = error_feedback(error)
+                return
             self.modelos = [modelo_row(modelo) for modelo in modelos]
             self.cores_por_modelo = {
                 str(modelo.id): [cor.model_dump() for cor in modelo.variacoes_cor]

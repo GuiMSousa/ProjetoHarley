@@ -36,7 +36,7 @@ from typing import ClassVar
 from unittest.mock import patch
 
 from Projeto_HarleyStore.services.balcao import ItemVendaBalcaoCreate, VendaBalcaoCreate
-from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCor
+from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCorCreate
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
 from Projeto_HarleyStore.services.financeiro import FUSO_LOJA, OPERACOES_LIMITE, PeriodoFinanceiro
 from Projeto_HarleyStore.services.motos import (
@@ -740,7 +740,7 @@ class XanoLiveSalesWriteTestCase(XanoLiveWriteTestCase):
     """Creates a model and a unit of its own; they stay in the database (no deletion)."""
 
     def create_unit(self, client: XanoClient):
-        cor = VariacaoCor(
+        cor = VariacaoCorCreate(
             nome="Teste", hex="#FF6600", imagem_url="https://placehold.co/800x500/FF6600/000000/png"
         )
         modelo = client.criar_modelo_moto(

@@ -106,6 +106,29 @@ O `DELETE` de clientes, motos de clientes, produtos, fornecedores, funcionários
 
 Componentes e regras repetidos entre páginas DEVEM viver em módulos compartilhados: `ui_helpers.py` (`labeled`, `error_callout`, `operation_is_blocked`) e `feedback.py` (`error_feedback`, `toast_error`, `toast_success`). Os estados NÃO DEVEM chamar `rx.toast` diretamente nem importar funções de outros estados de página.
 
+## Requisito: leitura tolerante e observável
+
+Os DTOs de leitura DEVEM ser separados dos de escrita (Change 15).
+
+- Campos de exibição (textos, imagens, cores e preço de vitrine) DEVEM aceitar nulo ou formato fora do padrão, com valor padrão. Uma URL de imagem que não seja `http(s)` ou caminho local NÃO DEVE ser aceita.
+- Identidade, vínculo e regras de negócio (ids, chaves, enums, saldo ≥ 0, preço de peça > 0) DEVEM continuar estritos.
+- As listas do cliente Xano DEVEM ser validadas registro a registro. O registro inválido DEVE ser descartado e registrado em log com endpoint, índice, `id` e os campos e tipos do erro, NUNCA com os valores.
+- Uma lista sem nenhum registro válido, ou uma resposta que não seja lista, DEVE continuar sendo erro.
+- Telas que combinam fontes DEVEM isolar a falha de cada uma: os KPIs da visão geral, e as unidades e os modelos em `/vendas`.
+- As mensagens DEVEM distinguir falha de conexão, dados fora do contrato e erro interno do Xano.
+
+### Cenário: registro criado fora do app
+
+- **DADO** uma unidade com status fora do enum, gravada direto no painel do Xano
+- **QUANDO** `/vendas` carregar
+- **ENTÃO** as demais unidades DEVEM aparecer, sem mensagem de erro, e o log DEVE registrar o descarte sem os valores do registro
+
+### Cenário: uma fonte da visão geral falha
+
+- **DADO** um vendedor na visão geral
+- **QUANDO** a lista de motos responder `500`
+- **ENTÃO** o KPI de OS DEVE aparecer, o de motos DEVE mostrar "—" e a mensagem DEVE indicar erro interno do Xano
+
 ## Requisito: autoria imutável
 
 Nenhum endpoint DEVE gravar `id_funcionario` vindo do payload. Transações não têm correção manual; o autor é sempre o funcionário do JWT da operação que as criou.

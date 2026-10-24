@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any, Self, TypeVar
 
@@ -66,6 +67,21 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 MAX_VALIDATION_MESSAGE_LENGTH = 200
 
+logger = logging.getLogger(__name__)
+
+
+def _invalid_fields(error: ValidationError) -> str:
+    """Field paths and error types of a contract break, never the values (they may be personal data)."""
+    return "; ".join(
+        f"{'.'.join(str(part) for part in detail['loc']) or '<root>'}: {detail['type']}"
+        for detail in error.errors(include_input=False, include_url=False, include_context=False)
+    )
+
+
+def _record_id(item: object) -> int | None:
+    record_id = item.get("id") if isinstance(item, dict) else None
+    return record_id if isinstance(record_id, int) else None
+
 
 def validation_message(response: httpx.Response) -> str | None:
     """Return Xano's business validation message when it is short plain text."""
@@ -88,6 +104,10 @@ class XanoError(RuntimeError):
     def __init__(self, message: str, *, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+class XanoConnectionError(XanoError):
+    """Raised when Xano cannot be reached (timeout, DNS or connection failure)."""
 
 
 class XanoAuthenticationError(XanoError):
@@ -210,7 +230,8 @@ class XanoClient:
                 params=params,
             )
         except httpx.HTTPError as error:
-            raise XanoError("Unable to reach the Xano API.") from error
+            logger.warning("Xano %s %s unreachable: %s", method, path, type(error).__name__)
+            raise XanoConnectionError("Unable to reach the Xano API.") from error
 
         if response.status_code == 401:
             raise XanoAuthenticationError(
@@ -238,6 +259,7 @@ class XanoClient:
                 status_code=response.status_code,
             )
         if response.is_error:
+            logger.error("Xano %s %s answered HTTP %s", method, path, response.status_code)
             raise XanoError(
                 "The Xano API returned an unexpected error.",
                 status_code=response.status_code,
@@ -247,6 +269,7 @@ class XanoClient:
         try:
             payload = response.json()
         except ValueError as error:
+            logger.warning("Xano %s %s returned a body that is not JSON", method, path)
             raise XanoResponseError(
                 "The Xano API returned an invalid JSON response.",
                 status_code=response.status_code,
@@ -258,6 +281,12 @@ class XanoClient:
                 return response_model.validate_python(payload)
             return response_model.model_validate(payload)
         except ValidationError as error:
+            logger.warning(
+                "Xano %s %s returned a payload outside the read contract: %s",
+                method,
+                path,
+                _invalid_fields(error),
+            )
             raise XanoResponseError(
                 "The Xano API returned an unexpected response payload.",
                 status_code=response.status_code,
@@ -323,8 +352,42 @@ class XanoClient:
     ) -> Any:
         return self.request("DELETE", path, authenticated=authenticated)
 
+    def _list(
+        self,
+        path: str,
+        model: type[ModelT],
+        *,
+        params: Mapping[str, Any] | None = None,
+        authenticated: bool = True,
+    ) -> list[ModelT]:
+        """GET a list validating record by record (Change 15).
+
+        A record outside the read contract is logged and skipped, so one bad row never takes a
+        whole screen down. A payload that is not a list, or where no record is valid, is a
+        contract break and raises ``XanoResponseError``: an empty list would hide it.
+        """
+        payload = self.get(path, params=params, authenticated=authenticated)
+        if not isinstance(payload, list):
+            logger.warning("Xano GET %s: expected a list of records, got %s", path, type(payload).__name__)
+            raise XanoResponseError("The Xano API returned an unexpected response payload.")
+        records: list[ModelT] = []
+        for index, item in enumerate(payload):
+            try:
+                records.append(model.model_validate(item))
+            except ValidationError as error:
+                logger.warning(
+                    "Xano GET %s: record %s (id=%s) skipped, outside the read contract: %s",
+                    path,
+                    index,
+                    _record_id(item),
+                    _invalid_fields(error),
+                )
+        if payload and not records:
+            raise XanoResponseError("The Xano API returned an unexpected response payload.")
+        return records
+
     def _list_resource(self, path: str, model: type[ModelT]) -> list[ModelT]:
-        return self.get(path, response_model=TypeAdapter(list[model]))
+        return self._list(path, model)
 
     def _create_resource(
         self, path: str, payload: BaseModel, model: type[ModelT]
@@ -468,11 +531,7 @@ class XanoClient:
             for key, value in {"status": status, "id_moto_cliente": id_moto_cliente}.items()
             if value is not None
         }
-        return self.get(
-            "ordens_servico",
-            params=params or None,
-            response_model=TypeAdapter(list[OrdemServicoResumo]),
-        )
+        return self._list("ordens_servico", OrdemServicoResumo, params=params or None)
 
     def get_ordem_servico(self, os_id: int) -> OrdemServicoDetalhe:
         return self.get(
@@ -519,7 +578,7 @@ class XanoClient:
         )
 
     def list_mecanicos(self) -> list[Mecanico]:
-        return self.get("oficina/mecanicos", response_model=TypeAdapter(list[Mecanico]))
+        return self._list("oficina/mecanicos", Mecanico)
 
     # ----- motorcycle catalog -----
 
@@ -530,12 +589,7 @@ class XanoClient:
         params = {
             key: value for key, value in {"familia": familia, "busca": busca}.items() if value
         }
-        return self.get(
-            "catalogo",
-            params=params or None,
-            authenticated=False,
-            response_model=TypeAdapter(list[ModeloCatalogo]),
-        )
+        return self._list("catalogo", ModeloCatalogo, params=params or None, authenticated=False)
 
     def get_modelo_catalogo(self, modelo_id: int) -> ModeloCatalogo:
         return self.get(
@@ -543,7 +597,7 @@ class XanoClient:
         )
 
     def list_modelos_moto(self) -> list[ModeloMoto]:
-        return self.get("modelos_moto", response_model=TypeAdapter(list[ModeloMoto]))
+        return self._list("modelos_moto", ModeloMoto)
 
     def criar_modelo_moto(self, modelo: ModeloMotoCreate) -> ModeloMoto:
         return self.post(
@@ -570,9 +624,7 @@ class XanoClient:
             for key, value in {"status": status, "id_modelo": id_modelo}.items()
             if value is not None
         }
-        return self.get(
-            "motos", params=params or None, response_model=TypeAdapter(list[MotoEstoque])
-        )
+        return self._list("motos", MotoEstoque, params=params or None)
 
     def get_moto_estoque(self, moto_id: int) -> MotoEstoqueDetalhe:
         return self.get(f"motos/{moto_id}", response_model=MotoEstoqueDetalhe)

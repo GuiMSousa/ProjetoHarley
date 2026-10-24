@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -9,6 +10,8 @@ from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from Projeto_HarleyStore.services.leitura import TextoLido, lista_lida
 
 
 FamiliaMoto = Literal["TOURING", "CRUISER", "ADVENTURE", "SPORT"]
@@ -23,14 +26,39 @@ HTTPS_URL = r"^https://\S+$"
 HEX_COLOR = r"^#[0-9A-Fa-f]{6}$"
 
 
-class VariacaoCor(BaseModel):
-    """Color option of a model: display name, swatch color and the photo in that color."""
+class VariacaoCorCreate(BaseModel):
+    """Color option written by the manager: display name, swatch color and the photo in that color."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
 
     nome: str = Field(min_length=1, max_length=60)
     hex: str = Field(pattern=HEX_COLOR)
     imagem_url: str = Field(pattern=HTTPS_URL)
+
+
+class VariacaoCor(BaseModel):
+    """Color option as read from Xano (Change 15): tolerant, but never an unsafe value.
+
+    A color typed outside the app keeps its name; an invalid swatch color or a photo URL that
+    is not a web or local address reads as empty (no swatch, local photo).
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
+
+    nome: TextoLido = ""
+    hex: TextoLido = ""
+    imagem_url: TextoLido = ""
+
+    @field_validator("hex")
+    @classmethod
+    def _hex_valido(cls, value: str) -> str:
+        return value if re.match(HEX_COLOR, value) else ""
+
+    @field_validator("imagem_url")
+    @classmethod
+    def _url_segura(cls, value: str) -> str:
+        # Only web photos or local assets reach an <img>: never javascript:, data: and the like.
+        return value if value.startswith(("https://", "http://", "/")) else ""
 
 
 class ModeloMotoCreate(BaseModel):
@@ -41,7 +69,7 @@ class ModeloMotoCreate(BaseModel):
     descricao: str | None = Field(default=None, max_length=2000)
     preco_base: Decimal = Field(gt=0, decimal_places=2)
     imagem_principal: str = Field(pattern=HTTPS_URL)
-    variacoes_cor: list[VariacaoCor] = Field(default_factory=list, max_length=MAX_CORES)
+    variacoes_cor: list[VariacaoCorCreate] = Field(default_factory=list, max_length=MAX_CORES)
     destaque: bool = False
 
 
@@ -55,22 +83,25 @@ class ModeloMotoUpdate(BaseModel):
     descricao: str | None = Field(default=None, max_length=2000)
     preco_base: Decimal | None = Field(default=None, gt=0, decimal_places=2)
     imagem_principal: str | None = Field(default=None, pattern=HTTPS_URL)
-    variacoes_cor: list[VariacaoCor] | None = Field(default=None, max_length=MAX_CORES)
+    variacoes_cor: list[VariacaoCorCreate] | None = Field(default=None, max_length=MAX_CORES)
     destaque: bool | None = None
     ativo: bool | None = None
 
 
 class ModeloMoto(BaseModel):
-    """Model as managed by the store manager (includes inactive ones)."""
+    """Model as managed by the store manager (includes inactive ones).
+
+    Display fields are tolerant (Change 15); ModeloMotoCreate/Update validate what is written.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     id: int
-    nome_modelo: str
+    nome_modelo: TextoLido = ""
     familia: FamiliaMoto
     descricao: str | None = None
-    preco_base: Decimal
-    imagem_principal: str
+    preco_base: Decimal | None = None
+    imagem_principal: TextoLido = ""
     variacoes_cor: list[VariacaoCor] = []
     destaque: bool = False
     ativo: bool = True
@@ -78,7 +109,7 @@ class ModeloMoto(BaseModel):
     @field_validator("variacoes_cor", mode="before")
     @classmethod
     def _null_cores(cls, value: object) -> object:
-        return [] if value is None else value
+        return lista_lida(value, (dict, BaseModel))
 
     @field_validator("destaque", mode="before")
     @classmethod
@@ -97,7 +128,7 @@ class ModeloCatalogo(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: int
-    nome_modelo: str
+    nome_modelo: TextoLido = ""
     familia: FamiliaMoto
     descricao: str | None = None
     # Optional: without it (or with a placeholder) the page shows the local photo (get_foto_moto).
@@ -106,13 +137,19 @@ class ModeloCatalogo(BaseModel):
     galeria: list[str] = []
     variacoes_cor: list[VariacaoCor] = []
     destaque: bool = False
-    preco_a_partir: Decimal
+    # Null when the model has neither an available unit nor a base price: "Preço sob consulta".
+    preco_a_partir: Decimal | None = None
     disponiveis: int = 0
 
-    @field_validator("variacoes_cor", "galeria", mode="before")
+    @field_validator("variacoes_cor", mode="before")
     @classmethod
     def _null_cores(cls, value: object) -> object:
-        return [] if value is None else value
+        return lista_lida(value, (dict, BaseModel))
+
+    @field_validator("galeria", mode="before")
+    @classmethod
+    def _null_galeria(cls, value: object) -> object:
+        return lista_lida(value, str)
 
     @field_validator("destaque", mode="before")
     @classmethod

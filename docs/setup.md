@@ -67,7 +67,7 @@ Estados possíveis:
 | find-skills | A cópia em `.agents/skills/` estava alterada ("claude" trocado por "Codex", provável importador do Codex) e ignorada pelo `.gitignore`. Foi restaurada a partir de `.claude/skills/` e o ignore saiu | Projeto | Validado: as duas cópias têm o mesmo sha256 e a skill é descoberta pelo Claude |
 | Skills Reflex | Plugin no Claude e no Codex, mais cópias em `.agents/` e `.aider-desk/` | Usuário + projeto | Reaproveitado; no Codex aparecem duplicadas (plugin e `.agents/`) |
 | MCP do plugin reflex | Precisa de autenticação | Usuário | Bloqueado: o usuário autentica pelo `/mcp` |
-| MCP xano-developer | Já conectado | Usuário + editor | Reaproveitado |
+| MCP xano-developer | Developer MCP do manual (documentação e validação, sem token). Em 2026-10-22 entrou também em `.mcp.json` e `.codex/config.toml`, com o mesmo nome da configuração do usuário para não duplicar e `cmd /c` porque o `npx` do Windows é um `.cmd`. O editor e o Gemini usam `.vscode/mcp.json` e `.gemini/settings.json`, como no manual | Projeto + usuário + editor | Validado: `claude mcp list` mostra um único `xano-developer` conectado (vale o do usuário até o do projeto ser aprovado), e o validador aprovou os 129 `.xs` |
 | web-design-guidelines | Já instalada | Usuário | Reaproveitado para revisão de UI |
 | Skills Vercel React/Next e mobile | O frontend é escrito em Python; o React é gerado em `.web/` | — | Inaplicável |
 | writing-guidelines | Guia em inglês e voltado à Vercel; os docs são em pt-BR | — | Inaplicável |
@@ -151,7 +151,8 @@ Estados possíveis:
 | RTK, graphify no Codex, agent-browser | Instalação global, fora do escopo autorizado | Prompt 10, com autorização |
 | `~/.codex/AGENTS.md` com o caminho `~/.Codex/skills/graphify` | Provável importador do Codex trocando "claude" por "Codex" | Corrigir no prompt 10 (`graphify install --platform codex`) |
 | "�" no bloco gerenciado do Reflex no AGENTS.md | Travessão gravado com encoding errado | Não editado, por respeito ao marcador "do not edit"; um `reflex init` futuro pode regenerar o bloco |
-| Change 13 arquivada em `openspec/archive/saneamento-pos-change-7/carrossel-galeria-moto/` | Fica aninhada, diferente das outras 16 changes | Usuário: confirmar se é intencional (o padrão seria `openspec/archive/carrossel-galeria-moto/`) |
+| Colunas de `modelos_moto` só no Xano publicado | `galeria` (`image[1:10]`) e `default_motos` (texto) foram criadas pelo painel e nunca entraram em `xano/table/modelos_moto.xs` (comparação de 2026-10-22). O push parcial não as apaga; um `--sync` apagaria as colunas e as fotos | Decisão do usuário: versionar (e levar à vitrine numa change) ou remover. Até lá, nenhum `--sync` |
+| OpenSpec fora do layout da CLI | O projeto arquiva em `openspec/archive/` e guarda specs em `openspec/specs/*.md`. A CLI 1.13.2 e o material do curso esperam `openspec/changes/archive/` e `openspec/specs/<capacidade>/spec.md`: `openspec list --specs` responde "No specs found", e um `openspec archive` criaria uma segunda pasta de archive. Os workflows `/opsx` não estão instalados | Decisão do usuário: manter o layout próprio, documentado, ou migrar numa change de estrutura |
 | Débitos do audit no Xano | Mudanças no Xano exigem dupla aprovação e push | Changes próprias. Itens: agente e tool de IA remotos (`--sync --delete`), `\|sort` ambíguo em `entrada_mercadoria_POST` e `Financeiro/resumo_operacoes`, Swagger público, integração nunca rodada ao vivo (os modais sem Esc nem foco preso foram resolvidos na Change 14) |
 | 14 arquivos acima de 350 linhas | Refatorar não cabe num setup | Change OpenSpec própria (prompt 09 do toolkit) |
 | reflex 0.10.0 e outras atualizações | Pode trazer quebras | Change própria, com changelog e a suíte completa |

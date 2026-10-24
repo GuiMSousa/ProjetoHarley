@@ -77,20 +77,33 @@ class DashboardState(AuthState):
         self.is_loading_kpis = True
         self.kpi_error = ""
         yield  # render the busy state before the Xano call
+        erros: list[XanoError] = []
+
+        def buscar(carregar):
+            # Each source fails alone (Change 15): its card shows "—" and the others keep their values.
+            try:
+                return carregar()
+            except XanoAuthenticationError:
+                raise
+            except XanoError as error:
+                erros.append(error)
+                return None
+
         try:
             with XanoClient(token=self.auth_token) as client:
-                ordens = client.list_ordens_servico() if "os" in visiveis else None
-                motos = client.list_motos_estoque() if "motos" in visiveis else None
+                ordens = buscar(client.list_ordens_servico) if "os" in visiveis else None
+                motos = buscar(client.list_motos_estoque) if "motos" in visiveis else None
                 resumo = None
                 if "faturamento" in visiveis:
                     hoje = datetime.now(FUSO_LOJA).date()
-                    resumo = client.resumo_financeiro(PeriodoFinanceiro(inicio=hoje.replace(day=1), fim=hoje))
+                    periodo = PeriodoFinanceiro(inicio=hoje.replace(day=1), fim=hoje)
+                    resumo = buscar(lambda: client.resumo_financeiro(periodo))
             self.kpis = montar_kpis(ordens, motos, resumo)
-        except XanoError as error:
+            self.kpi_error = error_feedback(erros[0]) if erros else ""
+        except XanoAuthenticationError as error:
             self.kpis = {}
             self.kpi_error = error_feedback(error)
-            if isinstance(error, XanoAuthenticationError):
-                return self._xano_error_response(error)
+            return self._xano_error_response(error)
         finally:
             self.is_loading_kpis = False
         return None

@@ -35,13 +35,14 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 | XanoScript | Validador do MCP `xano-developer` e `xano workspace push -d ./xano --dry-run` | Sintaxe dos `.xs` e o diff que o push aplicaria | Nada é publicado; o push exige o OK do usuário |
 | Tipos | indisponível | — | — |
 
-**Referência em 2026-10-15:**
+**Referência em 2026-10-23 (Change 15, com a correção da amostra de cor):**
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 403 passaram, 41 pulados (integração e navegador);
+- pytest: 430 passaram, 42 pulados (integração e navegador);
 - `reflex compile --dry`: OK;
-- smoke de navegador: 2 passaram, 5 rodadas seguidas.
+- smoke de navegador: 3 passaram, com o catálogo público real;
+- validador do MCP `xano-developer`: 129 `.xs` válidos.
 
 **Tipos:** não há checker estático. As Vars e os componentes do Reflex são dinâmicos, então mypy ou pyright gerariam ruído antes de achar defeitos; as fronteiras externas já são validadas em runtime pelo pydantic. Vale revisitar se a camada `services/` crescer sem cobertura de testes.
 
@@ -95,6 +96,7 @@ Para remedir (o `--isolated` ignora o `ruff.toml`):
 
 - **Testes offline (padrão):** simulam o `XanoClient` e exercitam os handlers como o Reflex os executa. Comportamento novo vem com teste do caminho feliz e das falhas relevantes; correção de bug vem com teste de regressão.
 - **Contratos dos `.xs`:** leem o texto dos endpoints e protegem RBAC, transações e validações sem chamar o Xano.
+- **Leitura tolerante (Change 15):** `tests/test_resiliencia_leitura.py` injeta JSON malformado pelo HTTP simulado. Confere que só o registro ruim some, que o log não traz valores, que cada tela isola sua fonte e que as mensagens separam rede, dados e erro interno. Um registro gravado fora do app (painel do Xano) é o caso a cobrir sempre que um DTO de leitura mudar. Para ver o efeito na tela, rode uma cópia do app fora do projeto, com um `.env` próprio apontando para um Xano simulado (o `env_file` do Reflex sobrescreve variáveis do processo), e instale os pacotes da cópia nela mesma. Não ligue o `node_modules` da cópia ao do projeto: o cache do Reflex guarda caminhos absolutos, a cópia reinstala os pacotes e pode gravar versões novas no projeto.
 - **Integração e navegador:** são opt-in. Use um workspace ou branch de testes, porque a integração com escrita grava dados reais. O smoke lê o catálogo público do workspace configurado no `.env` e nunca faz login.
 - **Sem cobertura:** fluxos autenticados no navegador, regressão visual e a integração ao vivo.
 
