@@ -21,6 +21,10 @@ O objetivo é alinhar o versionado com o publicado, corrigir a ordem de baixa de
 3. **`GET ordens_servico`:** a consulta de funcionários traz todas as colunas para mapear dois nomes. Passa a usar `output = ["id", "nome_funcionario"]`.
 4. **Verificar, sem alterar, `Financeiro/resumo_operacoes`:** o exemplo da documentação do `sort` é ambíguo quanto ao terceiro argumento. Se `false` ordenar de forma crescente, o limite de 500 guarda as operações mais antigas. A conferência é feita com uma sessão de gerente, olhando a ordem do resumo.
 
+**No cliente Reflex** (sem push):
+
+- **Sanitização e observabilidade das respostas 5xx** (feito em 2026-10-25): o log `ERROR` passa a trazer a `message` do Xano, que nomeia o passo que falhou, em uma linha e com mascaramento de dados pessoais e numéricos: e-mails, códigos de 5 ou mais caracteres com letras e dígitos (placa, chassi) e sequências de 3 ou mais dígitos (CPF, telefone, ids) viram `…`. O texto é cortado em 200 caracteres, e corpo que não é JSON não é registrado. As mensagens `400` continuam como o Xano as envia, porque vão para a tela.
+
 **Com mudança de banco** (cada item precisa de OK antes de editar e de novo antes do push):
 
 5. **`modelos_moto`:** versionar `galeria` e `default_motos` em `xano/table/modelos_moto.xs`, ou removê-las com `--sync`. Recomendação:

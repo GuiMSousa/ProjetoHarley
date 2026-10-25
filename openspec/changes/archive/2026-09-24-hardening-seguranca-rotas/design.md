@@ -57,7 +57,7 @@ A UI usará `disabled` e texto de progresso no botão. O bloqueio visual é apen
 
 ## Documentação
 
-[docs/domain-model.md](../../docs/domain-model.md) deve refletir:
+[docs/domain-model.md](../../../../docs/domain-model.md) deve refletir:
 
 - `ativo` nos cadastros;
 - `produtos.codigo` e sua unicidade;
@@ -65,7 +65,7 @@ A UI usará `disabled` e texto de progresso no botão. O bloqueio visual é apen
 - limites financeiros estritos;
 - autoria operacional derivada do funcionário vinculado.
 
-[docs/xano-api-client.md](../../docs/xano-api-client.md) deve refletir:
+[docs/xano-api-client.md](../../../../docs/xano-api-client.md) deve refletir:
 
 - DTOs Pydantic por recurso;
 - métodos de listagem, criação, atualização e desativação;

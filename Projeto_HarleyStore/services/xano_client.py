@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Mapping
 from typing import Any, Self, TypeVar
 
@@ -83,8 +84,7 @@ def _record_id(item: object) -> int | None:
     return record_id if isinstance(record_id, int) else None
 
 
-def validation_message(response: httpx.Response) -> str | None:
-    """Return Xano's business validation message when it is short plain text."""
+def _xano_message(response: httpx.Response) -> str | None:
     try:
         payload = response.json()
     except ValueError:
@@ -92,10 +92,29 @@ def validation_message(response: httpx.Response) -> str | None:
     message = payload.get("message") if isinstance(payload, dict) else None
     if not isinstance(message, str):
         return None
-    message = message.strip()
-    if not message or len(message) > MAX_VALIDATION_MESSAGE_LENGTH:
-        return None
-    return message
+    return message.strip() or None
+
+
+def validation_message(response: httpx.Response) -> str | None:
+    """Return Xano's business validation message when it is short plain text."""
+    message = _xano_message(response)
+    return message if message and len(message) <= MAX_VALIDATION_MESSAGE_LENGTH else None
+
+
+# Personal data a Xano error may echo: e-mails, codes mixing letters and digits (plate, VIN) and
+# digit runs (CPF, phone, ids). One pass, left to right, so a plate becomes a single "…".
+PERSONAL_DATA = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\b(?=\w*\d)(?=\w*[a-zA-Z])\w{5,}\b|\d{3,}")
+
+
+def _server_error_message(response: httpx.Response) -> str:
+    """Xano's 5xx message for the log: one line, personal data masked, cut to the limit.
+
+    Only the log is sanitized: 400 messages (``validation_message``) are shown to the user as sent.
+    """
+    message = _xano_message(response)
+    if not message:
+        return "sem mensagem"
+    return PERSONAL_DATA.sub("…", " ".join(message.split()))[:MAX_VALIDATION_MESSAGE_LENGTH]
 
 
 class XanoError(RuntimeError):
@@ -259,7 +278,14 @@ class XanoClient:
                 status_code=response.status_code,
             )
         if response.is_error:
-            logger.error("Xano %s %s answered HTTP %s", method, path, response.status_code)
+            # Xano's message names the failing step: without it a 500 cannot be diagnosed.
+            logger.error(
+                "Xano %s %s answered HTTP %s: %s",
+                method,
+                path,
+                response.status_code,
+                _server_error_message(response),
+            )
             raise XanoError(
                 "The Xano API returned an unexpected error.",
                 status_code=response.status_code,

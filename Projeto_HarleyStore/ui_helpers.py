@@ -54,7 +54,8 @@ def get_foto_moto(moto: object, imagem_url: str | None = None) -> str:
     ``moto`` is a catalog model, a stock unit or a dict with ``nome_modelo`` (and optionally
     ``imagem_principal``); ``imagem_url`` (the photo of a color) replaces the main image.
     """
-    remota = (imagem_url if imagem_url is not None else _campo(moto, "imagem_principal")).strip()
+    # A color without its own photo ("" after the tolerant read) falls back to the model photo.
+    remota = (imagem_url or _campo(moto, "imagem_principal")).strip()
     if _real(remota):
         return remota
     slug = _slug(moto)
@@ -350,7 +351,12 @@ def swatch(hex_color: rx.Var | str, name: rx.Var | str, *, selected: rx.Var | bo
         "border_radius": RADII["pill"],
         # An unreadable color is read as "" (Change 15): an empty ring, never the button's accent color.
         "background": rx.cond(hex_var == "", "transparent", hex_var),
-        "border": rx.cond(selected, f"2px solid {COLORS['orange']}", f"2px solid {COLORS['metal_edge']}"),
+        # Without a fill the ring alone marks the control: muted reaches 3:1 on the surface, metal_edge does not.
+        "border": rx.cond(
+            selected,
+            f"2px solid {COLORS['orange']}",
+            rx.cond(hex_var == "", f"2px dashed {COLORS['muted']}", f"2px solid {COLORS['metal_edge']}"),
+        ),
         "box_shadow": rx.cond(selected, f"0 0 0 2px {COLORS['black']} inset", "none"),
         "padding": "0",
         "aria_label": name,

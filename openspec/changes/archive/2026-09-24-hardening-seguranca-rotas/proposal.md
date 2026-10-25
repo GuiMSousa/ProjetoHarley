@@ -56,8 +56,8 @@ Corrigir os contratos de autorização e integridade, reforçar a proteção das
 - Criar testes de contrato para autorização de `PUT`/`PATCH` e derivação de funcionário pelo JWT.
 - Criar testes dos limites financeiros (`0`, negativos e positivos).
 - Criar testes de guard de rota e loading/bloqueio de mutações.
-- Atualizar [docs/domain-model.md](../../docs/domain-model.md) com `ativo`, `codigo`, soft delete e regras financeiras atuais.
-- Atualizar [docs/xano-api-client.md](../../docs/xano-api-client.md) com DTOs tipados, métodos de cadastro e comportamento de erros.
+- Atualizar [docs/domain-model.md](../../../../docs/domain-model.md) com `ativo`, `codigo`, soft delete e regras financeiras atuais.
+- Atualizar [docs/xano-api-client.md](../../../../docs/xano-api-client.md) com DTOs tipados, métodos de cadastro e comportamento de erros.
 
 ## Fora do escopo
 
@@ -87,7 +87,7 @@ Corrigir os contratos de autorização e integridade, reforçar a proteção das
 - Changes de autenticação e cadastros arquivadas.
 - Vínculo `user.id_funcionario` disponível no schema Xano.
 - `Quick Start/enforce_role` funcionando como autoridade de cargo.
-- Cliente Xano tipado em [Projeto_HarleyStore/services/xano_client.py](../../Projeto_HarleyStore/services/xano_client.py).
+- Cliente Xano tipado em [Projeto_HarleyStore/services/xano_client.py](../../../../Projeto_HarleyStore/services/xano_client.py).
 - Ambiente de testes com perfis gerente, vendedor e mecânico, preferencialmente contra Xano real para validar o contrato final.
 
 ## Resultado aplicado

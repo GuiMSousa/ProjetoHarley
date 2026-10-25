@@ -5,7 +5,7 @@ from pathlib import Path
 import reflex as rx
 
 from Projeto_HarleyStore.feedback import TOAST_POSITION, toast_error, toast_success
-from Projeto_HarleyStore.styles.theme import STATUS_COLORS
+from Projeto_HarleyStore.styles.theme import COLORS, STATUS_COLORS, contrast_ratio
 from Projeto_HarleyStore.ui_helpers import (
     card,
     danger_button,
@@ -68,7 +68,10 @@ class SharedHelpersTests(unittest.TestCase):
         for hex_color in ("", rx.Var.create("")):
             with self.subTest(hex_color=hex_color):
                 rendered = str(swatch(hex_color, "Preto", on_click=rx.console_log("x")))
-                self.assertIn("transparent", rendered)
+                # The empty-color branch must be the "transparent" fill and the dashed muted ring.
+                self.assertIn('=== ""?.valueOf?.()) ? "transparent"', rendered)
+                self.assertIn(f'=== ""?.valueOf?.()) ? "2px dashed {COLORS["muted"]}"', rendered)
+        self.assertGreaterEqual(contrast_ratio(COLORS["muted"], COLORS["surface"]), 3)
 
     def test_status_badge_covers_every_status_with_its_palette(self):
         rendered = str(status_badge(rx.Var.create("RESERVADA"), "Reservada"))

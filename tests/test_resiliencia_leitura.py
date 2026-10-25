@@ -109,7 +109,7 @@ class ListReadingTests(unittest.TestCase):
                 self.assertLogs(LOGGER, level="ERROR") as logs, self.assertRaises(XanoError) as context:
             client.list_motos_estoque()
         self.assertEqual(context.exception.status_code, 500)
-        self.assertIn("answered HTTP 500", "\n".join(logs.output))
+        self.assertIn("answered HTTP 500: boom", "\n".join(logs.output))
 
         def sem_rede(request):
             raise httpx.ConnectError("connection failed", request=request)
@@ -119,6 +119,37 @@ class ListReadingTests(unittest.TestCase):
                 self.assertLogs(LOGGER, level="WARNING") as logs, self.assertRaises(XanoConnectionError):
             client.list_motos_estoque()
         self.assertNotIn("jwt", "\n".join(logs.output))
+
+    def test_server_error_log_masks_personal_data_and_keeps_a_long_message_cut(self):
+        mensagem = (
+            "Key (cpf_cnpj)=(12345678900) already exists;\ntel 11987654321; email joao.silva@exemplo.com; "
+            "placa ABC1D23; chassi 9BWZZZ377VT004251; linha 12; " + "x" * 300
+        )
+        with xano({"clientes": (500, {"message": mensagem})}), XanoClient(token="jwt-secreto") as client, \
+                self.assertLogs(LOGGER, level="ERROR") as logs, self.assertRaises(XanoError):
+            client.list_clientes()
+        registro = logs.output[0].split("answered HTTP 500: ", 1)[1]
+        self.assertTrue(registro.startswith(
+            "Key (cpf_cnpj)=(…) already exists; tel …; email …; placa …; chassi …; linha 12; xxx"
+        ))
+        self.assertEqual(len(registro), 200)
+        self.assertNotRegex(registro, r"\d{3,}|@|\n")
+        self.assertNotIn("jwt-secreto", "\n".join(logs.output))
+
+    def test_server_error_with_an_html_body_logs_no_message(self):
+        # A proxy 502 answers with HTML: nothing of the body reaches the log.
+        def gateway(request):
+            return httpx.Response(502, text="<html>Bad gateway 12345678900</html>", headers={"content-type": "text/html"})
+
+        with patch.dict(os.environ, {"XANO_API_BASE_URL": "https://xano.test/api:test"}), \
+                XanoClient(token="jwt-secreto", transport=httpx.MockTransport(gateway)) as client, \
+                self.assertLogs(LOGGER, level="ERROR") as logs, self.assertRaises(XanoError) as context:
+            client.list_motos_estoque()
+        self.assertEqual(context.exception.status_code, 502)
+        saida = "\n".join(logs.output)
+        self.assertIn("answered HTTP 502: sem mensagem", saida)
+        self.assertNotIn("html", saida.lower())
+        self.assertNotIn("jwt-secreto", saida)
 
 
 class TolerantReadDtoTests(unittest.TestCase):

@@ -79,6 +79,17 @@ class FotoMotoTests(PastaTemporariaTestCase):
         self.assertEqual(get_foto_moto(modelo, "https://cdn.loja.test/vermelho.webp"), "https://cdn.loja.test/vermelho.webp")
         self.assertEqual(get_foto_moto(modelo, PLACEHOLDER), "/motos/fat-boy/1.fat-boy.jpg")
 
+    def test_color_without_its_own_photo_keeps_the_model_photo(self):
+        # A color photo typed outside the app is read as "" (Change 15): never the missing default art.
+        modelo = {"nome_modelo": "Low Rider", "imagem_principal": REAL}
+        self.assertEqual(get_foto_moto(modelo, ""), REAL)
+        self.assertEqual(get_lista_fotos_moto(modelo, ""), [REAL])
+        card = modelo_card(ModeloCatalogo(
+            id=1, nome_modelo="Low Rider", familia="CRUISER", imagem_principal=REAL,
+            variacoes_cor=[{"nome": "Preto", "hex": "000000", "imagem_url": "low-rider.png"}],
+        ))
+        self.assertEqual(card.cores[0].imagem_url, REAL)
+
     def test_dtos_and_legacy_units_are_accepted(self):
         self.assertEqual(get_foto_moto(MotoEstoque(id=1, nome_modelo="Fat Boy")), "/motos/fat-boy/1.fat-boy.jpg")
         self.assertEqual(get_foto_moto(MotoEstoque(id=2, modelo="Fat Boy")), "/motos/fat-boy/1.fat-boy.jpg")

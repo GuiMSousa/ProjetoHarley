@@ -131,7 +131,7 @@ O código compila, os testes passam e as regras de negócio vivem no Xano, que �
 
 ### Sprint de saneamento pós-Change 7 (2026-09-25)
 
-Registro OpenSpec em `openspec/archive/saneamento-pos-change-7/`.
+Registro OpenSpec em `openspec/changes/archive/2026-09-25-saneamento-pos-change-7/`.
 
 | # | Débito | Situação |
 |---|---|---|
@@ -154,7 +154,7 @@ Registro OpenSpec em `openspec/archive/saneamento-pos-change-7/`.
 
 ### Saneamento pós-Change 9 (2026-10-09)
 
-Registro OpenSpec em `openspec/archive/saneamento-pos-change-9/`.
+Registro OpenSpec em `openspec/changes/archive/2026-10-09-saneamento-pos-change-9/`.
 
 | # | Débito | Situação |
 | --- | --- | --- |

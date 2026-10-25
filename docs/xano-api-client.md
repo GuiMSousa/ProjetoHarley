@@ -31,7 +31,7 @@ Regras importantes:
 - `--sync --delete` também remove do workspace objetos ausentes em `xano/`; use apenas depois de revisar o `--dry-run`.
 - Para testar antes de publicar no live, use um branch: `xano workspace push -d ./xano -b <branch>`.
 - O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
-- Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (configurado em `.vscode/mcp.json`).
+- Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (MCP `xano-developer`, configurado em `.mcp.json`, `.codex/config.toml` e `.vscode/mcp.json`).
 - Desde 2026-10-15, o token do Swagger em `xano/api/harley/harley.xs` é o placeholder `YOUR_XANO_SWAGGER_TOKEN`; o valor real continua no histórico do Git. Antes de qualquer push, desligue o Swagger público (`xano workspace edit --no-swagger`) ou gere um token novo, e confira se o `--dry-run` lista o grupo `HARLEY`: publicar o placeholder pode trocar o token do Swagger por um valor conhecido. Um `xano workspace pull` traz o token real de volta ao arquivo.
 - Não rode `xano workspace pull` dentro de `xano/`. Além de trazer o token, a CLI 1.3.x grava 6 endpoints em pastas aninhadas (por exemplo, `motos/motos_id/reserva_POST.xs` no lugar de `motos/motos_id_reserva_POST.xs`) e não apaga os arquivos que já existem (conferido em 2026-10-22): esses endpoints ficariam em dobro no próximo push. Para conferir mudanças feitas no painel, puxe numa pasta temporária fora do projeto, compare com `xano/` e apague a pasta, porque ela contém o token.
 
@@ -53,7 +53,7 @@ Regras importantes:
 3. Conferir com um `pull` que o enum do livro tem `SAIDA_VENDA` (confirmado em 2026-10-11).
 4. Rodar a integração: `XANO_TEST_LIVE=true` (mecânico barrado e carrinhos inválidos), `XANO_TEST_ALLOW_WRITES=true` (consumidor final, cliente com repetição da chave, saldo insuficiente e preço alterado) e `XANO_TEST_CONCURRENCY=true` (duas vendas pelo saldo inteiro).
 
-O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz. Nenhum push parcial alinha isso, e a diferença é só cosmética.
+O `--dry-run` sempre lista `UPDATE table modelos_moto`. Até 2026-10-15, a única causa era cosmética: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz. Desde 2026-10-22, o remoto também tem as colunas `galeria` e `default_motos`, criadas pelo painel e ausentes de `xano/table/modelos_moto.xs`. Em 2026-10-25, o `--dry-run` do push completo listou dois `DROP_FIELD` em `modelos_moto` em "Destructive Operations". A documentação da CLI diz que o push parcial não remove colunas, mas não está confirmado se o preview só avisa ou se aplicaria a remoção. Até decidir o item 5 da Change 16, publique só os arquivos alterados, com `-i` (por exemplo, `xano workspace push -d ./xano -i "api/harley/motos_GET.xs"`), e confira no `--dry-run` que nenhuma tabela aparece.
 
 ### Checklist de deploy da Change 10 (fechamento financeiro)
 
@@ -195,7 +195,7 @@ Os DTOs ficam em `Projeto_HarleyStore.services.motos`:
 
 | Método | Endpoint | Perfil |
 | --- | --- | --- |
-| `list_motos_estoque(status=None, id_modelo=None)` | `GET motos` | `GERENTE`, `VENDEDOR` |
+| `list_motos_estoque(status=None, id_modelo=None)` | `GET motos` (nomes de modelo, cliente e vendedor por join, Change 16) | `GERENTE`, `VENDEDOR` |
 | `get_moto_estoque(id)` | `GET motos/{id}` | `GERENTE`, `VENDEDOR` |
 | `cadastrar_moto_estoque(moto)` | `POST motos` | `GERENTE` |
 | `atualizar_moto_estoque(id, moto)` | `PATCH motos/{id}` | `GERENTE` |
@@ -304,7 +304,7 @@ Os DTOs ficam em `Projeto_HarleyStore.services.balcao`:
 | `429` | `XanoRateLimitError` | genérica | "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente." | toast ou erro da lista; a vitrine usa cache de 60 s |
 | `400` / `422` | `XanoValidationError` | `message` do Xano, se texto com até 200 caracteres; senão genérica | a própria mensagem de negócio | mantém o formulário aberto com a mensagem |
 | transporte (timeout, conexão) | `XanoConnectionError` | genérica | "Sem conexão com o Xano. Verifique a internet e tente novamente." | toast ou erro da lista; log `WARNING` |
-| `5xx` | `XanoError` | genérica | "O Xano teve um erro interno. O problema foi registrado; tente novamente em instantes." | toast ou erro da lista; log `ERROR` |
+| `5xx` | `XanoError` | genérica | "O Xano teve um erro interno. O problema foi registrado; tente novamente em instantes." | toast ou erro da lista; log `ERROR` com o método, o caminho e a `message` do Xano, que nomeia o passo que falhou, em uma linha: e-mails, códigos de 5 ou mais caracteres com letras e dígitos (placa, chassi) e sequências de 3 ou mais dígitos (CPF, telefone, ids) viram `…`, e o texto é cortado em 200 caracteres. Corpo que não é JSON vira "sem mensagem" |
 | demais | `XanoError` | genérica | "Não foi possível comunicar com o Xano. Tente novamente." | toast ou erro da lista |
 | `2xx` fora do DTO | `XanoResponseError` | genérica | "O Xano enviou dados fora do formato esperado. O problema foi registrado; avise o responsável pelo sistema." | toast ou erro da lista; log `WARNING` |
 

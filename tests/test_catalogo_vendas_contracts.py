@@ -167,6 +167,23 @@ class VendasContractTests(unittest.TestCase):
                 self.assertIn('required_role: "VENDEDOR"', read(relative_path))
         self.assertIn("$db.motos.status ==? $input.status", read(f"{API}/motos_GET.xs"))
 
+    def test_stock_list_joins_names_in_one_query(self):
+        # Change 16: no whole-table reads and no field access on a missing model, client or seller.
+        content = read(f"{API}/motos_GET.xs")
+        self.assertEqual(re.findall(r"db\.query (\w+)", content), ["motos"])
+        self.assertNotIn("|find:", content)
+        # Left joins keep units without a model, client or seller; an inner join would hide them.
+        self.assertEqual(len(re.findall(r'type\s*:\s*"left"', content)), 3)
+        for join in ("$db.motos.id_modelo == $db.modelos_moto.id", "$db.motos.clientes_id == $db.clientes.id",
+                     "$db.motos.id_vendedor_reserva == $db.funcionarios.id"):
+            with self.subTest(join=join):
+                self.assertIn(join, content)
+        eval_block = re.search(r"eval = \{(.*?)\}", content, re.DOTALL).group(1)
+        self.assertEqual(
+            set(re.findall(r"(\w+)\s*:", eval_block)),
+            {"nome_modelo", "familia", "variacoes_cor", "nome_cliente", "nome_vendedor"},
+        )
+
     def test_sample_data_is_idempotent_and_uses_neutral_https_placeholders(self):
         content = read("function/catalogo/seed_exemplo.xs")
         self.assertIn("if (!$ja_populado)", content)

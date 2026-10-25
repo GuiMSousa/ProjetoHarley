@@ -116,12 +116,19 @@ Os DTOs de leitura DEVEM ser separados dos de escrita (Change 15).
 - Uma lista sem nenhum registro válido, ou uma resposta que não seja lista, DEVE continuar sendo erro.
 - Telas que combinam fontes DEVEM isolar a falha de cada uma: os KPIs da visão geral, e as unidades e os modelos em `/vendas`.
 - As mensagens DEVEM distinguir falha de conexão, dados fora do contrato e erro interno do Xano.
+- Uma resposta 5xx DEVE ser registrada em log com método, caminho, status e a `message` do Xano em uma única linha, com mascaramento de dados pessoais e numéricos (Change 16): e-mails, códigos de 5 ou mais caracteres com letras e dígitos (placa, chassi) e sequências de 3 ou mais dígitos (CPF, telefone, ids) viram `…`. A mensagem DEVE ser cortada em 200 caracteres, e um corpo que não seja JSON NÃO DEVE ser registrado. O log NUNCA DEVE trazer token, cabeçalhos nem query string. As mensagens `400`, exibidas ao usuário, NÃO passam por essa máscara.
 
 ### Cenário: registro criado fora do app
 
 - **DADO** uma unidade com status fora do enum, gravada direto no painel do Xano
 - **QUANDO** `/vendas` carregar
 - **ENTÃO** as demais unidades DEVEM aparecer, sem mensagem de erro, e o log DEVE registrar o descarte sem os valores do registro
+
+### Cenário: erro interno com dado na mensagem
+
+- **DADO** uma resposta 500 do Xano cuja `message` cita CPF, telefone, e-mail, placa ou chassi, em mais de uma linha
+- **QUANDO** o cliente registrar o erro
+- **ENTÃO** o log DEVE trazer a mensagem em uma linha, com esses dados trocados por `…`, no máximo 200 caracteres e sem token
 
 ### Cenário: uma fonte da visão geral falha
 

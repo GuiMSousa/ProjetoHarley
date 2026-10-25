@@ -41,7 +41,7 @@ Rode lint, sintaxe, testes e build, conforme a tabela de [AGENTS.md](../AGENTS.m
 
 Leia [AGENTS.md](../AGENTS.md); o [CLAUDE.md](../CLAUDE.md) importa as mesmas instruções. Skills, MCPs, escopos e pendências estão em [setup.md](setup.md).
 
-Na primeira sessão depois do setup, aprove o servidor `context7` do projeto. No Claude Code, isso aparece como pedido de aprovação dos MCPs do `.mcp.json`; no Codex, como confiança no projeto.
+Na primeira sessão depois do setup, aprove os servidores `context7` e `xano-developer` do projeto. No Claude Code, isso aparece como pedido de aprovação dos MCPs do `.mcp.json`; no Codex, como confiança no projeto.
 
 ## Dificuldades conhecidas
 
