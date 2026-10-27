@@ -28,6 +28,9 @@ GALERIA = [f"https://x8.xano.test/vault/fb/{n}.jpg" for n in range(1, 5)]
 class FotoMotoTests(unittest.TestCase):
     def test_real_xano_image_wins(self):
         self.assertEqual(get_foto_moto({"nome_modelo": "Fat Boy", "imagem_principal": REAL}), REAL)
+        # The main and color photos share the gallery sanitizer: https, whatever the scheme case.
+        self.assertEqual(get_foto_moto({"imagem_principal": "HTTP://cdn.loja.test/fb.jpg"}), "https://cdn.loja.test/fb.jpg")
+        self.assertEqual(get_foto_moto({"imagem_principal": REAL}, "http://cdn.loja.test/cor.jpg"), "https://cdn.loja.test/cor.jpg")
 
     def test_without_a_real_web_photo_the_neutral_image_is_used(self):
         # Placeholders, empty values and local paths (Change 17: there are no local photos).

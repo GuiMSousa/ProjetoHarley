@@ -110,7 +110,7 @@ Componentes e regras repetidos entre páginas DEVEM viver em módulos compartilh
 
 Os DTOs de leitura DEVEM ser separados dos de escrita (Change 15).
 
-- Campos de exibição (textos, imagens, cores e preço de vitrine) DEVEM aceitar nulo ou formato fora do padrão, com valor padrão. Uma URL de imagem que não seja `http(s)` NÃO DEVE ser aceita (Change 17: não há fotos locais). Na `galeria`, o `path` `/vault/...` de um arquivo do Xano DEVE virar URL na origem de `XANO_API_BASE_URL`.
+- Campos de exibição (textos, imagens, cores e preço de vitrine) DEVEM aceitar nulo ou formato fora do padrão, com valor padrão. Uma URL de imagem que não seja `http(s)` NÃO DEVE ser aceita (Change 17: não há fotos locais). Na `galeria`, o `path` `/vault/...` de um arquivo do Xano DEVE virar URL na origem de `XANO_API_BASE_URL`, e um `path` que saia do vault (`..`, também codificado ou com barra invertida) NÃO DEVE ser aceito. O esquema DEVE ser comparado sem diferença de maiúsculas, e `http` DEVE ser promovido a `https`.
 - Identidade, vínculo e regras de negócio (ids, chaves, enums, saldo ≥ 0, preço de peça > 0) DEVEM continuar estritos.
 - As listas do cliente Xano DEVEM ser validadas registro a registro. O registro inválido DEVE ser descartado e registrado em log com endpoint, índice, `id` e os campos e tipos do erro, NUNCA com os valores.
 - Uma lista sem nenhum registro válido, ou uma resposta que não seja lista, DEVE continuar sendo erro.

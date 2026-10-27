@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 import reflex as rx
 
+from Projeto_HarleyStore.services.leitura import url_de_midia
 from Projeto_HarleyStore.styles.theme import (
     CARD,
     COLORS,
@@ -38,10 +39,10 @@ def _campo(moto: object, nome: str) -> str:
     return str(valor or "").strip()
 
 
-def _real(url: str | None) -> bool:
-    """A web photo that is not a remote placeholder."""
-    url = (url or "").strip()
-    return url.startswith(("https://", "http://")) and not any(host in url for host in PLACEHOLDER_HOSTS)
+def _foto_real(url: object) -> str:
+    """The photo as a safe https URL (``url_de_midia``), or "" for a remote placeholder or a non-web value."""
+    url = url_de_midia(url)
+    return "" if any(host in url for host in PLACEHOLDER_HOSTS) else url
 
 
 def get_foto_moto(moto: object, imagem_url: str | None = None) -> str:
@@ -50,10 +51,8 @@ def get_foto_moto(moto: object, imagem_url: str | None = None) -> str:
     ``moto`` is a catalog model, a stock unit or a dict with ``imagem_principal``; ``imagem_url``
     is the photo of the chosen color. Placeholders and non-web values are skipped.
     """
-    return next(
-        (url.strip() for url in (imagem_url, _campo(moto, "imagem_principal")) if _real(url)),
-        FOTO_INDISPONIVEL,
-    )
+    candidatas = (_foto_real(imagem_url), _foto_real(_campo(moto, "imagem_principal")))
+    return next((url for url in candidatas if url), FOTO_INDISPONIVEL)
 
 
 def get_lista_fotos_moto(moto: object, imagem_url: str | None = None) -> list[str]:
@@ -62,11 +61,12 @@ def get_lista_fotos_moto(moto: object, imagem_url: str | None = None) -> list[st
     A real ``imagem_url`` (the chosen color) leads the list when the gallery does not have it.
     """
     galeria = moto.get("galeria") if isinstance(moto, Mapping) else getattr(moto, "galeria", None)
-    fotos = [url.strip() for url in galeria or [] if isinstance(url, str) and _real(url)]
+    fotos = [url for url in map(_foto_real, galeria or []) if url]
     if not fotos:
         return [get_foto_moto(moto, imagem_url)]
-    if _real(imagem_url) and imagem_url.strip() not in fotos:
-        fotos.insert(0, imagem_url.strip())
+    cor = _foto_real(imagem_url)
+    if cor and cor not in fotos:
+        fotos.insert(0, cor)
     return fotos
 
 

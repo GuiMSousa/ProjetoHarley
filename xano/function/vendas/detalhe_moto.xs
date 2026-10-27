@@ -58,7 +58,7 @@ function "Vendas/detalhe_moto" {
         |set:"familia":$modelo.familia
         |set:"variacoes_cor":$modelo.variacoes_cor
         |set:"imagem_principal":$modelo.imagem_principal
-        |set:"galeria":(($modelo.galeria ?? [])|map:$$.path)
+        |set:"galeria":((($modelo.galeria ?? [])|filter:$$.access != "private")|map:$$.path)
         |set:"nome_cliente":$cliente.nome_cliente
         |set:"nome_vendedor":$vendedor.nome_funcionario
         |set:"historico":$historico

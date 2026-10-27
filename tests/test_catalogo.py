@@ -122,6 +122,26 @@ class GaleriaDoXanoTests(unittest.TestCase):
                    {"path": None}, None, 7, "  "]
         self.assertEqual(ModeloCatalogo.model_validate({**VITRINE, "galeria": galeria}).galeria, [])
 
+    def test_a_path_that_climbs_out_of_the_vault_is_refused(self):
+        # The browser resolves "..", %2e%2e and backslashes alike: none may leave /vault/.
+        for caminho in ("/vault/../api:Hd3aQ/auth/me", "/vault/%2e%2E/api:Hd3aQ", r"/vault/a\..\..\api:Hd3aQ",
+                        {"path": "/vault/../api:Hd3aQ"}):
+            with self.subTest(caminho=caminho):
+                self.assertEqual(ModeloCatalogo.model_validate({**VITRINE, "galeria": [caminho]}).galeria, [])
+        # Dots inside a file name are not a climb.
+        self.assertEqual(
+            ModeloCatalogo.model_validate({**VITRINE, "galeria": ["/vault/abc/fat..boy.jpg"]}).galeria,
+            ["https://x8.xano.test/vault/abc/fat..boy.jpg"],
+        )
+
+    def test_web_urls_are_read_on_https_whatever_the_scheme_case(self):
+        galeria = ["http://cdn.loja.test/1.jpg", "HTTPS://cdn.loja.test/2.JPG", "Http://cdn.loja.test/3.jpg",
+                   "https://", "ftp://cdn.loja.test/4.jpg", "//cdn.loja.test/5.jpg"]
+        self.assertEqual(
+            ModeloCatalogo.model_validate({**VITRINE, "galeria": galeria}).galeria,
+            ["https://cdn.loja.test/1.jpg", "https://cdn.loja.test/2.JPG", "https://cdn.loja.test/3.jpg"],
+        )
+
     def test_without_the_xano_url_a_vault_path_cannot_be_resolved(self):
         with patch.dict(os.environ, {"XANO_API_BASE_URL": ""}):
             modelo = ModeloCatalogo.model_validate(

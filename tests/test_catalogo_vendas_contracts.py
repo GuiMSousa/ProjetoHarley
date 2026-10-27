@@ -59,8 +59,11 @@ class CatalogoContractTests(unittest.TestCase):
                 "disponiveis",
             },
         )
-        # Change 17: the public gallery is only the file paths, never the stored file objects.
-        self.assertRegex(card, r"galeria\s*:\s*\(\$modelo\.galeria \?\? \[\]\)\|map:\$\$\.path")
+        # Change 17: the public gallery is only the paths of non-private files, never the stored objects.
+        self.assertRegex(
+            card,
+            r'galeria\s*:\s*\(\(\$modelo\.galeria \?\? \[\]\)\|filter:\$\$\.access != "private"\)\|map:\$\$\.path',
+        )
         for internal in ("chassi", "clientes_id", "id_vendedor_reserva", "historico"):
             with self.subTest(field=internal):
                 self.assertNotIn(internal, card)
@@ -192,7 +195,7 @@ class VendasContractTests(unittest.TestCase):
         # Change 17: the /vendas carousel reads the gallery of the unit's model.
         content = read("function/vendas/detalhe_moto.xs")
         self.assertIn('"imagem_principal", "galeria"]', content)
-        self.assertIn('|set:"galeria":(($modelo.galeria ?? [])|map:$$.path)', content)
+        self.assertIn('|set:"galeria":((($modelo.galeria ?? [])|filter:$$.access != "private")|map:$$.path)', content)
 
     def test_sample_data_is_idempotent_and_uses_neutral_https_placeholders(self):
         content = read("function/catalogo/seed_exemplo.xs")

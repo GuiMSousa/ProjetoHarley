@@ -27,7 +27,7 @@ Estado verificado em 2026-10-27:
 ## Decisões
 
 - **D1 — `path` em vez de objeto na resposta:** o objeto de imagem do Xano não tem `url`, só `path`. Num arquivo público, a URL é a origem da instância mais o `path`. A vitrine devolve só o `path` (a projeção pública não expõe nome nem metadados do arquivo), e o Reflex monta a URL com a origem que já conhece. A instância não é versionada.
-- **D2 — Só fotos públicas:** um arquivo privado precisaria de URL assinada. As fotos da galeria DEVEM ser enviadas como públicas.
+- **D2 — Só fotos públicas:** um arquivo privado precisaria de URL assinada. Desde a revisão de 2026-10-27, a vitrine e o detalhe filtram a `galeria` com `$$.access != "private"` antes de pegar o `path`. A expressão é `!=`, e não `== "public"`, para não perder fotos públicas antigas do Xano que venham sem o campo `access`. Um arquivo privado sempre traz `"access": "private"`.
 - **D3 — Placeholder embutido:** um SVG em `data:`, gerado com as cores do tema, sem arquivo e sem chamada externa.
 - **D4 — `default_motos` versionada sem uso:** a decisão de manter ou remover continua no item 5 da Change 16.
 
@@ -38,9 +38,11 @@ Estado verificado em 2026-10-27:
 
 ## Riscos
 
-- Até o push e o envio das fotos, o carrossel mostra só a foto principal de cada modelo. As fotos removidas continuam no histórico do Git (`git checkout 9e41407 -- assets/motos`) para o envio pelo painel.
+- **`/vendas` depende do push de `GET motos`:** sem as fotos locais, as linhas da lista só têm foto quando o `GET motos` publicado devolve a `imagem_principal` do modelo. Antes desse push, todas as linhas mostram a imagem neutra. O detalhe já trazia a foto principal, mas a galeria depende do push de `Vendas/detalhe_moto`.
+
+- Até o push e o envio das fotos, o carrossel mostra só a foto principal de cada modelo. Para enviá-las pelo painel, as fotos removidas podem ser extraídas do histórico do Git sem voltar ao projeto: `git archive --format=zip -o fotos-motos.zip 9e41407 assets/motos`.
 - Uma URL externa fora do ar aparece como imagem quebrada; o app não verifica a URL.
 
 ## Status
 
-Apply em 2026-10-27; push pendente do OK do usuário.
+Apply em 2026-10-27. Em 2026-10-27, a vitrine publicada já devolvia a `galeria`, com 4 fotos por modelo nos 5 modelos, e as 20 respondiam 200 com JPEG pela URL que o Reflex monta. A revisão do mesmo dia acrescentou o filtro de privados e o reforço das URLs (https, maiúsculas, `..`); falta o push de `Catalogo/vitrine` e `Vendas/detalhe_moto`.

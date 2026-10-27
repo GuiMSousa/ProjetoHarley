@@ -30,7 +30,7 @@ O botão primário e os cartões interativos (atalhos da visão geral e cartões
 
 Toda foto de moto DEVE vir do Xano (Change 17): `imagem_principal` (URL https), a `galeria` do modelo (imagens públicas enviadas pelo painel) e as fotos das cores. O projeto NÃO DEVE ter fotos locais por modelo. Em `ui_helpers.py`:
 
-- `get_foto_moto(moto, imagem_url=None)` DEVE devolver a foto da cor; senão a `imagem_principal`; senão `FOTO_INDISPONIVEL`. Uma foto só é usada se for `http(s)` e não for placeholder (`placehold.co` e afins).
+- `get_foto_moto(moto, imagem_url=None)` DEVE devolver a foto da cor; senão a `imagem_principal`; senão `FOTO_INDISPONIVEL`. Uma foto só é usada se for `http(s)`, sempre lida como `https` pelo mesmo saneador da galeria, e não for placeholder (`placehold.co` e afins).
 - `get_lista_fotos_moto(moto, imagem_url=None)` DEVE devolver a `galeria` do Xano, só com URLs reais; senão a foto única de `get_foto_moto`. Uma foto de cor real ausente da galeria DEVE abrir a lista.
 - `FOTO_INDISPONIVEL` DEVE ser uma imagem neutra embutida (SVG em `data:`, nas cores do tema), sem arquivo e sem requisição.
 
