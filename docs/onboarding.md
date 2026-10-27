@@ -45,7 +45,6 @@ Na primeira sessão depois do setup, aprove os servidores `context7` e `xano-dev
 
 ## Dificuldades conhecidas
 
-- **`reflex run` falha com `FileExistsError` em `.web/public/motos/...`:** acontece depois de reorganizar `assets/motos/`, porque a cópia gerada ficou velha. Apague `.web/public/motos` e rode de novo.
 - **Porta 3000 continua ocupada depois de encerrar o servidor no Windows:** um processo filho `multiprocessing-fork` pode continuar ativo. Encerre-o também.
 - **Login responde 404:** falta `XANO_AUTH_API_BASE_URL`, e os grupos de API do workspace têm URLs diferentes.
 - **O `--dry-run` sempre lista `UPDATE table modelos_moto`:** é uma diferença cosmética do padrão de `destaque`, explicada em [xano-api-client.md](xano-api-client.md).

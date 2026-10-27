@@ -18,6 +18,7 @@ class CatalogoContractTests(unittest.TestCase):
             'values = ["TOURING", "CRUISER", "ADVENTURE", "SPORT"]',
             "decimal preco_base filters=min:0.01",
             "json? variacoes_cor?",
+            "image[1:10]? galeria?",
             "bool? destaque?=false",
             "bool? ativo?=true",
         ):
@@ -51,12 +52,15 @@ class CatalogoContractTests(unittest.TestCase):
                 "familia",
                 "descricao",
                 "imagem_principal",
+                "galeria",
                 "variacoes_cor",
                 "destaque",
                 "preco_a_partir",
                 "disponiveis",
             },
         )
+        # Change 17: the public gallery is only the file paths, never the stored file objects.
+        self.assertRegex(card, r"galeria\s*:\s*\(\$modelo\.galeria \?\? \[\]\)\|map:\$\$\.path")
         for internal in ("chassi", "clientes_id", "id_vendedor_reserva", "historico"):
             with self.subTest(field=internal):
                 self.assertNotIn(internal, card)
@@ -181,8 +185,14 @@ class VendasContractTests(unittest.TestCase):
         eval_block = re.search(r"eval = \{(.*?)\}", content, re.DOTALL).group(1)
         self.assertEqual(
             set(re.findall(r"(\w+)\s*:", eval_block)),
-            {"nome_modelo", "familia", "variacoes_cor", "nome_cliente", "nome_vendedor"},
+            {"nome_modelo", "imagem_principal", "familia", "variacoes_cor", "nome_cliente", "nome_vendedor"},
         )
+
+    def test_unit_detail_sends_the_model_gallery_as_paths(self):
+        # Change 17: the /vendas carousel reads the gallery of the unit's model.
+        content = read("function/vendas/detalhe_moto.xs")
+        self.assertIn('"imagem_principal", "galeria"]', content)
+        self.assertIn('|set:"galeria":(($modelo.galeria ?? [])|map:$$.path)', content)
 
     def test_sample_data_is_idempotent_and_uses_neutral_https_placeholders(self):
         content = read("function/catalogo/seed_exemplo.xs")

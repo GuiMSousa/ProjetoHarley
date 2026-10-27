@@ -39,7 +39,8 @@ query motos verb=GET {
 
       where = $db.motos.status ==? $input.status && $db.motos.id_modelo ==? $input.id_modelo
       eval = {
-        nome_modelo  : $db.modelos_moto.nome_modelo
+        nome_modelo     : $db.modelos_moto.nome_modelo
+        imagem_principal: $db.modelos_moto.imagem_principal
         familia      : $db.modelos_moto.familia
         variacoes_cor: $db.modelos_moto.variacoes_cor
         nome_cliente : $db.clientes.nome_cliente

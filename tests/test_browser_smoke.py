@@ -53,6 +53,8 @@ class BrowserSmokeTests(unittest.TestCase):
         dialog = page.get_by_role("dialog")
         foto = dialog.get_by_role("img").first
         foto.wait_for()
+        # Change 17: every photo comes from Xano (or is the embedded neutral image), never a local file.
+        self.assertRegex(foto.get_attribute("src"), r"^(https?://|data:image/svg\+xml,)")
         self.assert_no_browser_errors()
         proxima = dialog.get_by_role("button", name="Próxima foto")
         if not proxima.count():

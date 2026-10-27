@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from Projeto_HarleyStore.services.catalogo import FamiliaMoto, VariacaoCor
-from Projeto_HarleyStore.services.leitura import lista_lida
+from Projeto_HarleyStore.services.leitura import TextoLido, galeria_lida, lista_lida
 
 
 StatusMoto = Literal["DISPONIVEL", "RESERVADA", "VENDIDA"]
@@ -148,6 +148,9 @@ class MotoEstoque(BaseModel):
     nome_modelo: str | None = None
     familia: FamiliaMoto | None = None
     variacoes_cor: list[VariacaoCor] = []
+    # Photos of the unit's model (Change 17): the list sends the main one, the detail also the gallery.
+    imagem_principal: TextoLido = ""
+    galeria: list[str] = []
     marca: str | None = None
     modelo: str | None = None
     chassi: str | None = None
@@ -171,6 +174,11 @@ class MotoEstoque(BaseModel):
     def _null_cores(cls, value: object) -> object:
         # Colors of the unit's model: free JSON in Xano, so only well-formed items are read.
         return lista_lida(value, (dict, BaseModel))
+
+    @field_validator("galeria", mode="before")
+    @classmethod
+    def _galeria(cls, value: object) -> object:
+        return galeria_lida(value)
 
 
 class MotoEstoqueDetalhe(MotoEstoque):

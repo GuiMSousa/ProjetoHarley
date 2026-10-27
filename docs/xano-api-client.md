@@ -53,7 +53,7 @@ Regras importantes:
 3. Conferir com um `pull` que o enum do livro tem `SAIDA_VENDA` (confirmado em 2026-10-11).
 4. Rodar a integração: `XANO_TEST_LIVE=true` (mecânico barrado e carrinhos inválidos), `XANO_TEST_ALLOW_WRITES=true` (consumidor final, cliente com repetição da chave, saldo insuficiente e preço alterado) e `XANO_TEST_CONCURRENCY=true` (duas vendas pelo saldo inteiro).
 
-O `--dry-run` sempre lista `UPDATE table modelos_moto`. Até 2026-10-15, a única causa era cosmética: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz. Desde 2026-10-22, o remoto também tem as colunas `galeria` e `default_motos`, criadas pelo painel e ausentes de `xano/table/modelos_moto.xs`. Em 2026-10-25, o `--dry-run` do push completo listou dois `DROP_FIELD` em `modelos_moto` em "Destructive Operations". A documentação da CLI diz que o push parcial não remove colunas, mas não está confirmado se o preview só avisa ou se aplicaria a remoção. Até decidir o item 5 da Change 16, publique só os arquivos alterados, com `-i` (por exemplo, `xano workspace push -d ./xano -i "api/harley/motos_GET.xs"`), e confira no `--dry-run` que nenhuma tabela aparece.
+O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz, uma diferença cosmética. Desde a Change 17 (2026-10-27), `galeria` e `default_motos` estão versionadas como publicadas; o push completo lista dois `UPDATE_FIELD` nelas, sem `DROP_FIELD`. Publique com `-i` nos arquivos alterados, porque o push completo também atualiza o grupo `HARLEY` (placeholder do token do Swagger).
 
 ### Checklist de deploy da Change 10 (fechamento financeiro)
 
@@ -177,7 +177,7 @@ Os DTOs ficam em `Projeto_HarleyStore.services.catalogo`:
 | `criar_modelo_moto(modelo)` | `POST modelos_moto` | `GERENTE` |
 | `atualizar_modelo_moto(id, modelo)` | `PATCH modelos_moto/{id}` | `GERENTE` |
 
-- **Projeção pública:** a função `Catalogo/vitrine` devolve só modelos ativos e só os campos `id`, `nome_modelo`, `familia`, `descricao`, `imagem_principal`, `variacoes_cor`, `destaque`, `preco_a_partir` e `disponiveis`. Nunca expõe unidades, chassi, cliente, vendedor ou histórico. As unidades são lidas numa única consulta (sem N+1).
+- **Projeção pública:** a função `Catalogo/vitrine` devolve só modelos ativos e só os campos `id`, `nome_modelo`, `familia`, `descricao`, `imagem_principal`, `galeria`, `variacoes_cor`, `destaque`, `preco_a_partir` e `disponiveis`. A `galeria` (Change 17) traz só o `path` de cada imagem (`/vault/...`); o Reflex monta a URL com a origem de `XANO_API_BASE_URL`, então as fotos precisam ser públicas. Nunca expõe unidades, chassi, cliente, vendedor ou histórico. As unidades são lidas numa única consulta (sem N+1).
 - **"A partir de":** menor `preco_venda` entre as unidades `DISPONIVEL` do modelo; sem unidades, vale o `preco_base` ("Sob consulta" na vitrine).
 - **Cache e `429`:** a vitrine passa pelo mesmo backend Reflex para todos os visitantes. `catalogo_cache` (TTL de 60 s, por processo) guarda a lista completa; a tela filtra família e busca localmente e só a recarrega depois do TTL ou de uma escrita do gerente (`invalidate`). Uma resposta `429` vira `XanoRateLimitError`, com a mensagem "Muitas requisições ao Xano. Aguarde alguns segundos e tente novamente.".
 
@@ -187,7 +187,7 @@ Os DTOs ficam em `Projeto_HarleyStore.services.motos`:
 
 - `MotoEstoqueCreate` — `id_modelo`, `chassi` (VIN de 17 caracteres, normalizado em caixa alta), `cor`, `ano_modelo` (de 1990 ao ano seguinte) e `preco_venda > 0`; nunca carrega status, cliente ou vendedor;
 - `MotoEstoqueUpdate` — `chassi`, `cor`, `ano_modelo` e `preco_venda`, opcionais;
-- `MotoEstoque` / `MotoEstoqueDetalhe` — unidade enriquecida (modelo, família, cores, cliente, vendedor, validade) e, no detalhe, `historico` (`HistoricoStatusMoto`); `status` nulo de unidades legadas é lido como `DISPONIVEL`;
+- `MotoEstoque` / `MotoEstoqueDetalhe` — unidade enriquecida (modelo, família, cores, foto principal do modelo, cliente, vendedor, validade; no detalhe, também a `galeria` do modelo, Change 17) e, no detalhe, `historico` (`HistoricoStatusMoto`); `status` nulo de unidades legadas é lido como `DISPONIVEL`;
 - `ReservaMotoCreate` — `id_cliente`, `dias_validade` (1 a 30, padrão 7) e `observacao`;
 - `CancelamentoReservaMoto` — `motivo` obrigatório;
 - `VendaMotoCreate` — `id_moto`, `id_cliente`, `valor_venda > 0` (duas casas), `placa` opcional (normalizada para caixa alta sem hífen ou espaços, padrão `ABC1234` ou `ABC1D23`; em branco vira ausente) e `observacao` (até 500); nunca carrega `id_funcionario`;
@@ -312,7 +312,7 @@ Os DTOs ficam em `Projeto_HarleyStore.services.balcao`:
 
 - Um registro fora do contrato de leitura é descartado e gera um log `WARNING` com endpoint, índice, `id` e os campos e tipos do erro, nunca os valores.
 - Uma resposta que não é lista, ou sem nenhum registro válido, continua sendo `XanoResponseError`.
-- Os DTOs de leitura são separados dos de escrita. Campos de exibição (textos, imagens, cores, preço de vitrine) aceitam nulo e formatos fora do padrão com valor padrão; uma `imagem_url` que não seja `http(s)` ou caminho local vira vazio.
+- Os DTOs de leitura são separados dos de escrita. Campos de exibição (textos, imagens, cores, preço de vitrine) aceitam nulo e formatos fora do padrão com valor padrão; uma `imagem_url` que não seja `http(s)` vira vazio (Change 17: não há fotos locais).
 - Identidade, vínculo e regras de negócio continuam estritos: ids, chaves, enums, saldo ≥ 0 e preço de peça > 0.
 - Os logs saem pelo logger `Projeto_HarleyStore.services.xano_client` na saída do backend do Reflex.
 

@@ -81,6 +81,7 @@ function "Catalogo/vitrine" {
                 familia         : $modelo.familia
                 descricao       : $modelo.descricao
                 imagem_principal: $modelo.imagem_principal
+                galeria         : ($modelo.galeria ?? [])|map:$$.path
                 variacoes_cor   : $modelo.variacoes_cor ?? []
                 destaque        : $modelo.destaque ?? false
                 preco_a_partir  : $menor_preco ?? $modelo.preco_base

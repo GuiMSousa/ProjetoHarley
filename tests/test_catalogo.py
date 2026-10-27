@@ -17,6 +17,7 @@ from Projeto_HarleyStore.services.catalogo import (
     TtlCache,
     VariacaoCorCreate,
 )
+from Projeto_HarleyStore.services.motos import MotoEstoque, MotoEstoqueDetalhe
 from Projeto_HarleyStore.services.xano_client import XanoClient, XanoRateLimitError
 
 
@@ -92,6 +93,46 @@ class CatalogoDtoTests(unittest.TestCase):
             }
         )
         self.assertEqual((gerido.variacoes_cor, gerido.destaque, gerido.ativo), ([], False, True))
+
+
+class GaleriaDoXanoTests(unittest.TestCase):
+    """Change 17: Xano sends the gallery as /vault/ paths (or file objects); the DTOs read URLs."""
+
+    def setUp(self):
+        environment = patch.dict(os.environ, {"XANO_API_BASE_URL": "https://x8.xano.test/api:Hd3aQ"})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def test_vault_paths_and_file_objects_become_urls_on_the_instance_origin(self):
+        galeria = [
+            "/vault/abc/fat-boy-1.jpg",
+            {"access": "public", "path": "/vault/abc/fat-boy-2.jpg", "mime": "image/jpeg"},
+            "https://cdn.loja.test/fat-boy-3.jpg",
+        ]
+        esperado = [
+            "https://x8.xano.test/vault/abc/fat-boy-1.jpg",
+            "https://x8.xano.test/vault/abc/fat-boy-2.jpg",
+            "https://cdn.loja.test/fat-boy-3.jpg",
+        ]
+        self.assertEqual(ModeloCatalogo.model_validate({**VITRINE, "galeria": galeria}).galeria, esperado)
+        self.assertEqual(MotoEstoqueDetalhe.model_validate({"id": 9, "galeria": galeria}).galeria, esperado)
+
+    def test_local_unsafe_or_unreadable_items_are_dropped(self):
+        galeria = ["/motos/fat-boy/1.fat-boy.jpg", "javascript:alert(1)", "data:image/png;base64,AA",
+                   {"path": None}, None, 7, "  "]
+        self.assertEqual(ModeloCatalogo.model_validate({**VITRINE, "galeria": galeria}).galeria, [])
+
+    def test_without_the_xano_url_a_vault_path_cannot_be_resolved(self):
+        with patch.dict(os.environ, {"XANO_API_BASE_URL": ""}):
+            modelo = ModeloCatalogo.model_validate(
+                {**VITRINE, "galeria": ["/vault/abc/1.jpg", "https://cdn.loja.test/2.jpg"]}
+            )
+        self.assertEqual(modelo.galeria, ["https://cdn.loja.test/2.jpg"])
+
+    def test_stock_units_carry_the_model_photo(self):
+        unidade = MotoEstoque.model_validate({"id": 9, "imagem_principal": "https://cdn.loja.test/sg.jpg"})
+        self.assertEqual((unidade.imagem_principal, unidade.galeria), ("https://cdn.loja.test/sg.jpg", []))
+        self.assertEqual(MotoEstoque.model_validate({"id": 10, "imagem_principal": None}).imagem_principal, "")
 
 
 class TtlCacheTests(unittest.TestCase):

@@ -17,6 +17,10 @@ table modelos_moto {
 
     // URL https validada no endpoint; imagens próprias ou licenciadas pela loja.
     text imagem_principal filters=trim
+    // Fotos do carrossel (Change 17): até 10 imagens públicas enviadas pelo painel; a vitrine devolve o path.
+    image[1:10]? galeria?
+    // Criada pelo painel e sem uso no app; manter ou remover é o item 5 da Change 16.
+    text default_motos? filters=trim
 
     // [{nome, hex, imagem_url}] com até 12 cores, validada no endpoint.
     json? variacoes_cor?

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Mapping
-from pathlib import Path
+from urllib.parse import quote
 
 import reflex as rx
 
-from Projeto_HarleyStore.listing import normalize_text
 from Projeto_HarleyStore.styles.theme import (
     CARD,
     COLORS,
@@ -21,13 +19,18 @@ from Projeto_HarleyStore.styles.theme import (
 )
 
 
-# ----- motorcycle media (Changes 12 and 13) -----
+# ----- motorcycle media (Changes 12, 13 and 17) -----
 
-# One folder per model: assets/motos/fat-boy/1.fat-boy.jpg … 4.fat-boy.jpg and default_fat_boy.png.
-MOTOS_DIR = Path(__file__).resolve().parents[1] / "assets" / "motos"
-GALERIA_LOCAL = range(1, 5)
 # Remote images that only stand in for a real photo (the catalog seed uses placehold.co).
 PLACEHOLDER_HOSTS = ("placehold.co", "placeholder.com", "dummyimage.com")
+# Every photo comes from Xano (Change 17). Without one, a neutral image embedded in the page:
+# no local file per model, no request that could answer 404.
+FOTO_INDISPONIVEL = "data:image/svg+xml," + quote(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">'
+    f'<rect width="1600" height="1000" fill="{COLORS['surface']}"/>'
+    f'<text x="800" y="520" fill="{COLORS['muted']}" font-family="sans-serif" font-size="56" '
+    'text-anchor="middle">Foto indisponível</text></svg>'
+)
 
 
 def _campo(moto: object, nome: str) -> str:
@@ -35,54 +38,35 @@ def _campo(moto: object, nome: str) -> str:
     return str(valor or "").strip()
 
 
-def _real(url: str) -> bool:
-    return bool(url) and not any(host in url for host in PLACEHOLDER_HOSTS)
-
-
-def _slug(moto: object) -> str:
-    nome = _campo(moto, "nome_modelo") or _campo(moto, "modelo")
-    return "-".join(re.findall(r"[a-z0-9]+", normalize_text(nome)))
-
-
-def _galeria_local(slug: str) -> list[str]:
-    return [f"/motos/{slug}/{n}.{slug}.jpg" for n in GALERIA_LOCAL if (MOTOS_DIR / slug / f"{n}.{slug}.jpg").is_file()]
+def _real(url: str | None) -> bool:
+    """A web photo that is not a remote placeholder."""
+    url = (url or "").strip()
+    return url.startswith(("https://", "http://")) and not any(host in url for host in PLACEHOLDER_HOSTS)
 
 
 def get_foto_moto(moto: object, imagem_url: str | None = None) -> str:
-    """URL of a motorcycle photo: the Xano image, else the first local photo, else the default art.
+    """URL of a motorcycle photo: the color photo, else the model photo from Xano, else the neutral image.
 
-    ``moto`` is a catalog model, a stock unit or a dict with ``nome_modelo`` (and optionally
-    ``imagem_principal``); ``imagem_url`` (the photo of a color) replaces the main image.
+    ``moto`` is a catalog model, a stock unit or a dict with ``imagem_principal``; ``imagem_url``
+    is the photo of the chosen color. Placeholders and non-web values are skipped.
     """
-    # A color without its own photo ("" after the tolerant read) falls back to the model photo.
-    remota = (imagem_url or _campo(moto, "imagem_principal")).strip()
-    if _real(remota):
-        return remota
-    slug = _slug(moto)
-    if slug:
-        locais = _galeria_local(slug)
-        if locais:
-            return locais[0]
-        padrao = f"default_{slug.replace('-', '_')}.png"
-        if (MOTOS_DIR / slug / padrao).is_file() or not remota:
-            return f"/motos/{slug}/{padrao}"
-    # A model without local art keeps the remote placeholder rather than a broken image.
-    return remota
+    return next(
+        (url.strip() for url in (imagem_url, _campo(moto, "imagem_principal")) if _real(url)),
+        FOTO_INDISPONIVEL,
+    )
 
 
 def get_lista_fotos_moto(moto: object, imagem_url: str | None = None) -> list[str]:
-    """Photos of the detail carousel: the Xano gallery, else the local gallery, else one photo.
+    """Photos of the detail carousel: the Xano gallery, else the single photo of ``get_foto_moto``.
 
     A real ``imagem_url`` (the chosen color) leads the list when the gallery does not have it.
     """
     galeria = moto.get("galeria") if isinstance(moto, Mapping) else getattr(moto, "galeria", None)
-    fotos = [url.strip() for url in galeria or [] if isinstance(url, str) and _real(url.strip())]
-    if not fotos:
-        fotos = _galeria_local(_slug(moto)) if _slug(moto) else []
+    fotos = [url.strip() for url in galeria or [] if isinstance(url, str) and _real(url)]
     if not fotos:
         return [get_foto_moto(moto, imagem_url)]
-    if imagem_url and _real(imagem_url) and imagem_url not in fotos:
-        fotos.insert(0, imagem_url)
+    if _real(imagem_url) and imagem_url.strip() not in fotos:
+        fotos.insert(0, imagem_url.strip())
     return fotos
 
 

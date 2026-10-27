@@ -35,11 +35,11 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 | XanoScript | Validador do MCP `xano-developer` e `xano workspace push -d ./xano --dry-run` | Sintaxe dos `.xs` e o diff que o push aplicaria | Nada é publicado; o push exige o OK do usuário |
 | Tipos | indisponível | — | — |
 
-**Referência em 2026-10-25 (`GET motos` com joins, foto da cor e anel do swatch):**
+**Referência em 2026-10-27 (Change 17: fotos das motos vindas do Xano):**
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 434 passaram, 42 pulados (integração e navegador);
+- pytest: 437 passaram, 42 pulados (integração e navegador);
 - `reflex compile --dry`: OK;
 - smoke de navegador: 3 passaram, com o catálogo público real;
 - validador do MCP `xano-developer`: 129 `.xs` válidos.

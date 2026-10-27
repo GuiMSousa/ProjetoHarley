@@ -27,7 +27,7 @@ O objetivo é alinhar o versionado com o publicado, corrigir a ordem de baixa de
 
 **Com mudança de banco** (cada item precisa de OK antes de editar e de novo antes do push):
 
-5. **`modelos_moto`:** versionar `galeria` e `default_motos` em `xano/table/modelos_moto.xs`, ou removê-las com `--sync`. Recomendação:
+5. **`modelos_moto`:** versionar `galeria` e `default_motos` em `xano/table/modelos_moto.xs`, ou removê-las com `--sync`. **Atualização (2026-10-27):** a Change 17 versionou as duas como publicadas e levou a `galeria` à vitrine e a `/vendas`; resta decidir `default_motos`. Recomendação:
    - versionar `galeria` e levá-la à vitrine numa change própria (o DTO `ModeloCatalogo.galeria` já existe desde a Change 13);
    - remover `default_motos`, que repete a convenção de arquivo local `default_<slug>.png`.
 6. **`entrada_mercadoria`:** índice único em (`id_fornecedor`, `numero_documento`). Hoje a duplicidade é conferida antes do insert, sem garantia no banco: dois envios simultâneos do mesmo documento lançariam a entrada, e o estoque, duas vezes. Antes de criar o índice, é preciso conferir se já há duplicatas publicadas.

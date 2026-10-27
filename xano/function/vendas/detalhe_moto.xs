@@ -19,7 +19,7 @@ function "Vendas/detalhe_moto" {
     db.get modelos_moto {
       field_name = "id"
       field_value = $moto.id_modelo
-      output = ["id", "nome_modelo", "familia", "variacoes_cor", "imagem_principal"]
+      output = ["id", "nome_modelo", "familia", "variacoes_cor", "imagem_principal", "galeria"]
     } as $modelo
 
     db.get clientes {
@@ -58,6 +58,7 @@ function "Vendas/detalhe_moto" {
         |set:"familia":$modelo.familia
         |set:"variacoes_cor":$modelo.variacoes_cor
         |set:"imagem_principal":$modelo.imagem_principal
+        |set:"galeria":(($modelo.galeria ?? [])|map:$$.path)
         |set:"nome_cliente":$cliente.nome_cliente
         |set:"nome_vendedor":$vendedor.nome_funcionario
         |set:"historico":$historico

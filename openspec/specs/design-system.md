@@ -28,16 +28,17 @@ O botão primário e os cartões interativos (atalhos da visão geral e cartões
 
 ## Requisito: fotos das motos
 
-As fotos locais DEVEM ficar numa pasta por modelo: `assets/motos/<slug>/1.<slug>.jpg` a `4.<slug>.jpg` e a arte padrão `assets/motos/<slug>/default_<slug com _>.png` (slug sem acentos, ex.: `pan-america`). Em `ui_helpers.py`:
+Toda foto de moto DEVE vir do Xano (Change 17): `imagem_principal` (URL https), a `galeria` do modelo (imagens públicas enviadas pelo painel) e as fotos das cores. O projeto NÃO DEVE ter fotos locais por modelo. Em `ui_helpers.py`:
 
-- `get_foto_moto(moto, imagem_url=None)` DEVE devolver a imagem do Xano (ou a da cor), se não for vazia nem placeholder; senão a primeira foto local; senão a arte padrão. Um modelo sem nenhuma arte local DEVE manter o placeholder remoto, em vez de uma imagem quebrada.
-- `get_lista_fotos_moto(moto, imagem_url=None)` (Change 13) DEVE devolver a `galeria` do Xano, só com URLs reais; senão as fotos locais existentes, em ordem; senão a foto única de `get_foto_moto`. Uma foto de cor real ausente da galeria DEVE abrir a lista.
+- `get_foto_moto(moto, imagem_url=None)` DEVE devolver a foto da cor; senão a `imagem_principal`; senão `FOTO_INDISPONIVEL`. Uma foto só é usada se for `http(s)` e não for placeholder (`placehold.co` e afins).
+- `get_lista_fotos_moto(moto, imagem_url=None)` DEVE devolver a `galeria` do Xano, só com URLs reais; senão a foto única de `get_foto_moto`. Uma foto de cor real ausente da galeria DEVE abrir a lista.
+- `FOTO_INDISPONIVEL` DEVE ser uma imagem neutra embutida (SVG em `data:`, nas cores do tema), sem arquivo e sem requisição.
 
-### Cenário: placeholder no Xano
+### Cenário: modelo sem foto no Xano
 
-- **DADO** o modelo "Fat Boy" com `imagem_principal` em `placehold.co` e quatro fotos locais
+- **DADO** um modelo com `imagem_principal` em `placehold.co` e sem `galeria`
 - **QUANDO** a vitrine for exibida
-- **ENTÃO** o cartão DEVE mostrar `/motos/fat-boy/1.fat-boy.jpg` e o detalhe DEVE oferecer as quatro fotos
+- **ENTÃO** o cartão e o carrossel DEVEM mostrar `FOTO_INDISPONIVEL`, sem nenhuma requisição que responda 404
 
 ## Requisito: visão geral executiva
 

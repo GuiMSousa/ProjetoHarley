@@ -12,7 +12,7 @@ O catálogo (`modelos_moto`) DEVE descrever o modelo comercial: nome único, fam
 
 ## Requisito: vitrine pública
 
-`GET catalogo` (filtros opcionais `familia` e `busca`) e `GET catalogo/{id}` DEVEM responder sem autenticação, apenas com modelos ativos e apenas com os campos `id`, `nome_modelo`, `familia`, `descricao`, `imagem_principal`, `variacoes_cor`, `destaque`, `preco_a_partir` e `disponiveis`. `preco_a_partir` DEVE ser o menor preço entre as unidades `DISPONIVEL` do modelo ou, sem unidades, o preço base.
+`GET catalogo` (filtros opcionais `familia` e `busca`) e `GET catalogo/{id}` DEVEM responder sem autenticação, apenas com modelos ativos e apenas com os campos `id`, `nome_modelo`, `familia`, `descricao`, `imagem_principal`, `galeria`, `variacoes_cor`, `destaque`, `preco_a_partir` e `disponiveis`. `galeria` (Change 17) DEVE trazer só o `path` de cada imagem pública do modelo, nunca o objeto do arquivo. `preco_a_partir` DEVE ser o menor preço entre as unidades `DISPONIVEL` do modelo ou, sem unidades, o preço base.
 
 ### Cenário: modelo sem unidades
 

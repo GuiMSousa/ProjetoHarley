@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from Projeto_HarleyStore.services.leitura import TextoLido, lista_lida
+from Projeto_HarleyStore.services.leitura import TextoLido, galeria_lida, lista_lida
 
 
 FamiliaMoto = Literal["TOURING", "CRUISER", "ADVENTURE", "SPORT"]
@@ -40,7 +40,7 @@ class VariacaoCor(BaseModel):
     """Color option as read from Xano (Change 15): tolerant, but never an unsafe value.
 
     A color typed outside the app keeps its name; an invalid swatch color or a photo URL that
-    is not a web or local address reads as empty (no swatch, local photo).
+    is not http(s) reads as empty (no swatch; the model photo is shown).
     """
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
@@ -57,8 +57,8 @@ class VariacaoCor(BaseModel):
     @field_validator("imagem_url")
     @classmethod
     def _url_segura(cls, value: str) -> str:
-        # Only web photos or local assets reach an <img>: never javascript:, data: and the like.
-        return value if value.startswith(("https://", "http://", "/")) else ""
+        # Only web photos reach an <img> (Change 17: there are no local photos): never javascript:, data:.
+        return value if value.startswith(("https://", "http://")) else ""
 
 
 class ModeloMotoCreate(BaseModel):
@@ -131,9 +131,9 @@ class ModeloCatalogo(BaseModel):
     nome_modelo: TextoLido = ""
     familia: FamiliaMoto
     descricao: str | None = None
-    # Optional: without it (or with a placeholder) the page shows the local photo (get_foto_moto).
+    # Optional: without it (or with a placeholder) the page shows the neutral image (get_foto_moto).
     imagem_principal: str | None = None
-    # Prepared for a future photo gallery; Xano does not send it yet.
+    # Carousel photos (Change 17): Xano sends the /vault/ paths, read here as absolute URLs.
     galeria: list[str] = []
     variacoes_cor: list[VariacaoCor] = []
     destaque: bool = False
@@ -149,7 +149,7 @@ class ModeloCatalogo(BaseModel):
     @field_validator("galeria", mode="before")
     @classmethod
     def _null_galeria(cls, value: object) -> object:
-        return lista_lida(value, str)
+        return galeria_lida(value)
 
     @field_validator("destaque", mode="before")
     @classmethod

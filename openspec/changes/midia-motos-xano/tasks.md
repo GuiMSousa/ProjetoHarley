@@ -1,0 +1,11 @@
+# Tarefas — Change 17: fotos das motos vindas do Xano
+
+- [x] `xano/table/modelos_moto.xs` com `galeria` e `default_motos` como publicadas; `Catalogo/vitrine` com `galeria` (paths); `Vendas/detalhe_moto` com `galeria`; `GET motos` com `imagem_principal`. Validador do MCP.
+- [x] DTOs: `galeria` como URLs absolutas (`path` do Xano + origem de `XANO_API_BASE_URL`); `MotoEstoque` com `imagem_principal` e `galeria`; foto de cor só http(s).
+- [x] `get_foto_moto` e `get_lista_fotos_moto` sem arquivos locais, com a imagem neutra embutida.
+- [x] Remover `assets/motos/` e `.web/public/motos/`.
+- [x] Testes com URLs remotas (`test_media.py` reescrito, `test_catalogo.py`, `test_resiliencia_leitura.py`; `test_ui_helpers.py` não tinha caminho local), contratos dos `.xs` e smoke exigindo foto remota ou a imagem neutra.
+- [x] Specs (`design-system.md`, `catalogo-vendas-motos.md`, `arquitetura-e-contratos.md`) e docs.
+- [x] `ruff`, `compileall`, `reflex compile --dry`, `pytest` (437 aprovados, 42 ignorados), smoke de navegador (2 aprovados; o carrossel é ignorado até o push, porque cada modelo tem uma foto) e `--dry-run` direcionado (só `Catalogo/vitrine`, `Vendas/detalhe_moto` e `GET motos`). Na vitrine local, as 6 fotos vêm do Xano e nenhuma resposta dá erro.
+- [ ] Push com o OK do usuário; enviar as fotos da galeria pelo painel (públicas).
+- [ ] Mover para o archive e commit (usuário).
