@@ -156,9 +156,10 @@ class TolerantReadDtoTests(unittest.TestCase):
     def test_color_read_is_tolerant_but_never_unsafe(self):
         cor = VariacaoCor.model_validate({"nome": None, "hex": "#000", "imagem_url": "javascript:alert(1)"})
         self.assertEqual((cor.nome, cor.hex, cor.imagem_url), ("", "", ""))
-        for url in ("https://cdn.test/a.jpg", "http://cdn.test/a.jpg"):
+        # The color photo follows the gallery rule (url_de_midia): https in any scheme case.
+        for url in ("https://cdn.test/a.jpg", "http://cdn.test/a.jpg", "HTTPS://cdn.test/a.jpg"):
             with self.subTest(url=url):
-                self.assertEqual(VariacaoCor(nome="Preto", hex="#0b0b0b", imagem_url=url).imagem_url, url)
+                self.assertEqual(VariacaoCor(nome="Preto", hex="#0b0b0b", imagem_url=url).imagem_url, "https://cdn.test/a.jpg")
         # Change 17: no local photos exist, so a local path is dropped like data: and javascript:.
         for url in ("data:image/png;base64,AA", "/motos/fat-boy/1.fat-boy.jpg"):
             with self.subTest(url=url):

@@ -7,6 +7,7 @@ Change pedida diretamente para execução (2026-10-27). As fotos das motos vinha
 O objetivo é que toda foto venha do Xano: a principal (`imagem_principal`) e as do carrossel (`galeria`). Sem foto, a tela mostra uma imagem neutra própria (SVG embutido), nunca um arquivo por pasta.
 
 Estado verificado em 2026-10-27:
+
 - os 5 modelos publicados têm `imagem_principal` em `www.harley-davidson.com`, e as 5 URLs respondem 200 com JPEG;
 - as fotos das cores são placeholders (`placehold.co`);
 - a coluna `galeria` (`image[1:10]?`) existe no Xano publicado, criada pelo painel, mas não estava em `xano/` nem era devolvida pelos endpoints.
@@ -45,4 +46,4 @@ Estado verificado em 2026-10-27:
 
 ## Status
 
-Apply em 2026-10-27. Em 2026-10-27, a vitrine publicada já devolvia a `galeria`, com 4 fotos por modelo nos 5 modelos, e as 20 respondiam 200 com JPEG pela URL que o Reflex monta. A revisão do mesmo dia acrescentou o filtro de privados e o reforço das URLs (https, maiúsculas, `..`); falta o push de `Catalogo/vitrine` e `Vendas/detalhe_moto`.
+Apply em 2026-10-27. Em 2026-10-27, a vitrine publicada já devolvia a `galeria`, com 4 fotos por modelo nos 5 modelos, e as 20 respondiam 200 com JPEG pela URL que o Reflex monta. A revisão do mesmo dia acrescentou o filtro de privados e o reforço das URLs (https, maiúsculas, `..`, tabulação e quebra de linha), e o push de `Catalogo/vitrine` e `Vendas/detalhe_moto` foi feito em 2026-10-27; depois dele, a vitrine publicada manteve as 4 fotos de cada modelo.

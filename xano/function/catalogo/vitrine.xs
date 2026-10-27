@@ -74,6 +74,7 @@ function "Catalogo/vitrine" {
 
         conditional {
           if ($busca == "" || ($modelo.nome_modelo|icontains:$busca)) {
+            // galeria: != "private" (e não == "public") mantém fotos públicas legadas sem o atributo access.
             var.update $card {
               value = {
                 id              : $modelo.id

@@ -124,8 +124,10 @@ class GaleriaDoXanoTests(unittest.TestCase):
 
     def test_a_path_that_climbs_out_of_the_vault_is_refused(self):
         # The browser resolves "..", %2e%2e and backslashes alike: none may leave /vault/.
+        # A tab or line break inside ".." is dropped by the browser before it resolves the path.
         for caminho in ("/vault/../api:Hd3aQ/auth/me", "/vault/%2e%2E/api:Hd3aQ", r"/vault/a\..\..\api:Hd3aQ",
-                        {"path": "/vault/../api:Hd3aQ"}):
+                        {"path": "/vault/../api:Hd3aQ"}, "/vault/.\t./api:Hd3aQ", "/vault/.\n./api:Hd3aQ",
+                        "/vault/.\r\n./api:Hd3aQ"):
             with self.subTest(caminho=caminho):
                 self.assertEqual(ModeloCatalogo.model_validate({**VITRINE, "galeria": [caminho]}).galeria, [])
         # Dots inside a file name are not a climb.

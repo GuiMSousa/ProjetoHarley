@@ -52,6 +52,7 @@ function "Vendas/detalhe_moto" {
       return = {type: "list"}
     } as $historico
 
+    // galeria: != "private" (e não == "public") mantém fotos públicas legadas sem o atributo access.
     var $detalhe {
       value = $moto
         |set:"nome_modelo":$modelo.nome_modelo

@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from Projeto_HarleyStore.services.leitura import TextoLido, galeria_lida, lista_lida
+from Projeto_HarleyStore.services.leitura import TextoLido, galeria_lida, lista_lida, url_de_midia
 
 
 FamiliaMoto = Literal["TOURING", "CRUISER", "ADVENTURE", "SPORT"]
@@ -39,8 +39,9 @@ class VariacaoCorCreate(BaseModel):
 class VariacaoCor(BaseModel):
     """Color option as read from Xano (Change 15): tolerant, but never an unsafe value.
 
-    A color typed outside the app keeps its name; an invalid swatch color or a photo URL that
-    is not http(s) reads as empty (no swatch; the model photo is shown).
+    A color typed outside the app keeps its name; an invalid swatch color reads as empty (no
+    swatch). The photo goes through ``url_de_midia``, like the gallery: https, or empty (the
+    model photo is shown).
     """
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
@@ -57,8 +58,8 @@ class VariacaoCor(BaseModel):
     @field_validator("imagem_url")
     @classmethod
     def _url_segura(cls, value: str) -> str:
-        # Only web photos reach an <img> (Change 17: there are no local photos): never javascript:, data:.
-        return value if value.startswith(("https://", "http://")) else ""
+        # Same rule as the gallery (Change 17): https in any scheme case, never javascript:, data: or local paths.
+        return url_de_midia(value)
 
 
 class ModeloMotoCreate(BaseModel):

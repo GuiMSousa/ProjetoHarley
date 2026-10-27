@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Annotated
 from urllib.parse import unquote, urlsplit
 
@@ -40,7 +41,8 @@ def url_de_midia(item: object) -> str:
         item = item.get("path")
     if not isinstance(item, str):
         return ""
-    item = item.strip()
+    # The browser drops tabs and line breaks anywhere in a URL (".<tab>." becomes ".."): drop them first.
+    item = re.sub(r"[\t\n\r]", "", item.strip())
     esquema, separador, resto = item.partition("://")
     if separador and esquema.lower() in ("https", "http"):
         return f"https://{resto}" if resto else ""
