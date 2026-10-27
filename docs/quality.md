@@ -39,7 +39,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 439 passaram, 42 pulados (integração e navegador);
+- pytest: 441 passaram, 42 pulados (integração e navegador);
 - `reflex compile --dry`: OK;
 - smoke de navegador: 3 passaram, com o catálogo público real;
 - validador do MCP `xano-developer`: 129 `.xs` válidos.

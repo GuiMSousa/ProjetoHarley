@@ -35,6 +35,8 @@ from pathlib import Path
 from typing import ClassVar
 from unittest.mock import patch
 
+import httpx
+
 from Projeto_HarleyStore.services.balcao import ItemVendaBalcaoCreate, VendaBalcaoCreate
 from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCorCreate
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
@@ -688,6 +690,7 @@ SHOWROOM_FIELDS = {
     "familia",
     "descricao",
     "imagem_principal",
+    "galeria",
     "variacoes_cor",
     "destaque",
     "preco_a_partir",
@@ -702,6 +705,26 @@ def random_vin() -> str:
 
 
 class XanoLiveCatalogReadTests(XanoLiveTestCase):
+    def test_seller_opens_the_detail_of_a_unit_without_a_reservation(self):
+        """Read-only. Audit 2026-10-27: Vendas/detalhe_moto answered 400 "Missing param: field_value"
+        for every unit without client or seller (a db.get with a null value)."""
+        with self.client_for("VENDEDOR") as client:
+            unidades = client.list_motos_estoque()
+        if not unidades:
+            self.skipTest("Nenhuma unidade no estoque para abrir o detalhe.")
+        # A unit without a reservation is the case that failed; any unit if all are reserved.
+        unidade = next((u for u in unidades if u.clientes_id is None), unidades[0])
+        resposta = httpx.get(
+            f"{BASE_URL.rstrip('/')}/motos/{unidade.id}",
+            headers={"Authorization": f"Bearer {self.token_for('VENDEDOR')}"},
+            timeout=30,
+        )
+        self.assertEqual(resposta.status_code, 200, resposta.text[:200])
+        detalhe = resposta.json()
+        self.assertEqual(detalhe["id"], unidade.id)
+        self.assertIn("imagem_principal", detalhe)
+        self.assertIsInstance(detalhe["galeria"], list)
+
     def test_public_catalog_exposes_only_showroom_fields(self):
         """Runs without credentials; skipped while Change 8 is not published."""
         with XanoClient() as client:

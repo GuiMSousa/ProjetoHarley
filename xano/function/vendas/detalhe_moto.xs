@@ -6,33 +6,45 @@ function "Vendas/detalhe_moto" {
   }
 
   stack {
-    db.get motos {
-      field_name = "id"
-      field_value = $input.moto_id
+    // Joins à esquerda: uma unidade sem reserva (ou sem modelo) não tem esses ids, e um db.get
+    // com field_value nulo respondia 400 "Missing param: field_value" (auditoria de 2026-10-27).
+    db.query motos {
+      join = {
+        modelos_moto: {
+          table: "modelos_moto"
+          type : "left"
+          where: $db.motos.id_modelo == $db.modelos_moto.id
+        }
+        clientes: {
+          table: "clientes"
+          type : "left"
+          where: $db.motos.clientes_id == $db.clientes.id
+        }
+        funcionarios: {
+          table: "funcionarios"
+          type : "left"
+          where: $db.motos.id_vendedor_reserva == $db.funcionarios.id
+        }
+      }
+
+      where = $db.motos.id == $input.moto_id
+      eval = {
+        nome_modelo     : $db.modelos_moto.nome_modelo
+        familia         : $db.modelos_moto.familia
+        variacoes_cor   : $db.modelos_moto.variacoes_cor
+        imagem_principal: $db.modelos_moto.imagem_principal
+        galeria         : $db.modelos_moto.galeria
+        nome_cliente    : $db.clientes.nome_cliente
+        nome_vendedor   : $db.funcionarios.nome_funcionario
+      }
+
+      return = {type: "single"}
     } as $moto
 
     precondition ($moto != null) {
       error_type = "notfound"
       error = "Moto não encontrada."
     }
-
-    db.get modelos_moto {
-      field_name = "id"
-      field_value = $moto.id_modelo
-      output = ["id", "nome_modelo", "familia", "variacoes_cor", "imagem_principal", "galeria"]
-    } as $modelo
-
-    db.get clientes {
-      field_name = "id"
-      field_value = $moto.clientes_id
-      output = ["id", "nome_cliente"]
-    } as $cliente
-
-    db.get funcionarios {
-      field_name = "id"
-      field_value = $moto.id_vendedor_reserva
-      output = ["id", "nome_funcionario"]
-    } as $vendedor
 
     db.query historico_status_moto {
       join = {
@@ -55,13 +67,7 @@ function "Vendas/detalhe_moto" {
     // galeria: != "private" (e não == "public") mantém fotos públicas legadas sem o atributo access.
     var $detalhe {
       value = $moto
-        |set:"nome_modelo":$modelo.nome_modelo
-        |set:"familia":$modelo.familia
-        |set:"variacoes_cor":$modelo.variacoes_cor
-        |set:"imagem_principal":$modelo.imagem_principal
-        |set:"galeria":((($modelo.galeria ?? [])|filter:$$.access != "private")|map:$$.path)
-        |set:"nome_cliente":$cliente.nome_cliente
-        |set:"nome_vendedor":$vendedor.nome_funcionario
+        |set:"galeria":((($moto.galeria ?? [])|filter:$$.access != "private")|map:$$.path)
         |set:"historico":$historico
     }
   }

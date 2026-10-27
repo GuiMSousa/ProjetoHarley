@@ -51,17 +51,16 @@ function "Quick Start/enforce_role" {
       error = "Invalid required role specified: " ~ $input.required_role
     }
 
-    conditional {
-      if (
-        ($user.role != "admin" && $input.required_role == "GERENTE" && $employee.tipo != "GERENTE") ||
-        ($user.role != "admin" && $input.required_role == "VENDEDOR" && $employee.tipo != "GERENTE" && $employee.tipo != "VENDEDOR") ||
-        ($user.role != "admin" && $input.required_role == "MECANICO" && $employee.tipo != "GERENTE" && $employee.tipo != "MECANICO")
-      ) {
-        throw {
-          name = "accessdenied"
-          value = "User does not have the required employee role. Required: " ~ $input.required_role ~ ", Actual: " ~ $employee.tipo
-        }
-      }
+    // A precondition answers HTTP 403; a throw answered HTTP 200 with the error in the body (audit 2026-10-27).
+    precondition (
+      $user.role == "admin" ||
+      $input.required_role == "ALL" ||
+      ($input.required_role == "GERENTE" && $employee.tipo == "GERENTE") ||
+      ($input.required_role == "VENDEDOR" && ($employee.tipo == "GERENTE" || $employee.tipo == "VENDEDOR")) ||
+      ($input.required_role == "MECANICO" && ($employee.tipo == "GERENTE" || $employee.tipo == "MECANICO"))
+    ) {
+      error_type = "accessdenied"
+      error = "User does not have the required employee role. Required: " ~ $input.required_role ~ ", Actual: " ~ $employee.tipo
     }
   }
 

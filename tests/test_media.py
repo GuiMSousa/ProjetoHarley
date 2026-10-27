@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 from urllib.parse import unquote
 
+import reflex as rx
 from reflex.state import State
 
 from Projeto_HarleyStore.catalogo_state import CatalogoState, fotos_com_cor, modelo_card
@@ -14,6 +15,7 @@ from Projeto_HarleyStore.services.catalogo import ModeloCatalogo, VariacaoCor
 from Projeto_HarleyStore.services.motos import MotoEstoque, MotoEstoqueDetalhe
 from Projeto_HarleyStore.styles.theme import COLORS
 from Projeto_HarleyStore.ui_helpers import FOTO_INDISPONIVEL, get_foto_moto, get_lista_fotos_moto, indice_carrossel
+from Projeto_HarleyStore.vendas_pages import _modelo_cell
 from Projeto_HarleyStore.vendas_state import VendasState, moto_row
 
 from tests.event_runner import run_event
@@ -129,6 +131,13 @@ class FotoNasTelasTests(unittest.TestCase):
         self.assertEqual(moto_row(unidade, "VENDEDOR", 2, agora)["foto"], REAL)
         legado = MotoEstoque(id=10, modelo="Street Glide")
         self.assertEqual(moto_row(legado, "VENDEDOR", 2, agora)["foto"], FOTO_INDISPONIVEL)
+
+    def test_stock_table_shows_the_row_photo(self):
+        # Audit 2026-10-27: the row computed "foto" but no screen showed it.
+        linha = rx.Var.create({"foto": REAL, "cor_hex": "", "cor": "Preto", "modelo": "Fat Boy", "familia": "Cruiser"})
+        celula = str(_modelo_cell(linha))
+        self.assertRegex(celula, r'src:\(\{.*\}\)\?\.\["foto"\]')
+        self.assertRegex(celula, r'alt:""')
 
 
 def substate(state_class):

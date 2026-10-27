@@ -191,11 +191,19 @@ class VendasContractTests(unittest.TestCase):
             {"nome_modelo", "imagem_principal", "familia", "variacoes_cor", "nome_cliente", "nome_vendedor"},
         )
 
-    def test_unit_detail_sends_the_model_gallery_as_paths(self):
-        # Change 17: the /vendas carousel reads the gallery of the unit's model.
+    def test_unit_detail_joins_its_links_and_sends_the_gallery_as_paths(self):
+        # Audit 2026-10-27: a unit without client, seller or model never reaches a db.get with a null
+        # value (Xano answered 400 "Missing param: field_value"). Change 17: the gallery goes as paths.
         content = read("function/vendas/detalhe_moto.xs")
-        self.assertIn('"imagem_principal", "galeria"]', content)
-        self.assertIn('|set:"galeria":((($modelo.galeria ?? [])|filter:$$.access != "private")|map:$$.path)', content)
+        self.assertNotRegex(content, r"db\.get (modelos_moto|clientes|funcionarios)\b")
+        for join in ("$db.motos.id_modelo == $db.modelos_moto.id", "$db.motos.clientes_id == $db.clientes.id",
+                     "$db.motos.id_vendedor_reserva == $db.funcionarios.id"):
+            with self.subTest(join=join):
+                self.assertIn(join, content)
+        # The three links of the unit plus the author of each history entry.
+        self.assertEqual(len(re.findall(r'type\s*:\s*"left"', content)), 4)
+        self.assertIn('return = {type: "single"}', content)
+        self.assertIn('|set:"galeria":((($moto.galeria ?? [])|filter:$$.access != "private")|map:$$.path)', content)
 
     def test_sample_data_is_idempotent_and_uses_neutral_https_placeholders(self):
         content = read("function/catalogo/seed_exemplo.xs")

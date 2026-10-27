@@ -146,6 +146,24 @@ class SecurityContractTests(unittest.TestCase):
         self.assertIn("$employee.ativo != false", content)
         self.assertIn("$employee_has_user", content)
 
+    def test_role_denial_answers_403_not_a_200_with_the_error(self):
+        # Audit 2026-10-27: Xano answers a throw with HTTP 200; only a precondition gives 403.
+        content = self.read("function/quick_start/enforce_role.xs")
+        self.assertNotRegex(content, r"(?m)^\s*throw\s*\{")
+        # The role precondition alone (from its condition to its error type), so a branch elsewhere
+        # in the file cannot satisfy the check. Each branch keeps a profile out of a 403 lockout.
+        bloco = re.search(r'precondition \(\s*\$user\.role == "admin"(.*?)\)\s*\{\s*error_type = "(\w+)"', content, re.DOTALL)
+        self.assertIsNotNone(bloco)
+        self.assertEqual(bloco.group(2), "accessdenied")
+        for ramo in (
+            '$input.required_role == "ALL"',
+            '($input.required_role == "GERENTE" && $employee.tipo == "GERENTE")',
+            '($input.required_role == "VENDEDOR" && ($employee.tipo == "GERENTE" || $employee.tipo == "VENDEDOR"))',
+            '($input.required_role == "MECANICO" && ($employee.tipo == "GERENTE" || $employee.tipo == "MECANICO"))',
+        ):
+            with self.subTest(ramo=ramo):
+                self.assertIn(ramo, bloco.group(1))
+
     def test_inactive_employee_loses_business_access(self):
         self.assertIn(
             "precondition ($employee.ativo != false)",

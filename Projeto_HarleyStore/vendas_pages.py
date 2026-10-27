@@ -72,6 +72,18 @@ def filtro_modelo() -> rx.Component:
 
 def _modelo_cell(row: rx.Var) -> rx.Component:
     return rx.hstack(
+        # Photo of the unit's model, from Xano (the neutral image without one); the name beside it
+        # already names the bike, so the picture is decorative for screen readers.
+        rx.image(
+            src=row["foto"],
+            alt="",
+            width="4rem",
+            min_width="4rem",
+            aspect_ratio="16 / 9",
+            object_fit="cover",
+            border_radius=RADII["sm"],
+            loading="lazy",
+        ),
         rx.cond(row["cor_hex"] != "", swatch(row["cor_hex"], row["cor"], size="1rem")),
         rx.vstack(
             rx.text(row["modelo"], font_weight="700"),

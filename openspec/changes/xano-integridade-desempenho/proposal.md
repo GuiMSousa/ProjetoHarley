@@ -25,6 +25,11 @@ O objetivo é alinhar o versionado com o publicado, corrigir a ordem de baixa de
 
 - **Sanitização e observabilidade das respostas 5xx** (feito em 2026-10-25): o log `ERROR` passa a trazer a `message` do Xano, que nomeia o passo que falhou, em uma linha e com mascaramento de dados pessoais e numéricos: e-mails, códigos de 5 ou mais caracteres com letras e dígitos (placa, chassi) e sequências de 3 ou mais dígitos (CPF, telefone, ids) viram `…`. O texto é cortado em 200 caracteres, e corpo que não é JSON não é registrado. As mensagens `400` continuam como o Xano as envia, porque vão para a tela.
 
+**Correções da auditoria E2E de 2026-10-27** (sem mudança de banco; push com o OK do usuário):
+
+- `Quick Start/enforce_role` recusa o perfil com `precondition` `accessdenied`: o `throw` anterior chegava ao app como HTTP 200 com o erro no corpo, e não houve vazamento nem gravação.
+- `Vendas/detalhe_moto` lê modelo, cliente e vendedor por joins à esquerda: com `db.get` e valor nulo, o detalhe de toda unidade sem reserva respondia 400.
+
 **Com mudança de banco** (cada item precisa de OK antes de editar e de novo antes do push):
 
 5. **`modelos_moto`:** versionar `galeria` e `default_motos` em `xano/table/modelos_moto.xs`, ou removê-las com `--sync`. **Atualização (2026-10-27):** a Change 17 versionou as duas como publicadas e levou a `galeria` à vitrine e a `/vendas`; resta decidir `default_motos`. Recomendação:
