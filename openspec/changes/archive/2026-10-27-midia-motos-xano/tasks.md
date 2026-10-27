@@ -10,4 +10,4 @@
 - [x] Push e fotos da galeria pelo painel (usuário): a vitrine publicada devolve 4 fotos por modelo, públicas (20/20 com 200).
 - [x] Revisão (2026-10-27): `galeria` só com arquivos não privados (`$$.access != "private"`) na vitrine e no detalhe; `url_de_midia` com esquema sem diferença de maiúsculas, `http` promovido a `https` e recusa de `..` (inclusive `%2e%2e` e barra invertida); foto principal e de cor pelo mesmo saneador. Testes com mutação (5 variantes pegas).
 - [ ] Push de `Catalogo/vitrine` e `Vendas/detalhe_moto` com o filtro de privados (OK do usuário).
-- [x] Mover para o archive e commit (usuário): commit `8937ea8`.
+- [x] Mover para o archive e commit (usuário), em 2026-10-27: `openspec/changes/archive/2026-10-27-midia-motos-xano/`. Código no commit `8937ea8`; a mudança de pasta entrou no `38416cb` como renomeação, com o histórico preservado (`git log --follow`).
