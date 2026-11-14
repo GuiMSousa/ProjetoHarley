@@ -34,19 +34,35 @@ query entrada_mercadoria verb=GET {
       return = {type: "list"}
     } as $entradas
 
+    // Itens contados numa única consulta, agrupados por entrada em memória (Change 16): antes era
+    // uma consulta de contagem por entrada. A chave leva o prefixo "e" porque um caminho só com
+    // dígitos pode ser lido como índice de array.
+    // shortcut: lê o id_entrada de todos os itens; paginar junto com a lista de entradas se ela crescer.
+    db.query itens_compra_estoque {
+      output = ["id_entrada"]
+      return = {type: "list"}
+    } as $itens
+
+    var $quantidades {
+      value = {}
+    }
+
+    foreach ($itens) {
+      each as $item {
+        var.update $quantidades {
+          value = $quantidades|set:("e" ~ $item.id_entrada):(($quantidades|get:("e" ~ $item.id_entrada):0) + 1)
+        }
+      }
+    }
+
     var $model {
       value = []
     }
 
     foreach ($entradas) {
       each as $entrada {
-        db.query itens_compra_estoque {
-          where = $db.itens_compra_estoque.id_entrada == $entrada.id
-          return = {type: "count"}
-        } as $quantidade_itens
-
         var.update $model {
-          value = $model|push:($entrada|set:"quantidade_itens":$quantidade_itens)
+          value = $model|push:($entrada|set:"quantidade_itens":($quantidades|get:("e" ~ $entrada.id):0))
         }
       }
     }

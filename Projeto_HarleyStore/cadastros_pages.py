@@ -101,14 +101,10 @@ def cadastro_form() -> rx.Component:
                     field("Descrição", "descricao"),
                     field("Categoria", "categoria"),
                     field("Preço de venda", "preco_venda"),
-                    rx.cond(
-                        CadastrosState.editing_id == "",
-                        field("Saldo inicial de estoque", "estoque_qtd"),
-                        rx.text(
-                            "O saldo de estoque é alterado somente por entradas de mercadoria.",
-                            size="2",
-                            color=COLORS["muted"],
-                        ),
+                    rx.text(
+                        "O produto começa com saldo 0; o estoque entra pelas entradas de mercadoria.",
+                        size="2",
+                        color=COLORS["muted"],
                     ),
                     align="stretch",
                     spacing="3",

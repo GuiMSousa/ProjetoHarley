@@ -7,6 +7,21 @@ ROOT = Path(__file__).parents[1]
 XANO = ROOT / "xano"
 
 
+def preconditions_without_error_type(content):
+    """Line numbers of the preconditions whose block does not declare an error_type."""
+    missing = []
+    for match in re.finditer(r"^\s*precondition\s*\(", content, re.MULTILINE):
+        depth, position = 1, match.end()
+        while depth:
+            depth += {"(": 1, ")": -1}.get(content[position], 0)
+            position += 1
+        opening = content.index("{", position)
+        body = content[opening + 1 : content.index("}", opening)]
+        if not re.search(r"^\s*error_type = ", body, re.MULTILINE):
+            missing.append(content.count("\n", 0, match.start()) + 1)
+    return missing
+
+
 class SecurityContractTests(unittest.TestCase):
     def read(self, relative_path):
         return (XANO / relative_path).read_text(encoding="utf-8")
@@ -163,6 +178,20 @@ class SecurityContractTests(unittest.TestCase):
         ):
             with self.subTest(ramo=ramo):
                 self.assertIn(ramo, bloco.group(1))
+
+    def test_every_refusal_declares_its_http_status(self):
+        # Change 16: a precondition without error_type and a throw do not answer the 400/403/404 the
+        # Reflex maps (a throw answers HTTP 200, audit 2026-10-27).
+        sample = 'precondition ($a) {\n  error = "x"\n}\nprecondition (($b|count) > 0) {\n  error_type = "notfound"\n}\n'
+        self.assertEqual(preconditions_without_error_type(sample), [1])
+        checked = 0
+        for path in XANO.rglob("*.xs"):
+            content = path.read_text(encoding="utf-8")
+            checked += content.count("precondition (")
+            with self.subTest(path=path.relative_to(XANO).as_posix()):
+                self.assertEqual(preconditions_without_error_type(content), [])
+                self.assertNotRegex(content, r"(?m)^\s*throw\s*\{")
+        self.assertGreater(checked, 150)
 
     def test_inactive_employee_loses_business_access(self):
         self.assertIn(

@@ -124,9 +124,9 @@ class CadastrosTests(unittest.TestCase):
         self.assertEqual(Produto.model_validate({**row, "estoque_qtd": 7}).estoque_qtd, 7)
         with self.assertRaises(ValidationError):
             Produto.model_validate({**row, "estoque_qtd": -1})
-        # The write DTO still requires a real balance.
-        with self.assertRaises(ValidationError):
-            ProdutoCreate(**{**row, "estoque_qtd": None})
+        # Change 16: a product starts at 0, so the create DTO never carries a balance.
+        self.assertNotIn("estoque_qtd", ProdutoCreate(**{**row, "estoque_qtd": 9}).model_dump())
+        self.assertNotIn("estoque_qtd", ProdutoCreate.model_fields)
 
     def test_product_update_does_not_accept_stock_balance(self):
         update = ProdutoUpdate(nome_produto="Filtro", estoque_qtd=999)
@@ -160,7 +160,6 @@ class CadastrosTests(unittest.TestCase):
                     codigo="SKU4",
                     nome_produto="Filtro",
                     categoria="Motor",
-                    estoque_qtd=2,
                     preco_venda=Decimal("45.50"),
                 )
             )
@@ -168,6 +167,7 @@ class CadastrosTests(unittest.TestCase):
         self.assertEqual(product.codigo, "SKU4")
         self.assertIn(b'"codigo":"SKU4"', captured["body"])
         self.assertIn(b'"preco_venda":"45.50"', captured["body"])
+        self.assertNotIn(b"estoque_qtd", captured["body"])
 
 
 if __name__ == "__main__":

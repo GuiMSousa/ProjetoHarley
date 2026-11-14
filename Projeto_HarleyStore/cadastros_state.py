@@ -269,7 +269,6 @@ class CadastrosState(AuthState):
             "nome_produto": "",
             "descricao": "",
             "categoria": "",
-            "estoque_qtd": "0",
             "preco_venda": "",
             "nome_fornecedor": "",
             "cnpj": "",
@@ -343,11 +342,8 @@ class CadastrosState(AuthState):
             return model(**payload), model
         if self.active_section == "produtos":
             payload = dict(data)
-            if self.editing_id:
-                # Stock balance changes only through stock movements.
-                payload.pop("estoque_qtd", None)
-            elif "estoque_qtd" in payload:
-                payload["estoque_qtd"] = int(payload["estoque_qtd"])
+            # Stock balance changes only through stock movements; a product starts at 0 (Change 16).
+            payload.pop("estoque_qtd", None)
             if "preco_venda" in payload:
                 payload["preco_venda"] = Decimal(payload["preco_venda"])
             model = ProdutoUpdate if self.editing_id else ProdutoCreate

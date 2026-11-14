@@ -103,6 +103,55 @@ class OrdemServicoContractTests(unittest.TestCase):
         for field in ("nome_cliente", "placa", "modelo", "nome_funcionario", "nome_mecanico"):
             self.assertIn(field, content)
 
+    def test_list_joins_author_and_mechanic_without_reading_all_employees(self):
+        # Change 16: one query; before, the whole employee table was read and searched per order.
+        content = self.read(f"{API}/ordens_servico_GET.xs")
+        self.assertEqual(re.findall(r"db\.query (\w+)", content), ["ordens_servico"])
+        self.assertNotIn("|find:", content)
+        self.assertNotIn("foreach", content)
+        for alias, column in (("autor", "id_funcionario"), ("mecanico", "id_mecanico")):
+            with self.subTest(alias=alias):
+                self.assertIn(
+                    f'{alias}: {{\n          table: "funcionarios"\n          type : "left"\n'
+                    f"          where: $db.ordens_servico.{column} == $db.{alias}.id",
+                    content,
+                )
+        self.assertIn("nome_funcionario: $db.autor.nome_funcionario", content)
+        self.assertIn("nome_mecanico   : $db.mecanico.nome_funcionario", content)
+        self.assertIn("response = $ordens", content)
+
+    def test_detail_joins_its_links_in_one_query(self):
+        # Change 16: a null link (order from the Xano panel or legacy) never reaches a db.get with a
+        # null value, which Xano answers with 400 "Missing param: field_value".
+        content = self.read("function/oficina/detalhe_os.xs")
+        self.assertNotRegex(content, r"db\.get (ordens_servico|motos_clientes|clientes|funcionarios)\b")
+        head = content[: content.index("db.query historico_status_os")]
+        for alias, table, condition in (
+            ("motos_clientes", "motos_clientes", "$db.ordens_servico.id_moto_cliente == $db.motos_clientes.id"),
+            ("cliente_os", "clientes", "$db.ordens_servico.id_cliente == $db.cliente_os.id"),
+            ("dono_moto", "clientes", "$db.motos_clientes.id_cliente == $db.dono_moto.id"),
+            ("autor", "funcionarios", "$db.ordens_servico.id_funcionario == $db.autor.id"),
+            ("mecanico", "funcionarios", "$db.ordens_servico.id_mecanico == $db.mecanico.id"),
+        ):
+            with self.subTest(alias=alias):
+                self.assertIn(
+                    f'{alias}: {{\n          table: "{table}"\n          type : "left"\n          where: {condition}',
+                    head,
+                )
+        self.assertEqual(len(re.findall(r'type\s*:\s*"left"', head)), 5)
+        # A single record, or 404 before any field is read.
+        self.assertLess(head.index('return = {type: "single"}'), head.index('error_type = "notfound"'))
+        # Client: the one photographed on the order or, before Change 6, the bike owner.
+        self.assertIn("value = $os.id_cliente ?? $os.id_cliente_moto", content)
+        self.assertRegex(
+            content,
+            r"if \(\$os\.id_cliente == null\) \{\s*var\.update \$nome_cliente \{\s*value = \$os\.nome_dono_moto",
+        )
+        # The helper fields of the joins stay out of the response.
+        for helper in ("id_cliente_moto", "nome_cliente_os", "nome_dono_moto"):
+            with self.subTest(helper=helper):
+                self.assertIn(f'|unset:"{helper}"', content)
+
     def test_mechanics_endpoint_exposes_only_id_and_name(self):
         content = self.read(f"{API}/oficina/mecanicos_GET.xs")
         self.assertIn('required_role: "MECANICO"', content)

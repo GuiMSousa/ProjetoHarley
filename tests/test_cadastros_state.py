@@ -155,35 +155,23 @@ class CadastrosStateTests(unittest.TestCase):
         )
         self.assertEqual((rows[0]["secondary"], rows[0]["placa"]), ("", ""))
 
-    def test_product_edit_payload_never_carries_stock_balance(self):
-        state = self.make_real_state("GERENTE")
-        state.active_section = "produtos"
-        state.editing_id = "4"
-        state.form_data = {
-            "codigo": "SKU4",
-            "nome_produto": "Filtro",
-            "categoria": "Motor",
-            "preco_venda": "45.50",
-            "estoque_qtd": "999",
-        }
-        payload, model = state._payload()
-        self.assertIs(model, ProdutoUpdate)
-        self.assertNotIn("estoque_qtd", payload.model_dump(exclude_unset=True))
-
-    def test_product_create_payload_keeps_initial_stock(self):
-        state = self.make_real_state("GERENTE")
-        state.active_section = "produtos"
-        state.editing_id = ""
-        state.form_data = {
-            "codigo": "SKU4",
-            "nome_produto": "Filtro",
-            "categoria": "Motor",
-            "preco_venda": "45.50",
-            "estoque_qtd": "3",
-        }
-        payload, model = state._payload()
-        self.assertIs(model, ProdutoCreate)
-        self.assertEqual(payload.estoque_qtd, 3)
+    def test_product_payload_never_carries_stock_balance(self):
+        # Edit: the balance changes only through stock movements. Create: it starts at 0 (Change 16).
+        for editing_id, expected_model in (("4", ProdutoUpdate), ("", ProdutoCreate)):
+            with self.subTest(editing_id=editing_id):
+                state = self.make_real_state("GERENTE")
+                state.active_section = "produtos"
+                state.editing_id = editing_id
+                state.form_data = {
+                    "codigo": "SKU4",
+                    "nome_produto": "Filtro",
+                    "categoria": "Motor",
+                    "preco_venda": "45.50",
+                    "estoque_qtd": "999",
+                }
+                payload, model = state._payload()
+                self.assertIs(model, expected_model)
+                self.assertNotIn("estoque_qtd", payload.model_dump(exclude_unset=True))
 
 
     def test_product_rows_show_formatted_price_and_balance(self):

@@ -101,7 +101,7 @@ class EstoqueContractTests(unittest.TestCase):
     def test_only_the_stock_function_writes_the_balance(self):
         allowed = {
             Path("xano/function/estoque/movimentar_estoque.xs"),
-            # Initial balance, set only when the product is created.
+            # Balance 0, written only when the product is created (Change 16).
             Path("xano/api/harley/produtos_POST.xs"),
         }
         for path in (ROOT / "xano").rglob("*.xs"):
@@ -189,8 +189,36 @@ class EstoqueContractTests(unittest.TestCase):
         self.assertIn('|unset:"estoque_qtd"', patch)
         self.assertIn('|unset:"versao_estoque"', patch)
         self.assertNotIn("versao_estoque", self.read(f"{API}/produtos/produtos_id_PUT.xs"))
-        self.assertIn("estoque_qtd", self.read(f"{API}/produtos_POST.xs"))
         self.assertNotIn("versao_estoque", self.read(f"{API}/produtos_POST.xs"))
+
+    def test_product_starts_with_zero_balance(self):
+        # Change 16: stock enters through goods receipts, so the ledger adds up to estoque_qtd.
+        content = self.read(f"{API}/produtos_POST.xs")
+        self.assertRegex(
+            content,
+            r'precondition \(\(\$input\.estoque_qtd \?\? 0\) == 0\) \{\s*error_type = "inputerror"',
+        )
+        self.assertIn("estoque_qtd : 0", content)
+        self.assertNotIn("estoque_qtd : $input", content)
+
+    def test_receipt_post_caps_items_at_50(self):
+        content = self.read(f"{API}/entrada_mercadoria_POST.xs")
+        checks = content[: content.index("try_catch {")]
+        self.assertRegex(checks, r'precondition \(\(\$input\.itens\|count\) <= 50\) \{\s*error_type = "inputerror"')
+        self.assertIn('"A entrada pode ter no máximo 50 itens."', checks)
+
+    def test_receipt_list_counts_items_in_one_query(self):
+        # Change 16: before, one count query ran per receipt.
+        listing = self.read(f"{API}/entrada_mercadoria_GET.xs")
+        self.assertEqual(re.findall(r"db\.query (\w+)", listing), ["entrada_mercadoria", "itens_compra_estoque"])
+        self.assertNotIn('type: "count"', listing)
+        self.assertLess(listing.index("db.query itens_compra_estoque"), listing.index("foreach ($entradas)"))
+        # Keys are prefixed: a digits-only path may be read as an array index.
+        self.assertIn(
+            '$quantidades|set:("e" ~ $item.id_entrada):(($quantidades|get:("e" ~ $item.id_entrada):0) + 1)',
+            listing,
+        )
+        self.assertIn('set:"quantidade_itens":($quantidades|get:("e" ~ $entrada.id):0)', listing)
 
     def test_supplier_reads_are_manager_only(self):
         for relative_path in (

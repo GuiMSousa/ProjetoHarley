@@ -19,7 +19,7 @@ Representa os itens físicos comercializados pela concessionária ou utilizados 
 - **Atributos:** Identificador (`id_produto`), Código (`codigo`), Nome (`nome_produto`), Descrição (`descricao`), Categoria (`categoria`), Quantidade em Estoque (`estoque_qtd`), Preço de Venda (`preco_venda`), Ativo (`ativo`).
 - **Regras:** O saldo em estoque deve ser maior ou igual a zero (`estoque_qtd >= 0`) e o preço de venda deve ser estritamente positivo (`preco_venda > 0`).
 - **Regras:** `codigo` deve ser alfanumérico e único; desativação usa soft delete.
-- **Saldo:** `estoque_qtd` é informado apenas na criação (saldo inicial de implantação). Depois disso, só muda por movimentações de estoque (`Estoque/movimentar_estoque`); `PUT`/`PATCH produtos/{id}` ignoram o campo e também `versao_estoque`, o contador de movimentações usado para serializar movimentações concorrentes.
+- **Saldo:** o produto nasce com `estoque_qtd = 0` (Change 16; antes, o saldo inicial era informado na criação, sem lançamento no livro). O saldo só muda por movimentações de estoque (`Estoque/movimentar_estoque`), a começar pela entrada de mercadoria; `PUT`/`PATCH produtos/{id}` ignoram o campo e também `versao_estoque`, o contador de movimentações usado para serializar movimentações concorrentes.
 
 ### Funcionarios
 Representa os colaboradores da concessionária/oficina.

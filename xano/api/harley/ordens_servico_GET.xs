@@ -1,4 +1,6 @@
 // Lista ordens de serviço enriquecidas; filtros opcionais por status e por moto do cliente.
+// Autor e mecânico vêm da mesma tabela, por dois apelidos de join (Change 16): antes, a tabela
+// inteira de funcionários era lida e percorrida para cada OS.
 query ordens_servico verb=GET {
   api_group = "HARLEY"
   auth = "user"
@@ -28,53 +30,32 @@ query ordens_servico verb=GET {
           type : "left"
           where: $db.motos_clientes.id_cliente == $db.clientes.id
         }
+        autor: {
+          table: "funcionarios"
+          type : "left"
+          where: $db.ordens_servico.id_funcionario == $db.autor.id
+        }
+        mecanico: {
+          table: "funcionarios"
+          type : "left"
+          where: $db.ordens_servico.id_mecanico == $db.mecanico.id
+        }
       }
 
       where = $db.ordens_servico.status ==? $input.status && $db.ordens_servico.id_moto_cliente ==? $input.id_moto_cliente
       eval = {
-        placa       : $db.motos_clientes.placa
-        modelo      : $db.motos_clientes.modelo
-        nome_cliente: $db.clientes.nome_cliente
+        placa           : $db.motos_clientes.placa
+        modelo          : $db.motos_clientes.modelo
+        nome_cliente    : $db.clientes.nome_cliente
+        nome_funcionario: $db.autor.nome_funcionario
+        nome_mecanico   : $db.mecanico.nome_funcionario
       }
 
       sort = {data_abertura: "desc"}
       return = {type: "list"}
     } as $ordens
-
-    // Autor e mecânico vêm da mesma tabela: um mapa com uma única consulta evita N+1.
-    db.query funcionarios {
-      return = {type: "list"}
-    } as $funcionarios
-
-    var $model {
-      value = []
-    }
-
-    var $autor {
-      value = null
-    }
-
-    var $mecanico {
-      value = null
-    }
-
-    foreach ($ordens) {
-      each as $ordem {
-        var.update $autor {
-          value = $funcionarios|find:$$.id == $ordem.id_funcionario
-        }
-
-        var.update $mecanico {
-          value = $funcionarios|find:$$.id == $ordem.id_mecanico
-        }
-
-        var.update $model {
-          value = $model|push:($ordem|set:"nome_funcionario":$autor.nome_funcionario|set:"nome_mecanico":$mecanico.nome_funcionario)
-        }
-      }
-    }
   }
 
-  response = $model
+  response = $ordens
   guid = "ejDbmcP8h6RVydMZ06OpqGhtIO0"
 }

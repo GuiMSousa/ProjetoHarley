@@ -20,7 +20,7 @@
 
 ## Requisito: validação de integridade
 
-O Xano DEVE rejeitar com `400` e mensagem legível: fornecedor inexistente ou inativo, documento vazio, lista de itens vazia, produto repetido, produto inexistente ou inativo, `quantidade < 1` e `valor_unitario < 0.01`. O frontend DEVE aplicar as mesmas regras antes do envio.
+O Xano DEVE rejeitar com `400` e mensagem legível: fornecedor inexistente ou inativo, documento vazio, lista de itens vazia ou com mais de 50 itens (Change 16), produto repetido, produto inexistente ou inativo, `quantidade < 1` e `valor_unitario < 0.01`. O frontend DEVE aplicar as mesmas regras antes do envio.
 
 ### Cenário: valores não positivos
 
@@ -55,7 +55,7 @@ Entradas e itens registrados NÃO DEVEM ser alterados ou removidos. `PUT`, `PATC
 
 ## Requisito: saldo alterado só por movimentação
 
-`PUT` e `PATCH produtos/{id}` NÃO DEVEM alterar `estoque_qtd` nem `versao_estoque`. O saldo inicial PODE ser informado em `POST produtos`. Depois disso, o saldo DEVE mudar somente pela função `Estoque/movimentar_estoque`.
+`PUT` e `PATCH produtos/{id}` NÃO DEVEM alterar `estoque_qtd` nem `versao_estoque`. O produto DEVE nascer com saldo 0 (Change 16): `POST produtos` DEVE responder `400` "O saldo inicial deve ser 0: o estoque entra pela entrada de mercadoria." a um saldo diferente de 0, para que a soma do livro de movimentações bata com `estoque_qtd`. O saldo DEVE mudar somente pela função `Estoque/movimentar_estoque`.
 
 ### Cenário: saldo protegido
 

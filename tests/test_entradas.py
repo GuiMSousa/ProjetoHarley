@@ -87,6 +87,13 @@ class EntradaDtoTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             EntradaMercadoriaCreate(**valid_payload(itens=[]))
 
+    def test_receipt_accepts_at_most_50_items(self):
+        # Change 16: same cap as POST entrada_mercadoria.
+        itens = [{"id_produto": n, "quantidade": 1, "valor_unitario": "1"} for n in range(1, 52)]
+        self.assertEqual(len(EntradaMercadoriaCreate(**valid_payload(itens=itens[:50])).itens), 50)
+        with self.assertRaises(ValidationError):
+            EntradaMercadoriaCreate(**valid_payload(itens=itens))
+
     def test_receipt_rejects_repeated_products(self):
         itens = [
             {"id_produto": 10, "quantidade": 1, "valor_unitario": Decimal("1")},

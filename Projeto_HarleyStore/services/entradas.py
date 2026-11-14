@@ -7,6 +7,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+# Same cap as POST entrada_mercadoria (Change 16).
+MAX_ITENS_ENTRADA = 50
 
 class ItemEntradaCreate(BaseModel):
     """Item sent when registering a goods receipt."""
@@ -26,7 +28,7 @@ class EntradaMercadoriaCreate(BaseModel):
 
     id_fornecedor: int = Field(gt=0)
     numero_documento: str = Field(min_length=1)
-    itens: list[ItemEntradaCreate] = Field(min_length=1)
+    itens: list[ItemEntradaCreate] = Field(min_length=1, max_length=MAX_ITENS_ENTRADA)
 
     @model_validator(mode="after")
     def reject_repeated_products(self) -> EntradaMercadoriaCreate:

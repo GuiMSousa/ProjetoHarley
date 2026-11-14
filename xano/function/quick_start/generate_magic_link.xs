@@ -7,6 +7,7 @@ function "Quick Start/generate_magic_link" {
   stack {
     // Checks that the email input is not empty
     precondition ($input.email != null) {
+      error_type = "inputerror"
       error = "email is required but was not suppiled. "
     }
   

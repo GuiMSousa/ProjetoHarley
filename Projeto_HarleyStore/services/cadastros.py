@@ -77,11 +77,12 @@ class MotoCliente(CadastroModel):
 
 
 class ProdutoCreate(BaseModel):
+    """A product starts with balance 0; stock enters through goods receipts (Change 16)."""
+
     codigo: str = Field(min_length=1, pattern=r"^[A-Za-z0-9]+$")
     nome_produto: str = Field(min_length=1)
     descricao: str | None = None
     categoria: str = Field(min_length=1)
-    estoque_qtd: int = Field(default=0, ge=0)
     preco_venda: Decimal = Field(gt=0)
 
 

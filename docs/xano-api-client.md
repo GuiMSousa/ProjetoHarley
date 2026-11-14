@@ -55,6 +55,8 @@ Regras importantes:
 
 O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz, uma diferença cosmética. Desde a Change 17 (2026-10-27), `galeria` e `default_motos` estão versionadas como publicadas; o push completo lista dois `UPDATE_FIELD` nelas, sem `DROP_FIELD`. Publique com `-i` nos arquivos alterados, porque o push completo também atualiza o grupo `HARLEY` (placeholder do token do Swagger).
 
+Um push com `-i` pode listar **Unresolved References** para tabelas e funções que existem, e dizer que elas "virarão placeholders". Esse aviso não aparece no `--dry-run`. Com o filtro, a CLI só resolve referências dentro dos arquivos incluídos (Change 16, 2026-11-14). Para confirmar que nada virou placeholder, repita o `--dry-run` com os mesmos `-i` logo depois do push: ele deve responder "No changes to push".
+
 ### Checklist de deploy da Change 10 (fechamento financeiro)
 
 1. Revisar `xano workspace push -d ./xano --dry-run`. Esperado, sem exclusões e sem `--sync`:
@@ -120,7 +122,7 @@ O cliente usa modelos Pydantic em `Projeto_HarleyStore.services.cadastros` para 
 
 `Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`. Desde o saneamento pós-Change 7, o `DELETE` físico de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações responde `403`; a única exclusão física do sistema é a remoção de item de OS aberta.
 
-`Produto` (modelo de leitura) trata `estoque_qtd` nulo, possível em registros legados do Xano, como `0`, a mesma leitura de `Estoque/movimentar_estoque`. `ProdutoCreate` continua exigindo um saldo inicial válido.
+`Produto` (modelo de leitura) trata `estoque_qtd` nulo, possível em registros legados do Xano, como `0`, a mesma leitura de `Estoque/movimentar_estoque`. `ProdutoCreate` não tem `estoque_qtd`: o produto nasce com saldo 0 e o Xano recusa outro valor (Change 16). `EntradaMercadoriaCreate` aceita de 1 a 50 itens (`MAX_ITENS_ENTRADA`), o mesmo teto de `POST entrada_mercadoria`.
 
 `Produto.preco_venda` e demais valores financeiros usam validação estrita `> 0` e são serializados como string decimal em JSON. Quantidades de itens usam `> 0` e saldos de estoque usam `>= 0`. Nenhum DTO de escrita envia `id_funcionario`, totais ou datas de autoria.
 

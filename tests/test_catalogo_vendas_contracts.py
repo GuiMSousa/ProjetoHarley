@@ -165,6 +165,24 @@ class VendasContractTests(unittest.TestCase):
         self.assertIn('status       : "DISPONIVEL"', post)
         self.assertIn("db.add historico_status_moto", self.transaction(post))
 
+    def test_price_and_color_change_only_while_the_unit_is_available(self):
+        # Change 16: a reservation or sale keeps the agreed price and color.
+        content = read(f"{API}/motos/motos_id_PATCH.xs")
+        self.assertIn('output = ["id", "status", "chassi", "id_modelo", "preco_venda", "cor"]', content)
+        # Only a change counts: the edit form sends the current values back.
+        self.assertIn(
+            "($input.preco_venda != null && $input.preco_venda != $moto.preco_venda) || "
+            "($input.cor != null && $input.cor != $moto.cor)",
+            content,
+        )
+        rule = r'precondition \(!\$muda_preco_ou_cor \|\| \(\${} \?\? "DISPONIVEL"\) == "DISPONIVEL"\) \{{\s*error_type = "inputerror"'
+        prechecks, transaction = content[: content.index("try_catch {")], self.transaction(content)
+        self.assertRegex(prechecks, rule.format(r"moto\.status"))
+        # Inside the transaction the patch locks the row before the status is read again, so a
+        # simultaneous reservation either waits for the commit or rolls the edit back.
+        self.assertLess(transaction.index("db.patch motos"), transaction.index("db.get motos"))
+        self.assertRegex(transaction, rule.format(r"moto_atual\.status"))
+
     def test_generic_put_is_blocked_and_reads_are_for_sellers(self):
         put = read(f"{API}/motos/motos_id_PUT.xs")
         self.assertIn("precondition (false)", put)

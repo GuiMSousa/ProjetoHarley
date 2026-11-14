@@ -1,5 +1,8 @@
 // Edita uma unidade do estoque (GERENTE, Change 8). Somente cor, ano, preço e chassi são
 // aceitos; status, cliente, vendedor e validade da reserva nunca vêm do payload.
+// Preço e cor só mudam com a moto DISPONIVEL (Change 16): a reserva e a venda ficam com os valores
+// combinados. A gravação trava a linha antes de reler o status, então uma reserva simultânea
+// espera o commit ou desfaz a edição.
 query "motos/{motos_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
@@ -20,12 +23,22 @@ query "motos/{motos_id}" verb=PATCH {
     db.get motos {
       field_name = "id"
       field_value = $input.motos_id
-      output = ["id", "status", "chassi", "id_modelo"]
+      output = ["id", "status", "chassi", "id_modelo", "preco_venda", "cor"]
     } as $moto
 
     precondition ($moto != null) {
       error_type = "notfound"
       error = "Moto não encontrada."
+    }
+
+    // Só a mudança conta: o formulário reenvia os valores atuais.
+    var $muda_preco_ou_cor {
+      value = ($input.preco_venda != null && $input.preco_venda != $moto.preco_venda) || ($input.cor != null && $input.cor != $moto.cor)
+    }
+
+    precondition (!$muda_preco_ou_cor || ($moto.status ?? "DISPONIVEL") == "DISPONIVEL") {
+      error_type = "inputerror"
+      error = "Preço e cor só podem ser alterados enquanto a moto está disponível."
     }
 
     conditional {
@@ -85,11 +98,37 @@ query "motos/{motos_id}" verb=PATCH {
       exclude_middleware = false
     } as $raw_input
 
-    db.patch motos {
-      field_name = "id"
-      field_value = $input.motos_id
-      data = `$input|pick:($raw_input|keys)`|unset:"motos_id"|filter_null|set:"atualizado_em":now
-    } as $atualizada
+    try_catch {
+      try {
+        db.transaction {
+          stack {
+            db.patch motos {
+              field_name = "id"
+              field_value = $input.motos_id
+              data = `$input|pick:($raw_input|keys)`|unset:"motos_id"|filter_null|set:"atualizado_em":now
+            } as $atualizada
+
+            db.get motos {
+              field_name = "id"
+              field_value = $input.motos_id
+              output = ["id", "status"]
+            } as $moto_atual
+
+            precondition (!$muda_preco_ou_cor || ($moto_atual.status ?? "DISPONIVEL") == "DISPONIVEL") {
+              error_type = "inputerror"
+              error = "Preço e cor só podem ser alterados enquanto a moto está disponível."
+            }
+          }
+        }
+      }
+
+      catch {
+        precondition (false) {
+          error_type = "inputerror"
+          error = "A moto foi alterada por outro usuário. Atualize e tente novamente."
+        }
+      }
+    }
 
     function.run "Vendas/detalhe_moto" {
       input = {moto_id: $input.motos_id}

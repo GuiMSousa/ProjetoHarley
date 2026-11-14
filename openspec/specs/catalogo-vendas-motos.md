@@ -38,7 +38,7 @@ A página `/catalogo` DEVE reutilizar a lista do catálogo por 60 segundos entre
 
 ## Requisito: cadastro de unidades
 
-Somente o `GERENTE` DEVE cadastrar e editar unidades, com inputs explícitos. O chassi DEVE ser um VIN de 17 caracteres, normalizado em caixa alta e único em `motos` e em `motos_clientes`; a cor DEVE ser uma das variações do modelo; o ano DEVE estar entre 1990 e o ano seguinte. A unidade DEVE nascer `DISPONIVEL`, com uma linha de histórico. Cadastro e edição NÃO DEVEM aceitar status, cliente, vendedor nem validade; `PUT` e `DELETE motos/{id}` DEVEM responder `403`.
+Somente o `GERENTE` DEVE cadastrar e editar unidades, com inputs explícitos. O chassi DEVE ser um VIN de 17 caracteres, normalizado em caixa alta e único em `motos` e em `motos_clientes`; a cor DEVE ser uma das variações do modelo; o ano DEVE estar entre 1990 e o ano seguinte. A unidade DEVE nascer `DISPONIVEL`, com uma linha de histórico. Cadastro e edição NÃO DEVEM aceitar status, cliente, vendedor nem validade; `PUT` e `DELETE motos/{id}` DEVEM responder `403`. Preço e cor de uma unidade `RESERVADA` ou `VENDIDA` NÃO DEVEM mudar (Change 16): `PATCH motos/{id}` DEVE responder `400` "Preço e cor só podem ser alterados enquanto a moto está disponível." quando o valor enviado difere do gravado, e reenviar o valor atual DEVE ser aceito. A edição DEVE travar a linha antes de reler o status, para que uma reserva simultânea espere o commit ou desfaça a edição.
 
 ## Requisito: reserva
 

@@ -1,15 +1,55 @@
 // Monta o detalhe de uma OS: dados enriquecidos, linha do tempo de status, itens, totais e o
 // lançamento financeiro da conclusão (id_transacao e data_lancamento, Change 10).
 // Os totais são recalculados a partir dos itens (fonte de verdade), o que cobre OS legadas.
+// Moto, cliente, autor e mecânico vêm de joins à esquerda numa só consulta (Change 16): um vínculo
+// nulo (OS do painel ou legada) dá nome nulo, e não o 400 "Missing param: field_value" do db.get.
 function "Oficina/detalhe_os" {
   input {
     int os_id
   }
 
   stack {
-    db.get ordens_servico {
-      field_name = "id"
-      field_value = $input.os_id
+    db.query ordens_servico {
+      join = {
+        motos_clientes: {
+          table: "motos_clientes"
+          type : "left"
+          where: $db.ordens_servico.id_moto_cliente == $db.motos_clientes.id
+        }
+        cliente_os: {
+          table: "clientes"
+          type : "left"
+          where: $db.ordens_servico.id_cliente == $db.cliente_os.id
+        }
+        dono_moto: {
+          table: "clientes"
+          type : "left"
+          where: $db.motos_clientes.id_cliente == $db.dono_moto.id
+        }
+        autor: {
+          table: "funcionarios"
+          type : "left"
+          where: $db.ordens_servico.id_funcionario == $db.autor.id
+        }
+        mecanico: {
+          table: "funcionarios"
+          type : "left"
+          where: $db.ordens_servico.id_mecanico == $db.mecanico.id
+        }
+      }
+
+      where = $db.ordens_servico.id == $input.os_id
+      eval = {
+        placa           : $db.motos_clientes.placa
+        modelo          : $db.motos_clientes.modelo
+        nome_funcionario: $db.autor.nome_funcionario
+        nome_mecanico   : $db.mecanico.nome_funcionario
+        id_cliente_moto : $db.motos_clientes.id_cliente
+        nome_cliente_os : $db.cliente_os.nome_cliente
+        nome_dono_moto  : $db.dono_moto.nome_cliente
+      }
+
+      return = {type: "single"}
     } as $os
 
     precondition ($os != null) {
@@ -17,33 +57,22 @@ function "Oficina/detalhe_os" {
       error = "Ordem de serviço não encontrada."
     }
 
-    db.get motos_clientes {
-      field_name = "id"
-      field_value = $os.id_moto_cliente
-      output = ["id", "id_cliente", "modelo", "placa"]
-    } as $moto
-
+    // Cliente fotografado na OS ou, em OS anteriores à Change 6, o dono da moto.
     var $id_cliente {
-      value = $os.id_cliente ?? $moto.id_cliente
+      value = $os.id_cliente ?? $os.id_cliente_moto
     }
 
-    db.get clientes {
-      field_name = "id"
-      field_value = $id_cliente
-      output = ["id", "nome_cliente"]
-    } as $cliente
+    var $nome_cliente {
+      value = $os.nome_cliente_os
+    }
 
-    db.get funcionarios {
-      field_name = "id"
-      field_value = $os.id_funcionario
-      output = ["id", "nome_funcionario"]
-    } as $autor
-
-    db.get funcionarios {
-      field_name = "id"
-      field_value = $os.id_mecanico
-      output = ["id", "nome_funcionario"]
-    } as $mecanico
+    conditional {
+      if ($os.id_cliente == null) {
+        var.update $nome_cliente {
+          value = $os.nome_dono_moto
+        }
+      }
+    }
 
     db.query historico_status_os {
       join = {
@@ -95,12 +124,11 @@ function "Oficina/detalhe_os" {
 
     var $detalhe {
       value = $os
+        |unset:"id_cliente_moto"
+        |unset:"nome_cliente_os"
+        |unset:"nome_dono_moto"
         |set:"id_cliente":$id_cliente
-        |set:"nome_cliente":$cliente.nome_cliente
-        |set:"placa":$moto.placa
-        |set:"modelo":$moto.modelo
-        |set:"nome_funcionario":$autor.nome_funcionario
-        |set:"nome_mecanico":$mecanico.nome_funcionario
+        |set:"nome_cliente":$nome_cliente
         |set:"historico":$historico
         |set:"itens":$itens
         |set:"valor_pecas":$totais.valor_pecas

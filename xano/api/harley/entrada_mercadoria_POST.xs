@@ -46,6 +46,12 @@ query entrada_mercadoria verb=POST {
       error = "Informe ao menos um item na entrada."
     }
 
+    // Teto da nota (Change 16): uma entrada grande deixa a transação e as travas de estoque abertas.
+    precondition (($input.itens|count) <= 50) {
+      error_type = "inputerror"
+      error = "A entrada pode ter no máximo 50 itens."
+    }
+
     var $ids_produto {
       value = $input.itens|map:$$.id_produto
     }

@@ -253,6 +253,12 @@ class XanoLiveServiceOrderReadTests(XanoLiveTestCase):
                     client.get_ordem_servico(ordens[0].id)
                 client.list_ordens_servico(status="ABERTA")
 
+    def test_unknown_order_detail_is_not_found(self):
+        # Change 16: the detail runs its aliased joins before the 404, so a 404 proves the query
+        # works even without orders in the database; a join Xano cannot resolve answers 500.
+        with self.client_for("VENDEDOR") as client, self.assertRaises(XanoNotFoundError):
+            client.get_ordem_servico(2_000_000_000)
+
     def test_salesperson_cannot_operate_orders(self):
         with self.client_for("VENDEDOR") as client:
             with self.assertRaises(XanoPermissionError):

@@ -23,6 +23,7 @@ from Projeto_HarleyStore.listing import (
     paginate,
 )
 from Projeto_HarleyStore.services.entradas import (
+    MAX_ITENS_ENTRADA,
     EntradaMercadoriaCreate,
     EntradaMercadoriaResumo,
     ItemEntrada,
@@ -92,6 +93,8 @@ def _validation_text(error: ValidationError) -> str:
     if location[:1] == ("numero_documento",):
         return "Informe o número do documento."
     if location == ("itens",):
+        if detail.get("type") == "too_long":
+            return f"A entrada pode ter no máximo {MAX_ITENS_ENTRADA} itens."
         return "Adicione ao menos um item."
     if len(location) >= 3 and location[0] == "itens":
         position = int(location[1]) + 1

@@ -88,6 +88,9 @@ class EntradaFormRulesTests(unittest.TestCase):
             "Item 1: o preço de custo deve ser maior que zero.": ("3 - A", "NF", [item(valor="0")]),
             "Item 1: informe quantidade inteira e preço de custo numérico.": ("3 - A", "NF", [item(valor="abc")]),
             "Um mesmo produto não pode aparecer mais de uma vez na entrada.": ("3 - A", "NF", [item(), item()]),
+            "A entrada pode ter no máximo 50 itens.": (
+                "3 - A", "NF", [item(produto=f"{n} - P{n}") for n in range(1, 52)]
+            ),
         }
         for message, args in cases.items():
             with self.subTest(message=message):
