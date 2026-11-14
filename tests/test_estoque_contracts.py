@@ -65,11 +65,35 @@ class EstoqueContractTests(unittest.TestCase):
             "quantidade    : $item.quantidade",
             "id_funcionario: $auth_user.id_funcionario",
             "id_entrada    : $entrada.id",
-            # Same lock order as the cancellation, to avoid deadlocks.
-            'foreach ($input.itens|sort:"id_produto":"int":false)',
         ):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, content)
+
+    def test_receipt_locks_products_in_ascending_id_order_from_the_database(self):
+        # Change 16: the counter sale and the order cancellation lock products in ascending id order
+        # through the database; the receipt follows it, so two of them never lock in opposite orders.
+        content = self.read(f"{API}/entrada_mercadoria_POST.xs")
+        transaction = content[content.index("db.transaction {") : content.index("catch {", content.index("db.transaction {"))]
+        self.assertNotIn("|sort:", content)
+        ordered = transaction.index("where = $db.produtos.id in $ids_produto")
+        self.assertIn('sort = {id: "asc"}', transaction[ordered : ordered + 80])
+        # A product missing from the ordered list would silently drop out of the receipt.
+        count_check = transaction.index("(($produtos_ordenados|count) == ($ids_produto|count))")
+        loop = transaction.index("foreach ($produtos_ordenados)")
+        self.assertLess(ordered, count_check)
+        self.assertLess(count_check, loop)
+        self.assertIn("$input.itens|find:$$.id_produto == $produto_ordenado.id", transaction)
+        self.assertLess(loop, transaction.index("db.add itens_compra_estoque"))
+        self.assertLess(loop, transaction.index('function.run "Estoque/movimentar_estoque"'))
+
+    def test_receipt_prechecks_read_the_products_in_one_query(self):
+        content = self.read(f"{API}/entrada_mercadoria_POST.xs")
+        checks = content[: content.index("try_catch {")]
+        self.assertNotRegex(content, r"db\.get produtos\b")
+        batch = checks.index("where = $db.produtos.id in $ids_produto")
+        self.assertLess(batch, checks.index("each as $item_validado"))
+        self.assertIn("$produtos|find:$$.id == $item_validado.id_produto", checks)
+        self.assertIn('"Produto inativo ou inexistente: " ~ $item_validado.id_produto', checks)
 
     def test_stock_function_writes_ledger_before_product(self):
         content = self.read("xano/function/estoque/movimentar_estoque.xs")

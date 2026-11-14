@@ -32,12 +32,12 @@
 - [x] `Oficina/detalhe_os` (item 9): uma consulta com 5 joins à esquerda (`motos_clientes`, `cliente_os`, `dono_moto`, `autor`, `mecanico`), `return single` antes do `notfound`, mesmos campos e fallback do cliente pelo dono da moto; os campos auxiliares saem da resposta. Contrato estático com mutações (join interno, campo auxiliar na resposta, fallback trocado).
 - [x] `GET ordens_servico` (item 10): `autor` e `mecanico` por joins com apelido, sem a leitura de `funcionarios` nem o laço. Contrato estático com mutação.
 - [x] `GET entrada_mercadoria` (item 11): os itens numa só consulta, contados num mapa por entrada (não há agregação com group by documentada no XanoScript). A chave leva o prefixo `e`, porque um caminho só com dígitos pode ser lido como índice de array (revisão de 2026-11-14). Contrato estático com mutações. Com zero entradas em produção, a contagem ainda não rodou ao vivo.
-- [ ] Pré-checagens de produto do balcão e da entrada (item 12) numa só consulta, com a mesma mensagem por produto. Contrato estático.
+- [x] Pré-checagens de produto do balcão e da entrada (item 12) numa só consulta (`id in $ids_produto`), conferidas na ordem do pedido e com a mesma mensagem por produto. O mapa de quantidades do balcão passou a usar chaves `"p" ~ id`, sem `|to_text`, no mesmo padrão da contagem de entradas. Contratos estáticos com mutações; publicado em 2026-11-14.
 
 ## Fase 3 — Travas de concorrência
 
-- [ ] `POST entrada_mercadoria` com a baixa em ordem crescente de produto pelo banco (item 2); teste estático da ordem.
-- [x] Teto de 50 itens na entrada (item 16): `precondition` antes da transação e `MAX_ITENS_ENTRADA` no DTO do Reflex, com a mesma mensagem.
+- [x] `POST entrada_mercadoria` com os produtos em ordem crescente de id pelo banco (item 2): `db.query produtos` com `sort = {id: "asc"}` dentro da transação, no lugar do `|sort:"id_produto":"int":false` em memória. Uma `precondition` confere a contagem, para que nenhum produto saia da nota sem erro. Contrato estático com mutações; publicado em 2026-11-14.
+- [x] Teto de 50 itens na entrada (item 16): `precondition` antes da transação e `MAX_ITENS_ENTRADA` no DTO do Reflex, com a mesma mensagem. Desde 2026-11-14 o formulário também recusa a 51ª linha no "Adicionar item", com toast, como o balcão.
 - [x] `PATCH motos/{id}` (item 13): preço e cor só mudam com a moto `DISPONIVEL`, e reenviar o valor atual é aceito. O status é conferido antes e de novo dentro da transação, depois da gravação que trava a linha. O Xano não tem `error_type` para 422; a recusa é `inputerror` (400), como as demais regras de negócio.
 - [x] `POST produtos` com saldo 0 (item 14): `precondition` e gravação de `estoque_qtd : 0`; o formulário e o `ProdutoCreate` deixam de ter o saldo inicial.
 - [ ] Conferir a ordem de `Financeiro/resumo_operacoes` com uma sessão de gerente (item 4).
@@ -52,6 +52,8 @@
 
 - [ ] Banco, conforme a decisão: `default_motos` (item 5), índice em `event_log.user_id` (item 7) e `motos.id_modelo` (item 8). O índice de `entrada_mercadoria` já existe (item 6).
 - [x] Fase 1 (itens 9, 10, 11 e 13 a 16): revisão em 6 ciclos sem achado Alto ou Crítico; validador do MCP, `ruff`, `compileall`, `pytest` (448 aprovados e 44 ignorados), `reflex compile --dry` e `--dry-run` revisado. Push dos 7 arquivos em 2026-11-14, autorizado pelo usuário. A CLI listou "Unresolved References" para tabelas e funções existentes, aviso que não apareceu no `--dry-run`. Era falso positivo, porque com `-i` a CLI só resolve referências dentro dos arquivos filtrados: o `--dry-run` seguinte deu "No changes to push", e o VENDEDOR recebe 403 no `POST entrada_mercadoria` publicado.
-- [ ] Push dos itens restantes (2, 12 e banco), com `--dry-run` revisado e o OK do usuário.
+- [x] Push da Fase 2 (itens 2 e 12: `balcao/vendas_POST.xs` e `entrada_mercadoria_POST.xs`) em 2026-11-14, autorizado pelo usuário. O push trouxe de novo o falso positivo "Unresolved References"; o `--dry-run` seguinte deu "No changes to push". Ao vivo, `test_cart_with_a_nonexistent_product_is_refused_before_any_write` passa como VENDEDOR: um carrinho com produto inexistente recebe 400 "Produto inativo ou inexistente" antes da transação, sem gravar nada e sem depender de produto no banco (produção tem zero).
+- [ ] Push do banco (itens 5, 7 e 8), conforme a decisão.
+- [x] `docs/quality.md` com a referência de 2026-11-14.
 - [ ] Docs: `docs/xano-api-client.md`, `docs/quality.md` e `docs/schema.sql`, se o banco mudar.
 - [ ] Mover para o archive e commit (usuário).

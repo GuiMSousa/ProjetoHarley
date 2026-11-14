@@ -1118,6 +1118,18 @@ class XanoLiveCounterReadTests(XanoLiveTestCase):
                 with self.subTest(itens=len(itens)), self.assertRaises(XanoValidationError):
                     client.request("POST", "balcao/vendas", json=body)
 
+    def test_cart_with_a_nonexistent_product_is_refused_before_any_write(self):
+        # Change 16: the cart is read in one query (id in $ids_produto) before the transaction, so
+        # this refusal proves that query runs; it needs no product in the database and writes nothing.
+        body = {
+            "chave_venda": str(uuid.uuid4()),
+            "total_esperado": "1.00",
+            "itens": [{"id_produto": NONEXISTENT_ID, "quantidade": 1}],
+        }
+        with self.client_for("VENDEDOR") as client, self.assertRaises(XanoValidationError) as context:
+            client.request("POST", "balcao/vendas", json=body)
+        self.assertIn(f"Produto inativo ou inexistente: {NONEXISTENT_ID}", str(context.exception))
+
 
 class XanoLiveCounterWriteTests(XanoLiveSalesWriteTestCase):
     """Change 11 with writes: a counter sale moves stock and posts BALCAO revenue once."""

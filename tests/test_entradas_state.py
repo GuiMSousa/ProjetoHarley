@@ -60,6 +60,13 @@ class EntradaFormRulesTests(unittest.TestCase):
         self.assertEqual(remove_item_row(items, 0), items)
         self.assertEqual(remove_item_row(items, 5), items)
 
+    def test_the_51st_row_is_refused_when_added(self):
+        # Change 16: the same cap as POST entrada_mercadoria, refused at once like the counter sale.
+        self.assertEqual(len(add_item_row([item()] * 49)), 50)
+        with self.assertRaises(EntradaFormError) as context:
+            add_item_row([item()] * 50)
+        self.assertEqual(str(context.exception), "A entrada pode ter no máximo 50 itens.")
+
     def test_total_preview_accepts_comma_and_ignores_incomplete_rows(self):
         items = [item(valor="10,00"), item(quantidade="2", valor="25.50"), item(quantidade="", valor="")]
         self.assertEqual(estimate_total(items), Decimal("101.00"))
@@ -158,6 +165,14 @@ class EntradasStateEventTests(unittest.TestCase):
         state.numero_documento = "NF-1"
         state.itens_form = [item()]
         return state
+
+    def test_add_item_stops_at_the_limit_with_a_toast(self):
+        state = self.make_state()
+        state.itens_form = [item()] * 49
+        self.assertIsNone(run_event(EntradasState.add_item, state))
+        self.assertEqual(len(state.itens_form), 50)
+        self.assertIsNotNone(run_event(EntradasState.add_item, state))
+        self.assertEqual(len(state.itens_form), 50)
 
     def test_load_skips_xano_without_session(self):
         state = self.make_state(authenticated=False)

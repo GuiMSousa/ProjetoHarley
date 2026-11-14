@@ -88,7 +88,7 @@ Toda alteração de saldo DEVE gravar uma linha em `movimentacoes_estoque` com t
 
 ## Requisito: movimentações concorrentes
 
-Cada movimentação DEVE partir da `versao_estoque` lida junto com o saldo e gravar a versão seguinte. O índice único `(id_produto, versao_anterior)` DEVE impedir que duas movimentações concorrentes do mesmo produto sejam gravadas a partir da mesma versão; a transação perdedora DEVE ser desfeita por inteiro. Operações com vários produtos DEVEM processá-los em ordem crescente de `id_produto`.
+Cada movimentação DEVE partir da `versao_estoque` lida junto com o saldo e gravar a versão seguinte. O índice único `(id_produto, versao_anterior)` DEVE impedir que duas movimentações concorrentes do mesmo produto sejam gravadas a partir da mesma versão; a transação perdedora DEVE ser desfeita por inteiro. Operações com vários produtos DEVEM processá-los em ordem crescente de `id_produto`, lida do banco dentro da transação (`sort = {id: "asc"}` em `produtos`) e não por filtro em memória; desde a Change 16 a entrada de mercadoria segue a mesma ordem da venda de balcão e do cancelamento de OS.
 
 ### Cenário: duas saídas disputando o último saldo
 

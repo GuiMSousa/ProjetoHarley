@@ -53,6 +53,9 @@ def empty_item() -> dict[str, str]:
 
 
 def add_item_row(items: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Add an empty row; raises ``EntradaFormError`` at the item limit, as the counter sale does."""
+    if len(items) >= MAX_ITENS_ENTRADA:
+        raise EntradaFormError(f"A entrada pode ter no máximo {MAX_ITENS_ENTRADA} itens.")
     return [*items, empty_item()]
 
 
@@ -322,8 +325,12 @@ class EntradasState(AuthState):
         self.form_error = ""
 
     @rx.event
-    def add_item(self) -> None:
-        self.itens_form = add_item_row(self.itens_form)
+    def add_item(self):
+        try:
+            self.itens_form = add_item_row(self.itens_form)
+        except EntradaFormError as error:
+            return toast_error(str(error))
+        return None
 
     @rx.event
     def remove_item(self, index: int) -> None:

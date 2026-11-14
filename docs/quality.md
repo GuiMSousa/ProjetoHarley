@@ -31,18 +31,19 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 | Testes | `.venv/Scripts/python -m pytest` | DTOs, cliente HTTP com respostas simuladas, States e handlers (via `tests/event_runner.py`) e contratos estáticos dos `.xs` (RBAC, transações, validações) | O Xano real: o cliente é simulado |
 | Build | `.venv/Scripts/reflex compile --dry` | A árvore de componentes do Reflex compila | Que o servidor sobe ou a tela funciona |
 | Navegador (opt-in) | Com o app rodando (`reflex run --env prod --single-port --backend-port 3100`): `HARLEY_BROWSER_URL=http://localhost:3100 .venv/Scripts/python -m pytest -m browser` (PowerShell: `$env:HARLEY_BROWSER_URL='http://localhost:3100'; .venv/Scripts/python -m pytest -m browser; Remove-Item Env:HARLEY_BROWSER_URL`) | No Edge instalado: `/catalogo` abre um modelo e o carrossel avança e volta; o diálogo prende o foco (`Tab`/`Shift+Tab`), tem `aria-labelledby`/`aria-describedby` com texto, ignora clique fora, fecha com Esc e devolve o foco ao "Detalhes"; uma rota protegida sem sessão mostra o login; nenhum erro no console | Fluxos autenticados (não há credenciais de teste) |
-| Integração (opt-in) | `XANO_TEST_LIVE=true` (só leitura), `XANO_TEST_ALLOW_WRITES=true` (grava) e `XANO_TEST_CONCURRENCY=true` (corridas), com `pytest -m integration` | Contratos contra um workspace real | Nada sem um workspace de testes; nunca foi rodada ao vivo |
+| Integração (opt-in) | `XANO_TEST_LIVE=true` (só leitura), `XANO_TEST_ALLOW_WRITES=true` (grava) e `XANO_TEST_CONCURRENCY=true` (corridas), com `pytest -m integration` | Contratos contra um workspace real. Só a parte de leitura rodou ao vivo, em produção, como VENDEDOR (2026-10-27 e 2026-11-14), em testes isolados e cadenciados por causa do limite de taxa do plano Free | Escrita e corridas: nada sem um workspace de testes, e nunca rodaram. GERENTE e MECANICO não têm credenciais de teste |
 | XanoScript | Validador do MCP `xano-developer` e `xano workspace push -d ./xano --dry-run` | Sintaxe dos `.xs` e o diff que o push aplicaria | Nada é publicado; o push exige o OK do usuário |
 | Tipos | indisponível | — | — |
 
-**Referência em 2026-10-27 (Change 17: fotos das motos vindas do Xano):**
+**Referência em 2026-11-14 (Change 16: JOINs, travas de estoque e limites):**
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 441 passaram, 42 pulados (integração e navegador);
+- pytest: 454 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 454 passaram e 45 foram desmarcados;
+- integração ao vivo, só leitura, como VENDEDOR e em testes isolados: o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
 - `reflex compile --dry`: OK;
-- smoke de navegador: 3 passaram, com o catálogo público real;
-- validador do MCP `xano-developer`: 129 `.xs` válidos.
+- validador do MCP `xano-developer`: 129 `.xs` válidos;
+- smoke de navegador: não repetido, porque cobre só o catálogo e o login, que esta change não alterou. Última execução: 3 passaram em 2026-10-27, com o catálogo público real.
 
 **Tipos:** não há checker estático. As Vars e os componentes do Reflex são dinâmicos, então mypy ou pyright gerariam ruído antes de achar defeitos; as fronteiras externas já são validadas em runtime pelo pydantic. Vale revisitar se a camada `services/` crescer sem cobertura de testes.
 
@@ -98,7 +99,7 @@ Para remedir (o `--isolated` ignora o `ruff.toml`):
 - **Contratos dos `.xs`:** leem o texto dos endpoints e protegem RBAC, transações e validações sem chamar o Xano.
 - **Leitura tolerante (Change 15):** `tests/test_resiliencia_leitura.py` injeta JSON malformado pelo HTTP simulado. Confere que só o registro ruim some, que o log não traz valores, que cada tela isola sua fonte e que as mensagens separam rede, dados e erro interno. Um registro gravado fora do app (painel do Xano) é o caso a cobrir sempre que um DTO de leitura mudar. Para ver o efeito na tela, rode uma cópia do app fora do projeto, com um `.env` próprio apontando para um Xano simulado (o `env_file` do Reflex sobrescreve variáveis do processo), e instale os pacotes da cópia nela mesma. Não ligue o `node_modules` da cópia ao do projeto: o cache do Reflex guarda caminhos absolutos, a cópia reinstala os pacotes e pode gravar versões novas no projeto.
 - **Integração e navegador:** são opt-in. Use um workspace ou branch de testes, porque a integração com escrita grava dados reais. O smoke lê o catálogo público do workspace configurado no `.env` e nunca faz login.
-- **Sem cobertura:** fluxos autenticados no navegador, regressão visual e a integração ao vivo.
+- **Sem cobertura:** fluxos autenticados no navegador, regressão visual e a integração ao vivo com escrita e concorrência.
 
 ## Revisão após implementação ou correção
 

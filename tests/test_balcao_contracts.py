@@ -127,6 +127,19 @@ class VendaBalcaoEndpointTests(unittest.TestCase):
         self.assertIn("($produto_previo.estoque_qtd ?? 0) >= $item_pedido.quantidade", self.prechecks)
         self.assertIn("($total_previo|round:2) == ($input.total_esperado|round:2)", self.prechecks)
 
+    def test_prechecks_read_the_products_in_one_query(self):
+        # Change 16: one query for the cart instead of one db.get per item, checked in cart order.
+        self.assertNotRegex(self.content, r"db\.get produtos\b")
+        batch = self.prechecks.index("where = $db.produtos.id in $ids_produto")
+        self.assertLess(batch, self.prechecks.index("foreach ($input.itens)"))
+        self.assertIn("$produtos_previos|find:$$.id == $item_pedido.id_produto", self.prechecks)
+
+    def test_quantity_map_uses_prefixed_keys(self):
+        # Change 16: a digits-only path may be read as an array index, so the keys carry a prefix.
+        self.assertNotIn("|to_text", self.content)
+        self.assertIn('$quantidades|set:("p" ~ $item_pedido.id_produto):$item_pedido.quantidade', self.prechecks)
+        self.assertEqual(self.transaction.count('$quantidades|get:("p" ~ $produto_atual.id)'), 2)
+
     def test_transaction_writes_header_items_and_stock_exits_in_product_order(self):
         ordered = self.transaction.index("where = $db.produtos.id in $ids_produto")
         self.assertIn('sort = {id: "asc"}', self.transaction[ordered : ordered + 120])

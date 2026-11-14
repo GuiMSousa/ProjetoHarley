@@ -107,23 +107,33 @@ query "balcao/vendas" verb=POST {
           }
         }
 
-        // Pré-checagens fora da transação: dão as mensagens específicas de produto e saldo.
+        // Pré-checagens fora da transação, com os produtos lidos numa só consulta (Change 16): dão
+        // as mensagens específicas de produto e saldo, na ordem do carrinho.
+        db.query produtos {
+          where = $db.produtos.id in $ids_produto
+          output = ["id", "codigo", "estoque_qtd", "preco_venda", "ativo"]
+          return = {type: "list"}
+        } as $produtos_previos
+
         var $total_previo {
           value = 0
         }
 
-        // Quantidade pedida por produto (chave = id em texto), usada dentro da transação.
+        // Quantidade pedida por produto, usada dentro da transação. A chave leva o prefixo "p"
+        // porque um caminho só com dígitos pode ser lido como índice de array (Change 16).
         var $quantidades {
           value = {}
         }
 
+        var $produto_previo {
+          value = null
+        }
+
         foreach ($input.itens) {
           each as $item_pedido {
-            db.get produtos {
-              field_name = "id"
-              field_value = $item_pedido.id_produto
-              output = ["id", "codigo", "estoque_qtd", "preco_venda", "ativo"]
-            } as $produto_previo
+            var.update $produto_previo {
+              value = $produtos_previos|find:$$.id == $item_pedido.id_produto
+            }
 
             precondition ($produto_previo != null && $produto_previo.ativo != false) {
               error_type = "inputerror"
@@ -140,7 +150,7 @@ query "balcao/vendas" verb=POST {
             }
 
             var.update $quantidades {
-              value = $quantidades|set:($item_pedido.id_produto|to_text):$item_pedido.quantidade
+              value = $quantidades|set:("p" ~ $item_pedido.id_produto):$item_pedido.quantidade
             }
           }
         }
@@ -190,9 +200,9 @@ query "balcao/vendas" verb=POST {
                     var.update $linha {
                       value = {
                         id_produto      : $produto_atual.id
-                        quantidade      : $quantidades|get:($produto_atual.id|to_text)
+                        quantidade      : $quantidades|get:("p" ~ $produto_atual.id)
                         valor_unitario  : $produto_atual.preco_venda
-                        valor_total_item: (($quantidades|get:($produto_atual.id|to_text)) * $produto_atual.preco_venda)|round:2
+                        valor_total_item: (($quantidades|get:("p" ~ $produto_atual.id)) * $produto_atual.preco_venda)|round:2
                       }
                     }
 

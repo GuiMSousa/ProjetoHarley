@@ -122,7 +122,7 @@ O cliente usa modelos Pydantic em `Projeto_HarleyStore.services.cadastros` para 
 
 `Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`. Desde o saneamento pós-Change 7, o `DELETE` físico de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações responde `403`; a única exclusão física do sistema é a remoção de item de OS aberta.
 
-`Produto` (modelo de leitura) trata `estoque_qtd` nulo, possível em registros legados do Xano, como `0`, a mesma leitura de `Estoque/movimentar_estoque`. `ProdutoCreate` não tem `estoque_qtd`: o produto nasce com saldo 0 e o Xano recusa outro valor (Change 16). `EntradaMercadoriaCreate` aceita de 1 a 50 itens (`MAX_ITENS_ENTRADA`), o mesmo teto de `POST entrada_mercadoria`.
+`Produto` (modelo de leitura) trata `estoque_qtd` nulo, possível em registros legados do Xano, como `0`, a mesma leitura de `Estoque/movimentar_estoque`. `ProdutoCreate` não tem `estoque_qtd`: o produto nasce com saldo 0 e o Xano recusa outro valor (Change 16). `EntradaMercadoriaCreate` aceita de 1 a 50 itens (`MAX_ITENS_ENTRADA`), o mesmo teto de `POST entrada_mercadoria`, e o formulário recusa a 51ª linha já no "Adicionar item", como o balcão.
 
 `Produto.preco_venda` e demais valores financeiros usam validação estrita `> 0` e são serializados como string decimal em JSON. Quantidades de itens usam `> 0` e saldos de estoque usam `>= 0`. Nenhum DTO de escrita envia `id_funcionario`, totais ou datas de autoria.
 
@@ -146,7 +146,7 @@ Métodos:
 | `get_entrada(id)` | `GET entrada_mercadoria/{id}` | todos |
 | `registrar_entrada(entrada)` | `POST entrada_mercadoria` | `GERENTE` |
 
-`registrar_entrada` envia somente cabeçalho e itens. `id_funcionario`, `valor_total` e `data_entrada` são definidos pelo Xano, que grava cabeçalho, itens e incremento de estoque na mesma transação. O incremento passa por `Estoque/movimentar_estoque` e gera uma linha `ENTRADA` no livro de movimentações. Não existem métodos de edição ou exclusão de entradas: elas são imutáveis.
+`registrar_entrada` envia somente cabeçalho e itens. `id_funcionario`, `valor_total` e `data_entrada` são definidos pelo Xano, que grava cabeçalho, itens e incremento de estoque na mesma transação. O incremento passa por `Estoque/movimentar_estoque` e gera uma linha `ENTRADA` no livro de movimentações, em ordem crescente de produto lida do banco, a mesma da venda de balcão (Change 16). Não existem métodos de edição ou exclusão de entradas: elas são imutáveis.
 
 As validações (fornecedor e produtos ativos, documento ainda não registrado) rodam antes da transação e devolvem `400` com mensagem própria. Dentro da transação ficam só as gravações, protegidas por `try_catch`: uma corrida (mesmo documento ou mesmo produto ao mesmo tempo) viola um índice único, desfaz tudo e responde `400` "A entrada não foi registrada: o documento ou o estoque foram alterados por outra operação. Atualize e tente novamente." em vez de um `500`.
 

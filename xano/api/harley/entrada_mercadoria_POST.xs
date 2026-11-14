@@ -1,4 +1,5 @@
 // Registra uma entrada de mercadoria com seus itens e incrementa o estoque atomicamente.
+// Os itens são gravados em ordem crescente de produto, pelo banco (Change 16).
 // O saldo muda somente por Estoque/movimentar_estoque (ENTRADA), que grava o livro de
 // movimentações e serializa movimentações concorrentes do mesmo produto (Change 7).
 // As validações rodam antes da transação, com mensagens específicas; dentro dela ficam só as
@@ -94,13 +95,22 @@ query entrada_mercadoria verb=POST {
       error = "Este documento já foi registrado para o fornecedor."
     }
 
+    // Produtos lidos numa só consulta (Change 16) e conferidos na ordem da nota.
+    db.query produtos {
+      where = $db.produtos.id in $ids_produto
+      output = ["id", "ativo"]
+      return = {type: "list"}
+    } as $produtos
+
+    var $produto {
+      value = null
+    }
+
     foreach ($input.itens) {
       each as $item_validado {
-        db.get produtos {
-          field_name = "id"
-          field_value = $item_validado.id_produto
-          output = ["id", "ativo"]
-        } as $produto
+        var.update $produto {
+          value = $produtos|find:$$.id == $item_validado.id_produto
+        }
 
         precondition ($produto != null && $produto.ativo != false) {
           error_type = "inputerror"
@@ -123,9 +133,31 @@ query entrada_mercadoria verb=POST {
               }
             } as $entrada
 
-            // Itens em ordem de produto: transações com vários produtos travam na mesma ordem.
-            foreach ($input.itens|sort:"id_produto":"int":false) {
-              each as $item {
+            // Ordem crescente de id, pelo banco (Change 16): a mesma da venda de balcão e do
+            // cancelamento de OS, para que operações simultâneas travem os produtos na mesma ordem.
+            db.query produtos {
+              where = $db.produtos.id in $ids_produto
+              sort = {id: "asc"}
+              output = ["id"]
+              return = {type: "list"}
+            } as $produtos_ordenados
+
+            // Um produto que sumisse daqui ficaria fora da nota sem erro.
+            precondition (($produtos_ordenados|count) == ($ids_produto|count)) {
+              error_type = "inputerror"
+              error = "Produto inativo ou inexistente."
+            }
+
+            var $item {
+              value = null
+            }
+
+            foreach ($produtos_ordenados) {
+              each as $produto_ordenado {
+                var.update $item {
+                  value = $input.itens|find:$$.id_produto == $produto_ordenado.id
+                }
+
                 db.add itens_compra_estoque {
                   data = {
                     id_entrada    : $entrada.id

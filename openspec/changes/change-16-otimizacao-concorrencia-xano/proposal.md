@@ -134,4 +134,4 @@ Proposta em 2026-10-22 e ampliada em 2026-11-11. Em 2026-11-14 o usuário aprovo
 - item 14: saldo inicial 0;
 - item 16: teto de 50 itens.
 
-Os itens 9, 10, 11 e 13 a 16 estão implementados localmente, sem push. O item 12 e as decisões de banco (itens 5, 7 e 8) continuam pendentes.
+Os itens 2 e 9 a 16 foram publicados em 2026-11-14 (fases 1 e 2). As decisões de banco (itens 5, 7 e 8) continuam pendentes.
