@@ -31,7 +31,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 | Testes | `.venv/Scripts/python -m pytest` | DTOs, cliente HTTP com respostas simuladas, States e handlers (via `tests/event_runner.py`) e contratos estáticos dos `.xs` (RBAC, transações, validações) | O Xano real: o cliente é simulado |
 | Build | `.venv/Scripts/reflex compile --dry` | A árvore de componentes do Reflex compila | Que o servidor sobe ou a tela funciona |
 | Navegador (opt-in) | Com o app rodando (`reflex run --env prod --single-port --backend-port 3100`): `HARLEY_BROWSER_URL=http://localhost:3100 .venv/Scripts/python -m pytest -m browser` (PowerShell: `$env:HARLEY_BROWSER_URL='http://localhost:3100'; .venv/Scripts/python -m pytest -m browser; Remove-Item Env:HARLEY_BROWSER_URL`) | No Edge instalado: `/catalogo` abre um modelo e o carrossel avança e volta; o diálogo prende o foco (`Tab`/`Shift+Tab`), tem `aria-labelledby`/`aria-describedby` com texto, ignora clique fora, fecha com Esc e devolve o foco ao "Detalhes"; uma rota protegida sem sessão mostra o login; nenhum erro no console | Fluxos autenticados (não há credenciais de teste) |
-| Integração (opt-in) | `XANO_TEST_LIVE=true` (só leitura), `XANO_TEST_ALLOW_WRITES=true` (grava) e `XANO_TEST_CONCURRENCY=true` (corridas), com `pytest -m integration` | Contratos contra um workspace real. Só a parte de leitura rodou ao vivo, em produção, como VENDEDOR (2026-10-27 e 2026-11-14), em testes isolados e cadenciados por causa do limite de taxa do plano Free | Escrita e corridas: nada sem um workspace de testes, e nunca rodaram. GERENTE e MECANICO não têm credenciais de teste |
+| Integração (opt-in) | `XANO_TEST_LIVE=true` (só leitura), `XANO_TEST_ALLOW_WRITES=true` (grava) e `XANO_TEST_CONCURRENCY=true` (corridas), com `pytest -m integration` | Contratos contra um workspace real. Só a parte de leitura rodou ao vivo, em produção: como VENDEDOR em 2026-10-27 e 2026-11-14, e com os 3 perfis em 2026-11-15. Os testes rodaram isolados e cadenciados (20 s entre eles) por causa do limite de taxa do plano Free | Escrita e corridas: nada sem um workspace de testes, e nunca rodaram. Teste que percorre os 3 perfis em sequência pode receber 429 no terceiro, mesmo isolado |
 | XanoScript | Validador do MCP `xano-developer` e `xano workspace push -d ./xano --dry-run` | Sintaxe dos `.xs` e o diff que o push aplicaria | Nada é publicado; o push exige o OK do usuário |
 | Tipos | indisponível | — | — |
 
@@ -40,7 +40,10 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 - ruff: sem violações;
 - compileall: OK;
 - pytest: 454 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 454 passaram e 45 foram desmarcados;
-- integração ao vivo, só leitura, como VENDEDOR e em testes isolados: o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
+- integração ao vivo, só leitura e em testes isolados:
+  - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
+  - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
+  - sem prova ao vivo: a ordem do resumo (0 operações em produção) e a recusa do MECANICO no balcão (sem produto ativo);
 - `reflex compile --dry`: OK;
 - validador do MCP `xano-developer`: 129 `.xs` válidos;
 - smoke de navegador: não repetido, porque cobre só o catálogo e o login, que esta change não alterou. Última execução: 3 passaram em 2026-10-27, com o catálogo público real.

@@ -28,14 +28,23 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
   - inclusão e remoção de item (`test_salesperson_cannot_change_items`).
 
   O `POST entrada_mercadoria` já tinha dado 403 em 2026-11-14 (`test_non_managers_cannot_register_receipts`). O pytest marca `test_suppliers_and_employees_are_manager_only` como pulado porque a parte final, a leitura permitida ao GERENTE, não tem credenciais. O subteste do VENDEDOR passou.
-- [ ] Os mesmos testes com MECANICO e GERENTE, que pulam sem `XANO_TEST_MECANICO_*` e `XANO_TEST_GERENTE_*` no `.env`. Hoje só as recusas do VENDEDOR estão provadas ao vivo; a recusa do MECANICO e a leitura permitida ao GERENTE não estão.
+- [x] Os mesmos testes com MECANICO e GERENTE, depois que as credenciais dos dois entraram no `.env`. Em 2026-11-15, com 20 s entre as execuções:
+  - MECANICO recebeu 403 em fornecedores e funcionários, no resumo financeiro e em `GET transacoes`, na lista de motos do estoque e no `POST entrada_mercadoria`;
+  - GERENTE leu fornecedores e funcionários e o resumo financeiro, e o período invertido ou maior que 366 dias recebeu 400;
+  - os 3 perfis leram a oficina (`test_every_profile_reads_the_workshop`).
+
+  Testes: `test_suppliers_and_employees_are_manager_only`, `test_financial_data_is_manager_only`, `test_manager_reads_the_summary_and_the_period_is_validated`, `test_sales_are_for_sellers_and_managers_only` e `test_non_managers_cannot_register_receipts`, todos aprovados.
+
+  `test_every_profile_reads_shared_resources` passou com GERENTE e VENDEDOR, mas o subteste do MECANICO recebeu 429 duas vezes, mesmo isolado: são 3 logins e 12 leituras em cerca de 5 s, acima do limite do plano Free. As mesmas 4 leituras do MECANICO passaram num script de leitura com 3 s entre as requisições.
+
+  `test_mechanic_cannot_sell_at_the_counter` pulou porque produção não tem produto ativo. A recusa do MECANICO no balcão continua sem prova ao vivo.
 
 ## Refatoração com JOINs
 
 - [x] Confirmar join da mesma tabela com dois apelidos. Validador do MCP: OK. A extensão do VSCode avisa "Unknown table", mas o leitor dela trata todo `$db.X` como tabela e não conhece joins. O sandbox do Xano exige plano pago. Depois do push de 2026-11-14:
   - o Xano guardou os 7 objetos sem mudança (`--dry-run` seguinte: "No changes to push");
   - `test_unknown_order_detail_is_not_found` passa (404, sem 500);
-  - `test_every_profile_reads_the_workshop` passa como VENDEDOR.
+  - `test_every_profile_reads_the_workshop` passa como VENDEDOR e, desde 2026-11-15, com os 3 perfis.
 
   Falta ver os nomes de autor e mecânico preenchidos pelos apelidos, o que exige uma OS no banco (produção tem zero).
 - [x] `Oficina/detalhe_os` (item 9): uma consulta com 5 joins à esquerda (`motos_clientes`, `cliente_os`, `dono_moto`, `autor`, `mecanico`), `return single` antes do `notfound`, mesmos campos e fallback do cliente pelo dono da moto; os campos auxiliares saem da resposta. Contrato estático com mutações (join interno, campo auxiliar na resposta, fallback trocado).
@@ -49,7 +58,8 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
 - [x] Teto de 50 itens na entrada (item 16): `precondition` antes da transação e `MAX_ITENS_ENTRADA` no DTO do Reflex, com a mesma mensagem. Desde 2026-11-14 o formulário também recusa a 51ª linha no "Adicionar item", com toast, como o balcão.
 - [x] `PATCH motos/{id}` (item 13): preço e cor só mudam com a moto `DISPONIVEL`, e reenviar o valor atual é aceito. O status é conferido antes e de novo dentro da transação, depois da gravação que trava a linha. O Xano não tem `error_type` para 422; a recusa é `inputerror` (400), como as demais regras de negócio.
 - [x] `POST produtos` com saldo 0 (item 14): `precondition` e gravação de `estoque_qtd : 0`; o formulário e o `ProdutoCreate` deixam de ter o saldo inicial.
-- [ ] Conferir a ordem de `Financeiro/resumo_operacoes` com uma sessão de gerente (item 4).
+- [x] `Financeiro/resumo_operacoes` com uma sessão de gerente (item 4), na parte de leitura. Em 2026-11-15 o resumo respondeu e o `ResumoFinanceiro` validou o retorno, tanto no mês corrente quanto nos últimos 360 dias. O período inválido recebeu 400.
+- [ ] Ordem do `resumo_operacoes` (item 4). Não há como verificar ainda: produção tem 0 operações nos últimos 360 dias, e a documentação do `sort` continua contraditória. Ela chama o terceiro argumento de `asc` (`true` = crescente), o que tornaria o `false` decrescente, com o limite de 500 guardando as operações mais recentes. Mas o exemplo da própria doc, com `true`, devolve a lista decrescente. Conferir quando houver 2 ou mais operações no período.
 
 ## Testes de escrita e concorrência (pendente)
 

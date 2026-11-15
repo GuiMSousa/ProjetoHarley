@@ -54,7 +54,7 @@ Lacunas menores, nos itens 13 e 14:
 - Não há mais nenhum `throw` nos 129 `.xs`. O contrato estático cobre só `enforce_role`.
 - Toda `precondition` tem `error_type`, menos uma em `Quick Start/generate_magic_link`. A função veio do modelo do Xano e nenhum endpoint a chama.
 - As recusas de acesso usam `accessdenied`: `enforce_role`, usuário sem funcionário vinculado e endpoints bloqueados. `seed_gerente` e `lancar_os_concluidas_legadas` usam `inputerror` para "não é gerente", mas são funções de console e não recusas de uma requisição.
-- Ao vivo, só `GET fornecedores` como VENDEDOR foi confirmado com 403 depois do push de 2026-10-27. Os 5 testes de controle de acesso da integração ainda não foram repetidos. **Atualização (2026-11-15):** as recusas do VENDEDOR nesses 5 testes deram 403 ao vivo; as do MECANICO e a leitura do GERENTE não rodaram, por falta de credenciais (ver `tasks.md`).
+- Ao vivo, só `GET fornecedores` como VENDEDOR foi confirmado com 403 depois do push de 2026-10-27. Os 5 testes de controle de acesso da integração ainda não foram repetidos. **Atualização (2026-11-15):** as recusas do VENDEDOR e do MECANICO nesses testes deram 403 ao vivo, e o GERENTE leu fornecedores, funcionários e o resumo financeiro (ver `tasks.md`). A recusa do MECANICO no balcão continua sem prova, porque produção não tem produto ativo.
 
 ## Escopo proposto
 
@@ -63,7 +63,7 @@ Lacunas menores, nos itens 13 e 14:
 1. **`GET motos`:** usa `join` à esquerda com `eval`, no lugar das tabelas inteiras e do `find` por unidade. Feito e publicado.
 2. **`POST entrada_mercadoria`:** `|sort:"id_produto":"int":false` usa um tipo que o filtro não documenta (`number`, `text`, `natural`, `itext`, `inatural`). Além disso, ordena ao contrário da venda de balcão e do cancelamento de OS, que movimentam o estoque em ordem crescente de `id` pelo banco. Duas transações com os mesmos produtos em ordens opostas podem se bloquear no índice único do livro, e o banco aborta uma delas. A entrada passa a usar a mesma ordem, também pelo banco.
 3. **`GET ordens_servico`:** restringir a consulta de funcionários com `output = ["id", "nome_funcionario"]`. Fica como alternativa caso o item 10 não seja viável. **Descartado (2026-11-14):** o item 10 foi publicado e a consulta inteira de funcionários deixou de existir.
-4. **Verificar, sem alterar, `Financeiro/resumo_operacoes`:** o exemplo da documentação do `sort` é ambíguo quanto ao terceiro argumento. Se `false` ordenar de forma crescente, o limite de 500 guarda as operações mais antigas. A conferência é feita com uma sessão de gerente.
+4. **Verificar, sem alterar, `Financeiro/resumo_operacoes`:** o exemplo da documentação do `sort` é ambíguo quanto ao terceiro argumento. Se `false` ordenar de forma crescente, o limite de 500 guarda as operações mais antigas. A conferência é feita com uma sessão de gerente. **Atualização (2026-11-15):** com o GERENTE, o resumo responde e o DTO valida. A ordem segue sem verificação: há 0 operações nos últimos 360 dias, e a doc ainda chama o argumento de `asc` enquanto o exemplo com `true` devolve a lista decrescente.
 
 Ampliação de 2026-11-11:
 
@@ -134,8 +134,9 @@ Proposta em 2026-10-22 e ampliada em 2026-11-11. Em 2026-11-14 o usuário aprovo
 - item 14: saldo inicial 0;
 - item 16: teto de 50 itens.
 
-Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos commits, "fase 1" e "fase 2"), e o item 3 foi descartado. Em 2026-11-15, as recusas do VENDEDOR deram 403 ao vivo. Continuam pendentes:
+Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos commits, "fase 1" e "fase 2"), e o item 3 foi descartado. Em 2026-11-15, as recusas do VENDEDOR e do MECANICO deram 403 ao vivo, e as leituras do GERENTE passaram. Continuam pendentes:
 
 - as decisões e o push de banco (itens 5, 7 e 8);
-- a conferência do item 4;
+- a ordem do resumo no item 4, que só pode ser conferida com 2 ou mais operações no período (a leitura como GERENTE passou em 2026-11-15);
+- a recusa do MECANICO no balcão, que precisa de um produto ativo;
 - os testes de escrita e concorrência do item 17, que dependem de um workspace de testes.
