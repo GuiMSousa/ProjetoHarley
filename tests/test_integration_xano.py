@@ -1119,8 +1119,11 @@ class XanoLiveCounterReadTests(XanoLiveTestCase):
                     client.request("POST", "balcao/vendas", json=body)
 
     def test_cart_with_a_nonexistent_product_is_refused_before_any_write(self):
-        # Change 16: the cart is read in one query (id in $ids_produto) before the transaction, so
-        # this refusal proves that query runs; it needs no product in the database and writes nothing.
+        # Change 16: live, the published endpoint refuses the cart with HTTP 400 before the
+        # transaction, so nothing is written and no product is needed in the database. That the
+        # check reads the cart in one query (id in $ids_produto) is proven by the static contract
+        # and by a post-push --dry-run with no changes, not by this test: a db.get per item would
+        # answer the same message.
         body = {
             "chave_venda": str(uuid.uuid4()),
             "total_esperado": "1.00",
@@ -1128,6 +1131,8 @@ class XanoLiveCounterReadTests(XanoLiveTestCase):
         }
         with self.client_for("VENDEDOR") as client, self.assertRaises(XanoValidationError) as context:
             client.request("POST", "balcao/vendas", json=body)
+        # XanoValidationError also covers 422; the business refusal is a 400.
+        self.assertEqual(context.exception.status_code, 400)
         self.assertIn(f"Produto inativo ou inexistente: {NONEXISTENT_ID}", str(context.exception))
 
 

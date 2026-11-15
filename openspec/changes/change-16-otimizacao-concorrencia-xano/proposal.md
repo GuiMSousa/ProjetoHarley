@@ -54,7 +54,7 @@ Lacunas menores, nos itens 13 e 14:
 - Não há mais nenhum `throw` nos 129 `.xs`. O contrato estático cobre só `enforce_role`.
 - Toda `precondition` tem `error_type`, menos uma em `Quick Start/generate_magic_link`. A função veio do modelo do Xano e nenhum endpoint a chama.
 - As recusas de acesso usam `accessdenied`: `enforce_role`, usuário sem funcionário vinculado e endpoints bloqueados. `seed_gerente` e `lancar_os_concluidas_legadas` usam `inputerror` para "não é gerente", mas são funções de console e não recusas de uma requisição.
-- Ao vivo, só `GET fornecedores` como VENDEDOR foi confirmado com 403 depois do push de 2026-10-27. Os 5 testes de controle de acesso da integração ainda não foram repetidos.
+- Ao vivo, só `GET fornecedores` como VENDEDOR foi confirmado com 403 depois do push de 2026-10-27. Os 5 testes de controle de acesso da integração ainda não foram repetidos. **Atualização (2026-11-15):** as recusas do VENDEDOR nesses 5 testes deram 403 ao vivo; as do MECANICO e a leitura do GERENTE não rodaram, por falta de credenciais (ver `tasks.md`).
 
 ## Escopo proposto
 
@@ -62,7 +62,7 @@ Lacunas menores, nos itens 13 e 14:
 
 1. **`GET motos`:** usa `join` à esquerda com `eval`, no lugar das tabelas inteiras e do `find` por unidade. Feito e publicado.
 2. **`POST entrada_mercadoria`:** `|sort:"id_produto":"int":false` usa um tipo que o filtro não documenta (`number`, `text`, `natural`, `itext`, `inatural`). Além disso, ordena ao contrário da venda de balcão e do cancelamento de OS, que movimentam o estoque em ordem crescente de `id` pelo banco. Duas transações com os mesmos produtos em ordens opostas podem se bloquear no índice único do livro, e o banco aborta uma delas. A entrada passa a usar a mesma ordem, também pelo banco.
-3. **`GET ordens_servico`:** restringir a consulta de funcionários com `output = ["id", "nome_funcionario"]`. Fica como alternativa caso o item 10 não seja viável.
+3. **`GET ordens_servico`:** restringir a consulta de funcionários com `output = ["id", "nome_funcionario"]`. Fica como alternativa caso o item 10 não seja viável. **Descartado (2026-11-14):** o item 10 foi publicado e a consulta inteira de funcionários deixou de existir.
 4. **Verificar, sem alterar, `Financeiro/resumo_operacoes`:** o exemplo da documentação do `sort` é ambíguo quanto ao terceiro argumento. Se `false` ordenar de forma crescente, o limite de 500 guarda as operações mais antigas. A conferência é feita com uma sessão de gerente.
 
 Ampliação de 2026-11-11:
@@ -71,8 +71,8 @@ Ampliação de 2026-11-11:
 10. **`GET ordens_servico`:** autor e mecânico por joins com apelido, sem ler a tabela inteira e sem o laço. Antes, é preciso confirmar no validador e numa leitura ao vivo que o Xano aceita a mesma tabela em dois apelidos; se não aceitar, aplica-se o item 3.
 11. **`GET entrada_mercadoria`:** `quantidade_itens` por um addon de contagem (padrão documentado do XanoScript) ou por uma única consulta dos itens das entradas listadas, contada em memória. O campo e o formato da resposta não mudam.
 12. **Pré-checagens de produto:** uma `db.query` com `id in $ids_produto` em `POST balcao/vendas` e `POST entrada_mercadoria`, mantendo a mensagem por produto. A entrada não tem teto de itens, ao contrário do balcão (30); o teto é uma decisão (item 16).
-13. **`PATCH motos/{id}`:** decidir se preço e cor podem mudar numa moto `RESERVADA`. Se não puderem, a edição exige `DISPONIVEL` e confere `versao_status` dentro de uma transação.
-14. **`POST produtos`:** o saldo inicial vira um lançamento `ENTRADA` no livro, ou o cadastro passa a exigir saldo 0 e o estoque entra pela entrada de mercadoria (decisão).
+13. **`PATCH motos/{id}`:** **decidido e publicado (2026-11-14):** preço e cor de uma moto `RESERVADA` ou `VENDIDA` não mudam, e reenviar o valor atual é aceito. O status é conferido antes da transação e de novo dentro dela, depois da gravação que trava a linha; isso substituiu a conferência de `versao_status` que este item sugeria. A recusa é `inputerror` (400), porque o Xano não tem `error_type` para 422.
+14. **`POST produtos`:** **decidido e publicado (2026-11-14):** o produto nasce com saldo 0, e o estoque entra pela entrada de mercadoria, que grava o livro. Um saldo diferente de 0 recebe 400, e o formulário e o `ProdutoCreate` não têm mais o saldo inicial. A alternativa de lançar o saldo inicial como `ENTRADA` foi descartada.
 15. **Recusas:** contrato estático que proíbe `throw` em todos os `.xs` e exige `error_type` em toda `precondition`. `generate_magic_link` recebe `inputerror`.
 
 **No cliente Reflex** (sem push):
@@ -97,7 +97,7 @@ Ampliação de 2026-11-11:
 
 **Decisões e testes:**
 
-16. **Teto de itens da entrada de mercadoria:** sem teto, uma nota grande deixa a transação e as travas de estoque abertas por mais tempo. Proposta: 50 itens, sujeita a decisão.
+16. **Teto de itens da entrada de mercadoria:** sem teto, uma nota grande deixa a transação e as travas de estoque abertas por mais tempo. **Decidido e publicado (2026-11-14):** 50 itens. O Xano recusa com 400 antes da transação, o DTO do Reflex aplica o mesmo limite e o formulário recusa a 51ª linha no "Adicionar item".
 17. **Cenários concorrentes novos:** a integração já tem 6:
     - duas OS disputando o saldo;
     - item incluído durante o cancelamento;
@@ -122,7 +122,7 @@ Ampliação de 2026-11-11:
 
 - O plano Free publica direto em produção. Antes de qualquer push, resolver o token do Swagger (`docs/xano-api-client.md`) e revisar o `--dry-run`.
 - Os cenários com escrita e concorrência gravam dados reais e exigem um workspace ou branch de testes. Sem ele, os itens 9 a 14 só têm cobertura estática e de leitura ao vivo.
-- Join da mesma tabela com dois apelidos (itens 9 e 10) ainda não foi usado neste workspace; o validador confere a sintaxe, não o resultado.
+- ~~Join da mesma tabela com dois apelidos (itens 9 e 10) ainda não foi usado neste workspace.~~ **Resolvido (2026-11-14):** os itens 9 e 10 foram publicados, o Xano guardou o código sem mudança (`--dry-run` seguinte sem diferenças), o detalhe de uma OS inexistente responde 404 sem 500 e a lista é lida. Resta ver os nomes de autor e mecânico preenchidos, o que exige uma OS no banco.
 - Uma resposta lida por `detalhe_os` ou por `GET ordens_servico` precisa manter os mesmos campos, porque `services/` os valida com pydantic.
 - `galeria` guarda arquivos enviados ao Xano. Um `--sync` sem a coluna versionada apagaria a coluna e as fotos.
 
@@ -134,4 +134,8 @@ Proposta em 2026-10-22 e ampliada em 2026-11-11. Em 2026-11-14 o usuário aprovo
 - item 14: saldo inicial 0;
 - item 16: teto de 50 itens.
 
-Os itens 2 e 9 a 16 foram publicados em 2026-11-14 (fases 1 e 2). As decisões de banco (itens 5, 7 e 8) continuam pendentes.
+Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos commits, "fase 1" e "fase 2"), e o item 3 foi descartado. Em 2026-11-15, as recusas do VENDEDOR deram 403 ao vivo. Continuam pendentes:
+
+- as decisões e o push de banco (itens 5, 7 e 8);
+- a conferência do item 4;
+- os testes de escrita e concorrência do item 17, que dependem de um workspace de testes.
