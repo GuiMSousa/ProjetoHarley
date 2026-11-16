@@ -86,14 +86,14 @@ Ampliação de 2026-11-11:
 
 **Com mudança de banco** (cada item precisa de OK antes de editar e de novo antes do push):
 
-5. **`modelos_moto`:** a Change 17 versionou `galeria` e `default_motos` como publicadas e levou a `galeria` à vitrine e a `/vendas`. Resta decidir `default_motos`; a recomendação é removê-la, porque repete a convenção de arquivo local `default_<slug>.png`, que a Change 17 eliminou.
+5. **`modelos_moto`:** a Change 17 versionou `galeria` e `default_motos` como publicadas e levou a `galeria` à vitrine e a `/vendas`. Resta decidir `default_motos`; a recomendação é removê-la, porque repete a convenção de arquivo local `default_<slug>.png`, que a Change 17 eliminou. **Não executado:** a remoção exige `--sync` e o OK do usuário. Transferido para os débitos conhecidos de `docs/quality.md` (2026-11-16).
 6. **`entrada_mercadoria`:** ~~índice único em (`id_fornecedor`, `numero_documento`)~~. **Correção (2026-11-11):** o índice já existe desde a Change 5 e já protege os envios simultâneos do mesmo documento. Nada a fazer no banco; falta só o cenário concorrente do item 17.
-7. **`event_log`:** índice em `user_id`, filtro de `GET logs/user/my_events`.
+7. **`event_log`:** índice em `user_id`, filtro de `GET logs/user/my_events`. **Não executado:** é mudança de banco e exige o OK do usuário. Transferido para os débitos conhecidos (2026-11-16).
 8. **`motos.id_modelo`:** é anulável por causa das unidades anteriores à Change 8, que usam `marca` e `modelo` legados. Uma unidade criada pelo painel sem modelo nunca aparece na vitrine e aparece em `/vendas` sem nome nem cores. As opções são:
    - tornar o campo obrigatório depois de atribuir um modelo às unidades legadas (`--sync`);
    - manter como está e documentar que motos se cadastram pelo app.
 
-   Recomendação: manter por ora e documentar. Em 2026-10-27 produção tinha uma unidade sem modelo.
+   Recomendação: manter por ora e documentar. Em 2026-10-27 produção tinha uma unidade sem modelo. **Decidido (2026-11-15):** mantido como está, sem mudança de banco, e documentado em `docs/domain-model.md`.
 
 **Decisões e testes:**
 
@@ -134,9 +134,11 @@ Proposta em 2026-10-22 e ampliada em 2026-11-11. Em 2026-11-14 o usuário aprovo
 - item 14: saldo inicial 0;
 - item 16: teto de 50 itens.
 
-Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos commits, "fase 1" e "fase 2"), e o item 3 foi descartado. Em 2026-11-15, as recusas do VENDEDOR e do MECANICO deram 403 ao vivo, e as leituras do GERENTE passaram. Continuam pendentes:
+Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos commits, "fase 1" e "fase 2"), e o item 3 foi descartado. Em 2026-11-15, as recusas do VENDEDOR e do MECANICO deram 403 ao vivo, e as leituras do GERENTE passaram. O item 8 foi decidido sem mudança de banco.
 
-- as decisões e o push de banco (itens 5, 7 e 8);
+**Arquivada em 2026-11-15.** Foram para a seção "Débitos conhecidos" de `docs/quality.md`:
+
+- os itens de banco 5 e 7, que não foram executados e exigem o OK do usuário;
 - a ordem do resumo no item 4, que só pode ser conferida com 2 ou mais operações no período (a leitura como GERENTE passou em 2026-11-15);
 - a recusa do MECANICO no balcão, que precisa de um produto ativo;
-- os testes de escrita e concorrência do item 17, que dependem de um workspace de testes.
+- os testes de escrita e concorrência do item 17, que dependem de um workspace de homologação.

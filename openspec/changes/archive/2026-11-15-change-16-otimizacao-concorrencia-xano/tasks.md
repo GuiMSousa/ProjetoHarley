@@ -1,11 +1,12 @@
 # Tarefas — Change 16: otimização, JOINs e concorrência no backend Xano
 
-As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas publicadas** (Entregas 1 e 2; nos commits, "fase 1" e "fase 2"). O que falta são as decisões e o push do banco e os testes de escrita e concorrência.
+As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas publicadas** (Entregas 1 e 2; nos commits, "fase 1" e "fase 2"). **Arquivada em 2026-11-15.** O que não foi executado, e por isso continua sem `[x]`, foi transferido para a seção "Débitos conhecidos" de `docs/quality.md`: os itens de banco 5 e 7, a ordem do resumo (item 4) e os testes de escrita e concorrência.
 
 ## Aprovação
 
 - [x] Aprovação do escopo dos itens 9 a 16 (2026-11-14), com as decisões: preço e cor bloqueados em moto reservada ou vendida (13), saldo inicial 0 (14) e teto de 50 itens na entrada (16).
-- [ ] Decisões de banco (itens 5, 7 e 8) pelo usuário.
+- [x] Item 8 (2026-11-15): `motos.id_modelo` continua anulável, conforme a recomendação da proposta, e a regra está documentada em `docs/domain-model.md`. Unidades se cadastram pelo app, e uma criada pelo painel sem modelo é tratada como legada. O banco não muda.
+- [ ] Itens 5 (remover `modelos_moto.default_motos`) e 7 (índice em `event_log.user_id`): não executados. Em 2026-11-16, o `--dry-run` das tabelas confirmou que `event_log` e `motos` não mudaram no publicado, e `modelos_moto` mostrou só a diferença cosmética conhecida. Os dois mudam o banco e exigem o OK do usuário antes de editar e antes do push. Transferidos para os débitos conhecidos.
 
 ## Concluído antes da ampliação
 
@@ -35,7 +36,7 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
 
   Testes: `test_suppliers_and_employees_are_manager_only`, `test_financial_data_is_manager_only`, `test_manager_reads_the_summary_and_the_period_is_validated`, `test_sales_are_for_sellers_and_managers_only` e `test_non_managers_cannot_register_receipts`, todos aprovados.
 
-  `test_every_profile_reads_shared_resources` passou com GERENTE e VENDEDOR, mas o subteste do MECANICO recebeu 429 duas vezes, mesmo isolado: são 3 logins e 12 leituras em cerca de 5 s, acima do limite do plano Free. As mesmas 4 leituras do MECANICO passaram num script de leitura com 3 s entre as requisições.
+  `test_every_profile_reads_shared_resources` passou com GERENTE e VENDEDOR, mas o subteste do MECANICO recebeu 429 duas vezes, mesmo isolado: são 3 logins e 12 leituras em cerca de 5 s, acima do limite do plano Free. As mesmas 4 leituras do MECANICO passaram num script de leitura com 3 s entre as requisições. Em 2026-11-16 o teste passou a pausar entre os perfis. Com 3 s, o terceiro ainda recebia 429; com 10 s, o teste passa com os 3 perfis (3 subtestes, 26,9 s).
 
   `test_mechanic_cannot_sell_at_the_counter` pulou porque produção não tem produto ativo. A recusa do MECANICO no balcão continua sem prova ao vivo.
 
@@ -59,9 +60,9 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
 - [x] `PATCH motos/{id}` (item 13): preço e cor só mudam com a moto `DISPONIVEL`, e reenviar o valor atual é aceito. O status é conferido antes e de novo dentro da transação, depois da gravação que trava a linha. O Xano não tem `error_type` para 422; a recusa é `inputerror` (400), como as demais regras de negócio.
 - [x] `POST produtos` com saldo 0 (item 14): `precondition` e gravação de `estoque_qtd : 0`; o formulário e o `ProdutoCreate` deixam de ter o saldo inicial.
 - [x] `Financeiro/resumo_operacoes` com uma sessão de gerente (item 4), na parte de leitura. Em 2026-11-15 o resumo respondeu e o `ResumoFinanceiro` validou o retorno, tanto no mês corrente quanto nos últimos 360 dias. O período inválido recebeu 400.
-- [ ] Ordem do `resumo_operacoes` (item 4). Não há como verificar ainda: produção tem 0 operações nos últimos 360 dias, e a documentação do `sort` continua contraditória. Ela chama o terceiro argumento de `asc` (`true` = crescente), o que tornaria o `false` decrescente, com o limite de 500 guardando as operações mais recentes. Mas o exemplo da própria doc, com `true`, devolve a lista decrescente. Conferir quando houver 2 ou mais operações no período.
+- [ ] Ordem do `resumo_operacoes` (item 4). Não há como verificar ainda: produção tem 0 operações nos últimos 360 dias, e a documentação do `sort` continua contraditória. Ela chama o terceiro argumento de `asc` (`true` = crescente), o que tornaria o `false` decrescente, com o limite de 500 guardando as operações mais recentes. Mas o exemplo da própria doc, com `true`, devolve a lista decrescente. Conferir quando houver 2 ou mais operações no período. Transferido para os débitos conhecidos.
 
-## Testes de escrita e concorrência (pendente)
+## Testes de escrita e concorrência (transferidos para os débitos conhecidos)
 
 - [ ] Workspace ou branch de testes do Xano definido pelo usuário. Sem ele, estes testes não rodam: a escrita e a concorrência gravam dados reais, e o plano Free publica em produção.
 - [ ] Cenários novos (item 17): duas entradas com o mesmo documento; duas entradas com produtos em ordens opostas; entrada e venda de balcão do mesmo produto.
@@ -73,9 +74,8 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
 - [x] Entrega 2 (itens 2 e 12: `balcao/vendas_POST.xs` e `entrada_mercadoria_POST.xs`), push em 2026-11-14 autorizado pelo usuário. O push trouxe de novo o falso positivo "Unresolved References"; o `--dry-run` seguinte deu "No changes to push". Ao vivo, `test_cart_with_a_nonexistent_product_is_refused_before_any_write` passa como VENDEDOR: um carrinho com produto inexistente recebe 400 "Produto inativo ou inexistente" antes da transação, sem gravar nada e sem depender de produto no banco (produção tem zero). Desde 2026-11-15, o teste também confere `status_code == 400`.
 - [x] `docs/quality.md` com a referência de 2026-11-14.
 
-## Banco e encerramento (pendente)
+## Encerramento
 
-- [ ] Banco, conforme a decisão: `default_motos` (item 5), índice em `event_log.user_id` (item 7) e `motos.id_modelo` (item 8). O índice de `entrada_mercadoria` já existe (item 6).
-- [ ] Push do banco (itens 5, 7 e 8), com `--dry-run` revisado e o OK do usuário.
-- [ ] Docs: `docs/xano-api-client.md`, `docs/quality.md` e `docs/schema.sql`, se o banco mudar.
-- [ ] Mover para o archive e commit (usuário).
+- [x] Banco: nada foi publicado. O item 6 já existia, o item 8 foi decidido sem mudança, e os itens 5 e 7 estão nos débitos conhecidos. `docs/schema.sql` não muda.
+- [x] Débitos conhecidos em `docs/quality.md`, com a ordem do resumo, os testes de escrita e concorrência, os itens 5 e 7 e o que ficou sem prova ao vivo por falta de dados.
+- [x] Arquivada em 2026-11-15, com `git mv`, para `openspec/changes/archive/2026-11-15-change-16-otimizacao-concorrencia-xano/`.

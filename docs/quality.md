@@ -31,7 +31,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 | Testes | `.venv/Scripts/python -m pytest` | DTOs, cliente HTTP com respostas simuladas, States e handlers (via `tests/event_runner.py`) e contratos estáticos dos `.xs` (RBAC, transações, validações) | O Xano real: o cliente é simulado |
 | Build | `.venv/Scripts/reflex compile --dry` | A árvore de componentes do Reflex compila | Que o servidor sobe ou a tela funciona |
 | Navegador (opt-in) | Com o app rodando (`reflex run --env prod --single-port --backend-port 3100`): `HARLEY_BROWSER_URL=http://localhost:3100 .venv/Scripts/python -m pytest -m browser` (PowerShell: `$env:HARLEY_BROWSER_URL='http://localhost:3100'; .venv/Scripts/python -m pytest -m browser; Remove-Item Env:HARLEY_BROWSER_URL`) | No Edge instalado: `/catalogo` abre um modelo e o carrossel avança e volta; o diálogo prende o foco (`Tab`/`Shift+Tab`), tem `aria-labelledby`/`aria-describedby` com texto, ignora clique fora, fecha com Esc e devolve o foco ao "Detalhes"; uma rota protegida sem sessão mostra o login; nenhum erro no console | Fluxos autenticados (não há credenciais de teste) |
-| Integração (opt-in) | `XANO_TEST_LIVE=true` (só leitura), `XANO_TEST_ALLOW_WRITES=true` (grava) e `XANO_TEST_CONCURRENCY=true` (corridas), com `pytest -m integration` | Contratos contra um workspace real. Só a parte de leitura rodou ao vivo, em produção: como VENDEDOR em 2026-10-27 e 2026-11-14, e com os 3 perfis em 2026-11-15. Os testes rodaram isolados e cadenciados (20 s entre eles) por causa do limite de taxa do plano Free | Escrita e corridas: nada sem um workspace de testes, e nunca rodaram. Teste que percorre os 3 perfis em sequência pode receber 429 no terceiro, mesmo isolado |
+| Integração (opt-in) | `XANO_TEST_LIVE=true` (só leitura), `XANO_TEST_ALLOW_WRITES=true` (grava) e `XANO_TEST_CONCURRENCY=true` (corridas), com `pytest -m integration` | Contratos contra um workspace real. Só a parte de leitura rodou ao vivo, em produção: como VENDEDOR em 2026-10-27 e 2026-11-14, e com os 3 perfis em 2026-11-15. Os testes rodaram isolados e cadenciados (20 s entre eles) por causa do limite de taxa do plano Free | Escrita e corridas: nada sem um workspace de testes, e nunca rodaram. O limite é de cerca de 10 requisições por 20 s: `test_every_profile_reads_shared_resources` pausa 10 s entre perfis, porque com 3 s o terceiro ainda recebia 429 |
 | XanoScript | Validador do MCP `xano-developer` e `xano workspace push -d ./xano --dry-run` | Sintaxe dos `.xs` e o diff que o push aplicaria | Nada é publicado; o push exige o OK do usuário |
 | Tipos | indisponível | — | — |
 
@@ -103,6 +103,21 @@ Para remedir (o `--isolated` ignora o `ruff.toml`):
 - **Leitura tolerante (Change 15):** `tests/test_resiliencia_leitura.py` injeta JSON malformado pelo HTTP simulado. Confere que só o registro ruim some, que o log não traz valores, que cada tela isola sua fonte e que as mensagens separam rede, dados e erro interno. Um registro gravado fora do app (painel do Xano) é o caso a cobrir sempre que um DTO de leitura mudar. Para ver o efeito na tela, rode uma cópia do app fora do projeto, com um `.env` próprio apontando para um Xano simulado (o `env_file` do Reflex sobrescreve variáveis do processo), e instale os pacotes da cópia nela mesma. Não ligue o `node_modules` da cópia ao do projeto: o cache do Reflex guarda caminhos absolutos, a cópia reinstala os pacotes e pode gravar versões novas no projeto.
 - **Integração e navegador:** são opt-in. Use um workspace ou branch de testes, porque a integração com escrita grava dados reais. O smoke lê o catálogo público do workspace configurado no `.env` e nunca faz login.
 - **Sem cobertura:** fluxos autenticados no navegador, regressão visual e a integração ao vivo com escrita e concorrência.
+
+## Débitos conhecidos
+
+Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem de dados, de ambiente ou de uma decisão de banco:
+
+- **Ordem do `Financeiro/resumo_operacoes`:** conferir, com uma sessão de GERENTE, se a lista vem da operação mais recente para a mais antiga. A conferência exige 2 ou mais operações no período, e produção tinha 0 nos últimos 360 dias em 2026-11-15. A documentação do `sort` é contraditória: chama o terceiro argumento de `asc`, mas o exemplo com `true` devolve a lista decrescente. Se a ordem vier invertida, o limite de 500 guarda as operações mais antigas.
+- **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.
+- **Banco, com OK do usuário antes de editar e antes do push:**
+  - remover `modelos_moto.default_motos`, que não tem uso, com `--sync`;
+  - criar um índice em `event_log.user_id` para `GET logs/user/my_events`.
+- **Sem prova ao vivo, por falta de dados:**
+  - nomes de autor e mecânico pelos apelidos de join (exige uma OS);
+  - contagem de itens da lista de entradas (exige uma entrada);
+  - recusa do MECANICO no balcão (exige um produto ativo);
+  - gravações do `PATCH motos/{id}` e do `POST produtos` (exigem escrita).
 
 ## Revisão após implementação ou correção
 

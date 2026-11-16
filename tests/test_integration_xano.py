@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -150,7 +151,12 @@ class XanoLiveReadTests(XanoLiveTestCase):
                 self.assertNotIn("password", identity.user.model_dump())
 
     def test_every_profile_reads_shared_resources(self):
-        for role in ROLES:
+        for index, role in enumerate(ROLES):
+            if index:
+                # Each profile makes 5 requests (login and 4 reads). Live, 10 requests passed and the
+                # 11th got a 429 within 20 s, also with 3 s pauses; 10 s keeps the third profile out
+                # of the first one's window.
+                time.sleep(10)
             with self.subTest(role=role), self.client_for(role) as client:
                 client.list_clientes()
                 client.list_motos_clientes()
