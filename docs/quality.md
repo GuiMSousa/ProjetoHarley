@@ -106,7 +106,7 @@ Para remedir (o `--isolated` ignora o `ruff.toml`):
 
 ## Débitos conhecidos
 
-Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem de dados, de ambiente ou de uma decisão de banco:
+Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem de dados ou de ambiente:
 
 - **Ordem do `Financeiro/resumo_operacoes`:** conferir, com uma sessão de GERENTE, se a lista vem da operação mais recente para a mais antiga. A conferência exige 2 ou mais operações no período, e produção tinha 0 nos últimos 360 dias em 2026-11-15. A documentação do `sort` é contraditória: chama o terceiro argumento de `asc`, mas o exemplo com `true` devolve a lista decrescente. Se a ordem vier invertida, o limite de 500 guarda as operações mais antigas.
 - **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.

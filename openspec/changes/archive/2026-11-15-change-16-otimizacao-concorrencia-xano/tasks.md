@@ -10,7 +10,10 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
   - o `--dry-run` seguinte mostrou em `modelos_moto` só o `UPDATE` cosmético;
   - o pull confirmou a coluna removida e o índice criado;
   - a leitura pública do catálogo passou ao vivo (`test_public_catalog_exposes_only_showroom_fields`);
-  - contratos estáticos: `default_motos` ausente e índice de `user_id` presente no filtro de `my_events`.
+  - contratos estáticos:
+    - `default_motos` ausente de `modelos_moto`;
+    - índice btree em `event_log.user_id`;
+    - filtro `user_id == $auth.id` no endpoint `logs/user/my_events`.
 - [x] FK `event_log.user_id → user` restaurada em 2026-11-17, com o OK do usuário. O push dos itens 5 e 7 a tinha deixado `table = ""` no publicado, porque `table/user.xs` estava fora do `-i`; os dados e o índice nunca foram afetados.
   - Correção: `xano workspace push -d ./xano -i "table/event_log.xs" -i "table/user.xs" --force`.
   - O push avisou da FK `user.id_funcionario → funcionarios`, fora do `-i`, mas o pull mostrou as duas FKs iguais ao versionado.

@@ -57,7 +57,7 @@ O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `
 
 Um push com `-i` pode listar **Unresolved References** para tabelas e funções que existem, e dizer que elas "virarão placeholders". Esse aviso não aparece no `--dry-run`. Com o filtro, a CLI só resolve referências dentro dos arquivos incluídos (Change 16, 2026-11-14). Para confirmar que nada virou placeholder, repita o `--dry-run` com os mesmos `-i` logo depois do push: ele deve responder "No changes to push".
 
-Numa **tabela**, o aviso é real. Em 2026-11-17, o push de `table/event_log.xs` sem `table/user.xs` gravou `table = ""` na FK `event_log.user_id`, e o `--dry-run` seguinte mostrou o `UPDATE_FIELD`. Ao publicar uma tabela com FK, inclua no `-i` as tabelas referenciadas. Quando elas estão iguais ao publicado, o `--dry-run` não lista mudança nelas.
+Numa **tabela**, o aviso pode ser real. Em 2026-11-17, o push de `table/event_log.xs` sem `table/user.xs` gravou `table = ""` na FK `event_log.user_id`, e o `--dry-run` seguinte mostrou o `UPDATE_FIELD`. Ao publicar uma tabela com FK, inclua no `-i` as tabelas referenciadas. Quando elas estão iguais ao publicado, o `--dry-run` não lista mudança nelas.
 
 Na correção, `table/user.xs` gerou o mesmo aviso para `funcionarios`, que ficou fora do `-i`, mas o pull mostrou a FK `user.id_funcionario` intacta. O aviso nem sempre se cumpre; quem decide é o `--dry-run` feito depois do push, ou um pull.
 
