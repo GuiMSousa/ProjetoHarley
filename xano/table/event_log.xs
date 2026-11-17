@@ -21,6 +21,7 @@ table event_log {
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree", field: [{name: "created_at", op: "desc"}]}
+    {type: "btree", field: [{name: "user_id"}]}
   ]
 
   tags = ["xano:quick-start"]

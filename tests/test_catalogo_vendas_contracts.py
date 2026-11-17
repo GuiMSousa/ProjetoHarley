@@ -25,6 +25,8 @@ class CatalogoContractTests(unittest.TestCase):
             with self.subTest(declaration=declaration):
                 self.assertIn(declaration, content)
         self.assertRegex(content, r'type: "btree\|unique", field: \[\{name: "nome_modelo"\}\]')
+        # Removed in Change 16 (item 5): it repeated the local default_<slug>.png convention.
+        self.assertNotIn("default_motos", content)
 
     def test_public_endpoints_need_no_session_and_share_the_showroom_projection(self):
         for relative_path in (f"{API}/catalogo_GET.xs", f"{API}/catalogo/catalogo_id_GET.xs"):

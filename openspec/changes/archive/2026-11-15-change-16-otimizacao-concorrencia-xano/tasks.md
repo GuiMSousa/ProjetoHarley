@@ -1,12 +1,17 @@
 # Tarefas — Change 16: otimização, JOINs e concorrência no backend Xano
 
-As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas publicadas** (Entregas 1 e 2; nos commits, "fase 1" e "fase 2"). **Arquivada em 2026-11-15.** O que não foi executado, e por isso continua sem `[x]`, foi transferido para a seção "Débitos conhecidos" de `docs/quality.md`: os itens de banco 5 e 7, a ordem do resumo (item 4) e os testes de escrita e concorrência.
+As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas publicadas** (Entregas 1 e 2; nos commits, "fase 1" e "fase 2"). **Arquivada em 2026-11-15.** O que não foi executado, e por isso continua sem `[x]`, foi transferido para a seção "Débitos conhecidos" de `docs/quality.md`: a ordem do resumo (item 4) e os testes de escrita e concorrência. Os itens de banco 5 e 7 também foram transferidos e depois executados, em 2026-11-17.
 
 ## Aprovação
 
 - [x] Aprovação do escopo dos itens 9 a 16 (2026-11-14), com as decisões: preço e cor bloqueados em moto reservada ou vendida (13), saldo inicial 0 (14) e teto de 50 itens na entrada (16).
 - [x] Item 8 (2026-11-15): `motos.id_modelo` continua anulável, conforme a recomendação da proposta, e a regra está documentada em `docs/domain-model.md`. Unidades se cadastram pelo app, e uma criada pelo painel sem modelo é tratada como legada. O banco não muda.
-- [ ] Itens 5 (remover `modelos_moto.default_motos`) e 7 (índice em `event_log.user_id`): não executados. Em 2026-11-16, o `--dry-run` das tabelas confirmou que `event_log` e `motos` não mudaram no publicado, e `modelos_moto` mostrou só a diferença cosmética conhecida. Os dois mudam o banco e exigem o OK do usuário antes de editar e antes do push. Transferidos para os débitos conhecidos.
+- [x] Itens 5 (remover `modelos_moto.default_motos`) e 7 (índice btree em `event_log.user_id`), publicados em 2026-11-17 com o OK do usuário para editar e para o push. Comando: `xano workspace push -d ./xano -i "table/modelos_moto.xs" -i "table/event_log.xs" --sync --force`, sem `--delete`; o `--sync` é necessário porque um push parcial não remove coluna. Verificação:
+  - o `--dry-run` seguinte mostrou em `modelos_moto` só o `UPDATE` cosmético;
+  - o pull confirmou a coluna removida e o índice criado;
+  - a leitura pública do catálogo passou ao vivo (`test_public_catalog_exposes_only_showroom_fields`);
+  - contratos estáticos: `default_motos` ausente e índice de `user_id` presente no filtro de `my_events`.
+- [ ] Restaurar a FK `event_log.user_id → user`, que o push dos itens 5 e 7 deixou `table = ""` no publicado, porque `table/user.xs` estava fora do `-i`. Os dados e o índice estão intactos, e o versionado está certo. O push de correção (`-i "table/event_log.xs" -i "table/user.xs"`) tem `--dry-run` revisado, que só muda `event_log`, e aguarda o OK do usuário. Registrado nos débitos conhecidos.
 
 ## Concluído antes da ampliação
 
@@ -76,6 +81,6 @@ As seções agrupam as tarefas por tema. O que foi publicado está em **Entregas
 
 ## Encerramento
 
-- [x] Banco: nada foi publicado. O item 6 já existia, o item 8 foi decidido sem mudança, e os itens 5 e 7 estão nos débitos conhecidos. `docs/schema.sql` não muda.
-- [x] Débitos conhecidos em `docs/quality.md`, com a ordem do resumo, os testes de escrita e concorrência, os itens 5 e 7 e o que ficou sem prova ao vivo por falta de dados.
+- [x] Banco: o item 6 já existia, o item 8 foi decidido sem mudança, e os itens 5 e 7 foram publicados em 2026-11-17, depois do arquivamento. `docs/schema.sql` não descreve as duas tabelas e não muda.
+- [x] Débitos conhecidos em `docs/quality.md`, com a ordem do resumo, os testes de escrita e concorrência, a FK de `event_log.user_id` e o que ficou sem prova ao vivo por falta de dados.
 - [x] Arquivada em 2026-11-15, com `git mv`, para `openspec/changes/archive/2026-11-15-change-16-otimizacao-concorrencia-xano/`.

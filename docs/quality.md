@@ -39,7 +39,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 454 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 454 passaram e 45 foram desmarcados;
+- pytest: 455 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 455 passaram e 45 foram desmarcados (2026-11-17, com o contrato do índice de `event_log`);
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
@@ -110,9 +110,7 @@ Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem 
 
 - **Ordem do `Financeiro/resumo_operacoes`:** conferir, com uma sessão de GERENTE, se a lista vem da operação mais recente para a mais antiga. A conferência exige 2 ou mais operações no período, e produção tinha 0 nos últimos 360 dias em 2026-11-15. A documentação do `sort` é contraditória: chama o terceiro argumento de `asc`, mas o exemplo com `true` devolve a lista decrescente. Se a ordem vier invertida, o limite de 500 guarda as operações mais antigas.
 - **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.
-- **Banco, com OK do usuário antes de editar e antes do push:**
-  - remover `modelos_moto.default_motos`, que não tem uso, com `--sync`;
-  - criar um índice em `event_log.user_id` para `GET logs/user/my_events`.
+- **FK de `event_log.user_id` perdida no publicado (2026-11-17):** o push dos itens 5 e 7 (`-i table/modelos_moto.xs -i table/event_log.xs --sync`) avisou que a referência à tabela `user` não estava no push, e o publicado ficou com `table = ""`. A coluna e os valores continuam, e o índice foi criado. `my_events` filtra pelo número e não depende da FK. O versionado está correto. Correção, com o OK do usuário: `xano workspace push -d ./xano -i "table/event_log.xs" -i "table/user.xs" --force`. O `--dry-run` revisado lista só `UPDATE` e `UPDATE_FIELD` em `event_log`, e `user` fica igual ao publicado. Depois, repetir o `--dry-run` com os mesmos `-i`: ele deve responder "No changes to push".
 - **Sem prova ao vivo, por falta de dados:**
   - nomes de autor e mecânico pelos apelidos de join (exige uma OS);
   - contagem de itens da lista de entradas (exige uma entrada);

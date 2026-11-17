@@ -152,6 +152,11 @@ class SecurityContractTests(unittest.TestCase):
             with self.subTest(path=path.relative_to(XANO).as_posix()):
                 self.assertIsNone(re.search(r"metadata:\s*\$user\d*\s*$", content, re.MULTILINE))
 
+    def test_own_event_logs_are_filtered_by_an_indexed_user(self):
+        # Change 16 (item 7): logs/user/my_events filters by user_id only.
+        self.assertIn("where = $db.event_log.user_id == $auth.id", self.read("api/event_logs/logs/user/my_events_GET.xs"))
+        self.assertIn('{type: "btree", field: [{name: "user_id"}]}', self.read("table/event_log.xs"))
+
     def test_signup_does_not_issue_tokens_for_other_users(self):
         content = self.read("api/authentication/auth/signup_POST.xs")
         self.assertNotIn("security.create_auth_token", content)

@@ -12,7 +12,7 @@ Revisão das tabelas e dos endpoints pedida em 2026-10-22, depois do incidente d
 
 O objetivo é alinhar o versionado com o publicado, tirar as leituras por registro (N+1) dos fluxos de Balcão, Oficina e Entradas, conferir que nenhuma alteração de status ou de estoque escapa das travas de versão, garantir que toda recusa responda com o status HTTP certo e limpar o schema.
 
-**Ampliação de 2026-11-11:** o escopo passou a incluir os JOINs de Balcão, Oficina e Entradas, a trava de concorrência em Vendas e Estoque, a auditoria de 403 em todos os `.xs` e a limpeza de schema. A pasta foi renomeada de `xano-integridade-desempenho` para `change-16-otimizacao-concorrencia-xano`; os itens 1 a 8 mantêm a numeração, porque `xano/table/modelos_moto.xs` cita o item 5.
+**Ampliação de 2026-11-11:** o escopo passou a incluir os JOINs de Balcão, Oficina e Entradas, a trava de concorrência em Vendas e Estoque, a auditoria de 403 em todos os `.xs` e a limpeza de schema. A pasta foi renomeada de `xano-integridade-desempenho` para `change-16-otimizacao-concorrencia-xano`; os itens 1 a 8 mantêm a numeração, porque `xano/table/modelos_moto.xs` citava o item 5 (o comentário saiu com a coluna, em 2026-11-17).
 
 ## Mapeamento de 2026-11-11
 
@@ -86,9 +86,9 @@ Ampliação de 2026-11-11:
 
 **Com mudança de banco** (cada item precisa de OK antes de editar e de novo antes do push):
 
-5. **`modelos_moto`:** a Change 17 versionou `galeria` e `default_motos` como publicadas e levou a `galeria` à vitrine e a `/vendas`. Resta decidir `default_motos`; a recomendação é removê-la, porque repete a convenção de arquivo local `default_<slug>.png`, que a Change 17 eliminou. **Não executado:** a remoção exige `--sync` e o OK do usuário. Transferido para os débitos conhecidos de `docs/quality.md` (2026-11-16).
+5. **`modelos_moto`:** a Change 17 versionou `galeria` e `default_motos` como publicadas e levou a `galeria` à vitrine e a `/vendas`. Resta decidir `default_motos`; a recomendação é removê-la, porque repete a convenção de arquivo local `default_<slug>.png`, que a Change 17 eliminou. **Feito (2026-11-17):** removida e publicada com `--sync`, com o OK do usuário.
 6. **`entrada_mercadoria`:** ~~índice único em (`id_fornecedor`, `numero_documento`)~~. **Correção (2026-11-11):** o índice já existe desde a Change 5 e já protege os envios simultâneos do mesmo documento. Nada a fazer no banco; falta só o cenário concorrente do item 17.
-7. **`event_log`:** índice em `user_id`, filtro de `GET logs/user/my_events`. **Não executado:** é mudança de banco e exige o OK do usuário. Transferido para os débitos conhecidos (2026-11-16).
+7. **`event_log`:** índice em `user_id`, filtro de `GET logs/user/my_events`. **Feito (2026-11-17):** índice btree publicado com o OK do usuário. O mesmo push deixou a FK `user_id → user` vazia no publicado, e a correção aguarda o OK do usuário (débitos conhecidos de `docs/quality.md`).
 8. **`motos.id_modelo`:** é anulável por causa das unidades anteriores à Change 8, que usam `marca` e `modelo` legados. Uma unidade criada pelo painel sem modelo nunca aparece na vitrine e aparece em `/vendas` sem nome nem cores. As opções são:
    - tornar o campo obrigatório depois de atribuir um modelo às unidades legadas (`--sync`);
    - manter como está e documentar que motos se cadastram pelo app.
@@ -136,9 +136,9 @@ Proposta em 2026-10-22 e ampliada em 2026-11-11. Em 2026-11-14 o usuário aprovo
 
 Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos commits, "fase 1" e "fase 2"), e o item 3 foi descartado. Em 2026-11-15, as recusas do VENDEDOR e do MECANICO deram 403 ao vivo, e as leituras do GERENTE passaram. O item 8 foi decidido sem mudança de banco.
 
-**Arquivada em 2026-11-15.** Foram para a seção "Débitos conhecidos" de `docs/quality.md`:
+**Arquivada em 2026-11-15.** Os itens de banco 5 e 7 foram transferidos e depois publicados, em 2026-11-17. Estão na seção "Débitos conhecidos" de `docs/quality.md`:
 
-- os itens de banco 5 e 7, que não foram executados e exigem o OK do usuário;
+- a FK `event_log.user_id → user`, que ficou vazia no publicado após o push dos itens 5 e 7;
 - a ordem do resumo no item 4, que só pode ser conferida com 2 ou mais operações no período (a leitura como GERENTE passou em 2026-11-15);
 - a recusa do MECANICO no balcão, que precisa de um produto ativo;
 - os testes de escrita e concorrência do item 17, que dependem de um workspace de homologação.

@@ -53,9 +53,11 @@ Regras importantes:
 3. Conferir com um `pull` que o enum do livro tem `SAIDA_VENDA` (confirmado em 2026-10-11).
 4. Rodar a integração: `XANO_TEST_LIVE=true` (mecânico barrado e carrinhos inválidos), `XANO_TEST_ALLOW_WRITES=true` (consumidor final, cliente com repetição da chave, saldo insuficiente e preço alterado) e `XANO_TEST_CONCURRENCY=true` (duas vendas pelo saldo inteiro).
 
-O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz, uma diferença cosmética. Desde a Change 17 (2026-10-27), `galeria` e `default_motos` estão versionadas como publicadas; o push completo lista dois `UPDATE_FIELD` nelas, sem `DROP_FIELD`. Publique com `-i` nos arquivos alterados, porque o push completo também atualiza o grupo `HARLEY` (placeholder do token do Swagger).
+O `--dry-run` sempre lista `UPDATE table modelos_moto`: o remoto tem o padrão `false` em `destaque`, mas o texto que ele guarda não o traz, uma diferença cosmética. A `galeria` está versionada como publicada desde a Change 17 (2026-10-27). A `default_motos` foi removida em 2026-11-17 (Change 16, item 5), com `--sync`, porque um push parcial não remove coluna. Desde então, o `--dry-run` de `table/modelos_moto.xs` lista só esse `UPDATE`. Publique com `-i` nos arquivos alterados, porque o push completo também atualiza o grupo `HARLEY` (placeholder do token do Swagger).
 
 Um push com `-i` pode listar **Unresolved References** para tabelas e funções que existem, e dizer que elas "virarão placeholders". Esse aviso não aparece no `--dry-run`. Com o filtro, a CLI só resolve referências dentro dos arquivos incluídos (Change 16, 2026-11-14). Para confirmar que nada virou placeholder, repita o `--dry-run` com os mesmos `-i` logo depois do push: ele deve responder "No changes to push".
+
+Numa **tabela**, o aviso é real. Em 2026-11-17, o push de `table/event_log.xs` sem `table/user.xs` gravou `table = ""` na FK `event_log.user_id`, e o `--dry-run` seguinte mostrou o `UPDATE_FIELD`. Ao publicar uma tabela com FK, inclua no `-i` as tabelas referenciadas. Quando elas estão iguais ao publicado, o `--dry-run` não lista mudança nelas.
 
 ### Checklist de deploy da Change 10 (fechamento financeiro)
 
