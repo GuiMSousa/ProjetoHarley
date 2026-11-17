@@ -59,6 +59,8 @@ Um push com `-i` pode listar **Unresolved References** para tabelas e funções 
 
 Numa **tabela**, o aviso é real. Em 2026-11-17, o push de `table/event_log.xs` sem `table/user.xs` gravou `table = ""` na FK `event_log.user_id`, e o `--dry-run` seguinte mostrou o `UPDATE_FIELD`. Ao publicar uma tabela com FK, inclua no `-i` as tabelas referenciadas. Quando elas estão iguais ao publicado, o `--dry-run` não lista mudança nelas.
 
+Na correção, `table/user.xs` gerou o mesmo aviso para `funcionarios`, que ficou fora do `-i`, mas o pull mostrou a FK `user.id_funcionario` intacta. O aviso nem sempre se cumpre; quem decide é o `--dry-run` feito depois do push, ou um pull.
+
 ### Checklist de deploy da Change 10 (fechamento financeiro)
 
 1. Revisar `xano workspace push -d ./xano --dry-run`. Esperado, sem exclusões e sem `--sync`:

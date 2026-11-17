@@ -88,7 +88,7 @@ Ampliação de 2026-11-11:
 
 5. **`modelos_moto`:** a Change 17 versionou `galeria` e `default_motos` como publicadas e levou a `galeria` à vitrine e a `/vendas`. Resta decidir `default_motos`; a recomendação é removê-la, porque repete a convenção de arquivo local `default_<slug>.png`, que a Change 17 eliminou. **Feito (2026-11-17):** removida e publicada com `--sync`, com o OK do usuário.
 6. **`entrada_mercadoria`:** ~~índice único em (`id_fornecedor`, `numero_documento`)~~. **Correção (2026-11-11):** o índice já existe desde a Change 5 e já protege os envios simultâneos do mesmo documento. Nada a fazer no banco; falta só o cenário concorrente do item 17.
-7. **`event_log`:** índice em `user_id`, filtro de `GET logs/user/my_events`. **Feito (2026-11-17):** índice btree publicado com o OK do usuário. O mesmo push deixou a FK `user_id → user` vazia no publicado, e a correção aguarda o OK do usuário (débitos conhecidos de `docs/quality.md`).
+7. **`event_log`:** índice em `user_id`, filtro de `GET logs/user/my_events`. **Feito (2026-11-17):** índice btree publicado com o OK do usuário. O mesmo push deixou a FK `user_id → user` vazia no publicado, e ela foi restaurada no mesmo dia, com `table/user.xs` no `-i`.
 8. **`motos.id_modelo`:** é anulável por causa das unidades anteriores à Change 8, que usam `marca` e `modelo` legados. Uma unidade criada pelo painel sem modelo nunca aparece na vitrine e aparece em `/vendas` sem nome nem cores. As opções são:
    - tornar o campo obrigatório depois de atribuir um modelo às unidades legadas (`--sync`);
    - manter como está e documentar que motos se cadastram pelo app.
@@ -138,7 +138,6 @@ Os itens 2 e 9 a 16 foram publicados em 2026-11-14, nas Entregas 1 e 2 (nos comm
 
 **Arquivada em 2026-11-15.** Os itens de banco 5 e 7 foram transferidos e depois publicados, em 2026-11-17. Estão na seção "Débitos conhecidos" de `docs/quality.md`:
 
-- a FK `event_log.user_id → user`, que ficou vazia no publicado após o push dos itens 5 e 7;
 - a ordem do resumo no item 4, que só pode ser conferida com 2 ou mais operações no período (a leitura como GERENTE passou em 2026-11-15);
 - a recusa do MECANICO no balcão, que precisa de um produto ativo;
 - os testes de escrita e concorrência do item 17, que dependem de um workspace de homologação.
