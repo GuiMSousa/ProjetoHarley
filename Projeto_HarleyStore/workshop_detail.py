@@ -390,6 +390,8 @@ def historico_moto_row(row: rx.Var) -> rx.Component:
         ),
         width="100%",
         align="center",
+        # ~32rem of content: unwrapped, the OS modal scrolled sideways at 320px and hid "Ver".
+        wrap="wrap",
         padding="0.4rem 0",
         border_bottom=f"1px solid {COLORS['border']}",
     )

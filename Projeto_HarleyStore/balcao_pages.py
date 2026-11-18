@@ -68,7 +68,8 @@ def produtos_panel() -> rx.Component:
                 value=BalcaoState.categoria,
                 on_change=BalcaoState.set_categoria,
                 disabled=BalcaoState.is_loading_list,
-                aria_label="Filtrar por categoria",
+                # aria_label would land on Select.Root, which renders no element.
+                custom_attrs={"aria-label": "Filtrar por categoria"},
                 width="100%",
             ),
             toolbar(

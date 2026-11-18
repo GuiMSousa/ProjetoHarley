@@ -7,6 +7,7 @@ from pathlib import Path
 import reflex as rx
 from reflex.state import State
 
+from Projeto_HarleyStore.balcao_pages import produtos_panel
 from Projeto_HarleyStore.balcao_state import BalcaoState
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_state import CatalogoState
@@ -15,6 +16,7 @@ from Projeto_HarleyStore.entradas_pages import item_form_row
 from Projeto_HarleyStore.entradas_state import EntradasState
 from Projeto_HarleyStore.ui_helpers import modal_header
 from Projeto_HarleyStore.vendas_state import VendasState
+from Projeto_HarleyStore.workshop_detail import historico_moto_row
 from Projeto_HarleyStore.workshop_state import WorkshopState
 
 from tests.event_runner import run_event
@@ -131,6 +133,20 @@ class EntradaItemRowTests(unittest.TestCase):
         nodes = walk(item_form_row(EntradasState.itens_form[0], rx.Var.create(0)))
         trigger = next(c for c in nodes if type(c).__name__ == "SelectTrigger")
         self.assertEqual(trigger.custom_attrs, {"aria-label": "Produto do item"})
+
+
+class NarrowScreenReviewTests(unittest.TestCase):
+    """Findings of the 2026-11-18 review of f43e7ba, measured in Edge at 320 and 360px."""
+
+    def test_os_history_row_wraps_so_ver_stays_inside_the_modal(self):
+        # Unwrapped, the row held 514px of content and the OS modal scrolled 252px sideways at 320px.
+        row = historico_moto_row(WorkshopState.historico_moto[0])
+        self.assertEqual(getattr(row.wrap, "_var_value", None), "wrap")
+
+    def test_counter_category_filter_names_its_trigger(self):
+        # With aria_label (on Select.Root) Edge exposed "combobox: Todas as categorias", without a name.
+        trigger = next(c for c in walk(produtos_panel()) if type(c).__name__ == "SelectTrigger")
+        self.assertEqual(trigger.custom_attrs, {"aria-label": "Filtrar por categoria"})
 
 
 class FocusScriptTests(unittest.TestCase):
