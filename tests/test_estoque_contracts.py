@@ -237,12 +237,24 @@ class EstoqueContractTests(unittest.TestCase):
         self.assertEqual(re.findall(r"db\.query (\w+)", listing), ["entrada_mercadoria", "itens_compra_estoque"])
         self.assertNotIn('type: "count"', listing)
         self.assertLess(listing.index("db.query itens_compra_estoque"), listing.index("foreach ($entradas)"))
-        # Keys are prefixed: a digits-only path may be read as an array index.
-        self.assertIn('value = "e" ~ $item.id_entrada', listing)
-        self.assertIn('value = "e" ~ $entrada.id', listing)
-        self.assertEqual(listing.count("value = $quantidades|get:$chave:0"), 2)
-        self.assertIn("value = $quantidades|set:$chave:$quantidade", listing)
-        self.assertIn('value = $entrada|set:"quantidade_itens":$quantidade', listing)
+        # Keys are prefixed: a digits-only path may be read as an array index. Each loop body is pinned
+        # whole, whitespace collapsed: the key is computed before get/set, and the get writes the
+        # variable the next step reads (a swap or a stray name passes line-by-line checks).
+        steps = " ".join(listing.split())
+        self.assertIn(
+            'each as $item { var.update $chave { value = "e" ~ $item.id_entrada } '
+            "var.update $quantidade { value = $quantidades|get:$chave:0 } "
+            "var.update $quantidade { value = $quantidade + 1 } "
+            "var.update $quantidades { value = $quantidades|set:$chave:$quantidade } }",
+            steps,
+        )
+        self.assertIn(
+            'each as $entrada { var.update $chave { value = "e" ~ $entrada.id } '
+            "var.update $quantidade { value = $quantidades|get:$chave:0 } "
+            'var.update $linha { value = $entrada|set:"quantidade_itens":$quantidade } '
+            "var.update $model { value = $model|push:$linha } }",
+            steps,
+        )
         # 2026-11-18: a parenthesized expression as a filter argument, e.g. get:("e" ~ $x), passed the
         # validator and failed at runtime with HTTP 500 "Invalid expression".
         self.assertNotIn(":(", listing)

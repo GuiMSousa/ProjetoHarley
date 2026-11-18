@@ -39,14 +39,14 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 459 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 459 passaram e 45 foram desmarcados (2026-11-18, com o contrato de filtros da venda de balcão);
+- pytest offline (`-m "not integration and not browser"`): 459 passaram e 45 foram desmarcados, 42 de integração e 3 de navegador, contados com `--collect-only` (2026-11-18, com os contratos de ordem dos mapas de balcão e entradas). A execução sem `-m` não foi repetida;
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
   - GERENTE (2026-11-18): com as primeiras entradas, `GET entrada_mercadoria` respondia `500 "Invalid expression"`. Depois da correção, respondeu 200 com 2 entradas, cada uma com `quantidade_itens` inteiro (3), aceito pelo DTO;
   - sem prova ao vivo: a ordem do resumo (0 operações em produção) e a recusa do MECANICO no balcão (sem produto ativo);
 - `reflex compile --dry`: OK;
-- validador do MCP `xano-developer`: 129 `.xs` válidos;
+- validador do `@xano/developer-mcp` 2.2.6, rodado localmente em Node a partir do pacote em cache, porque o MCP `xano-developer` não conectava: 129 `.xs` válidos (2026-11-18);
 - smoke de navegador: não repetido, porque cobre só o catálogo e o login, que esta change não alterou. Última execução: 3 passaram em 2026-10-27, com o catálogo público real.
 
 **Tipos:** não há checker estático. As Vars e os componentes do Reflex são dinâmicos, então mypy ou pyright gerariam ruído antes de achar defeitos; as fronteiras externas já são validadas em runtime pelo pydantic. Vale revisitar se a camada `services/` crescer sem cobertura de testes.

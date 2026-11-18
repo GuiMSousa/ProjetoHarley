@@ -136,13 +136,22 @@ class VendaBalcaoEndpointTests(unittest.TestCase):
 
     def test_quantity_map_uses_prefixed_keys(self):
         # Change 16: a digits-only path may be read as an array index, so the keys carry a prefix.
+        # Whole blocks, whitespace collapsed: the key is computed before get/set, and the get writes
+        # the variable the next step reads (a swap or a stray name passes line-by-line checks).
         self.assertNotIn("|to_text", self.content)
-        self.assertIn('value = "p" ~ $item_pedido.id_produto', self.prechecks)
-        self.assertIn("value = $quantidades|set:$chave:$item_pedido.quantidade", self.prechecks)
-        self.assertIn('value = "p" ~ $produto_atual.id', self.transaction)
-        self.assertIn("value = $quantidades|get:$chave\n", self.transaction)
-        self.assertIn("quantidade      : $quantidade_item\n", self.transaction)
-        self.assertIn("valor_total_item: ($quantidade_item * $produto_atual.preco_venda)|round:2", self.transaction)
+        self.assertIn(
+            'var.update $chave { value = "p" ~ $item_pedido.id_produto } '
+            "var.update $quantidades { value = $quantidades|set:$chave:$item_pedido.quantidade }",
+            " ".join(self.prechecks.split()),
+        )
+        self.assertIn(
+            'var.update $chave { value = "p" ~ $produto_atual.id } '
+            "var.update $quantidade_item { value = $quantidades|get:$chave } "
+            "var.update $linha { value = { id_produto : $produto_atual.id quantidade : $quantidade_item "
+            "valor_unitario : $produto_atual.preco_venda "
+            "valor_total_item: ($quantidade_item * $produto_atual.preco_venda)|round:2 } }",
+            " ".join(self.transaction.split()),
+        )
 
     def test_filters_never_take_a_parenthesized_argument(self):
         # 2026-11-18: get:("e" ~ $x) passed the validator and failed live with HTTP 500 "Invalid
