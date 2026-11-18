@@ -120,9 +120,15 @@ query "balcao/vendas" verb=POST {
         }
 
         // Quantidade pedida por produto, usada dentro da transação. A chave leva o prefixo "p"
-        // porque um caminho só com dígitos pode ser lido como índice de array (Change 16).
+        // porque um caminho só com dígitos pode ser lido como índice de array (Change 16). Ela é
+        // calculada num passo próprio: get/set com o caminho entre parênteses passa no validador e
+        // falha em execução com "Invalid expression", como na lista de entradas (2026-11-18).
         var $quantidades {
           value = {}
+        }
+
+        var $chave {
+          value = ""
         }
 
         var $produto_previo {
@@ -149,8 +155,12 @@ query "balcao/vendas" verb=POST {
               value = $total_previo + (($item_pedido.quantidade * $produto_previo.preco_venda)|round:2)
             }
 
+            var.update $chave {
+              value = "p" ~ $item_pedido.id_produto
+            }
+
             var.update $quantidades {
-              value = $quantidades|set:("p" ~ $item_pedido.id_produto):$item_pedido.quantidade
+              value = $quantidades|set:$chave:$item_pedido.quantidade
             }
           }
         }
@@ -190,6 +200,10 @@ query "balcao/vendas" verb=POST {
                   value = 0
                 }
 
+                var $quantidade_item {
+                  value = 0
+                }
+
                 foreach ($produtos) {
                   each as $produto_atual {
                     precondition ($produto_atual.ativo != false) {
@@ -197,12 +211,20 @@ query "balcao/vendas" verb=POST {
                       error = "Produto inativo ou inexistente."
                     }
 
+                    var.update $chave {
+                      value = "p" ~ $produto_atual.id
+                    }
+
+                    var.update $quantidade_item {
+                      value = $quantidades|get:$chave
+                    }
+
                     var.update $linha {
                       value = {
                         id_produto      : $produto_atual.id
-                        quantidade      : $quantidades|get:("p" ~ $produto_atual.id)
+                        quantidade      : $quantidade_item
                         valor_unitario  : $produto_atual.preco_venda
-                        valor_total_item: (($quantidades|get:("p" ~ $produto_atual.id)) * $produto_atual.preco_venda)|round:2
+                        valor_total_item: ($quantidade_item * $produto_atual.preco_venda)|round:2
                       }
                     }
 

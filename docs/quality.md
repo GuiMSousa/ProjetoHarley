@@ -39,7 +39,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 458 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 458 passaram e 45 foram desmarcados (2026-11-18, com os testes de largura do modal de entradas);
+- pytest: 459 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 459 passaram e 45 foram desmarcados (2026-11-18, com o contrato de filtros da venda de balcão);
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
@@ -111,7 +111,8 @@ Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem 
 
 - **Ordem do `Financeiro/resumo_operacoes`:** conferir, com uma sessão de GERENTE, se a lista vem da operação mais recente para a mais antiga. A conferência exige 2 ou mais operações no período, e produção tinha 0 nos últimos 360 dias em 2026-11-15. A documentação do `sort` é contraditória: chama o terceiro argumento de `asc`, mas o exemplo com `true` devolve a lista decrescente. Se a ordem vier invertida, o limite de 500 guarda as operações mais antigas.
 - **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.
-- **Mesmo padrão na venda de balcão:** `balcao/vendas_POST.xs` (linhas 153, 203 e 205) usa `("p" ~ …)` como argumento de `get`/`set`, a forma que quebrou a lista de entradas (`500 "Invalid expression"`, corrigida em 2026-11-18). Nunca rodou com dados e pode falhar do mesmo jeito na primeira venda.
+- **Venda de balcão:** `balcao/vendas_POST.xs` usava `("p" ~ …)` como caminho de `get`/`set`, a forma que quebrou a lista de entradas (`500 "Invalid expression"`, corrigida em 2026-11-18). A correção foi publicada em produção em 2026-11-18, e o `--dry-run` seguinte respondeu "No changes to push". Falta só a prova ao vivo, que é a primeira venda real no balcão.
+- **Expressão entre parênteses como valor de filtro:** a forma documentada (`map:($$|to_upper)`, `push:("…" ~ $x)`) continua em 13 pontos de 11 arquivos, nenhum com prova ao vivo registrada. Os que já rodam com dados merecem uma conferência na primeira vez: `function/estoque/detalhe_entrada.xs` (detalhe de entrada) e `function/vendas/detalhe_moto.xs` (detalhe de unidade).
 - **Sem prova ao vivo, por falta de dados:**
   - nomes de autor e mecânico pelos apelidos de join (exige uma OS);
   - recusa do MECANICO no balcão (exige um produto ativo);

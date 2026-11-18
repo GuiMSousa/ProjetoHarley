@@ -137,8 +137,17 @@ class VendaBalcaoEndpointTests(unittest.TestCase):
     def test_quantity_map_uses_prefixed_keys(self):
         # Change 16: a digits-only path may be read as an array index, so the keys carry a prefix.
         self.assertNotIn("|to_text", self.content)
-        self.assertIn('$quantidades|set:("p" ~ $item_pedido.id_produto):$item_pedido.quantidade', self.prechecks)
-        self.assertEqual(self.transaction.count('$quantidades|get:("p" ~ $produto_atual.id)'), 2)
+        self.assertIn('value = "p" ~ $item_pedido.id_produto', self.prechecks)
+        self.assertIn("value = $quantidades|set:$chave:$item_pedido.quantidade", self.prechecks)
+        self.assertIn('value = "p" ~ $produto_atual.id', self.transaction)
+        self.assertIn("value = $quantidades|get:$chave\n", self.transaction)
+        self.assertIn("quantidade      : $quantidade_item\n", self.transaction)
+        self.assertIn("valor_total_item: ($quantidade_item * $produto_atual.preco_venda)|round:2", self.transaction)
+
+    def test_filters_never_take_a_parenthesized_argument(self):
+        # 2026-11-18: get:("e" ~ $x) passed the validator and failed live with HTTP 500 "Invalid
+        # expression" in GET entrada_mercadoria; this endpoint had the same form with "p".
+        self.assertNotIn(":(", self.content)
 
     def test_transaction_writes_header_items_and_stock_exits_in_product_order(self):
         ordered = self.transaction.index("where = $db.produtos.id in $ids_produto")
