@@ -11,6 +11,7 @@ from Projeto_HarleyStore.balcao_state import BalcaoState
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_state import CatalogoState
 from Projeto_HarleyStore.components import MODAL_FOCUS_SCRIPT, modal_panel
+from Projeto_HarleyStore.entradas_pages import item_form_row
 from Projeto_HarleyStore.entradas_state import EntradasState
 from Projeto_HarleyStore.ui_helpers import modal_header
 from Projeto_HarleyStore.vendas_state import VendasState
@@ -105,6 +106,31 @@ class ModalPanelTests(unittest.TestCase):
         self.assertEqual(type(header.children[0]).__name__, "DialogTitle")
         fechar = next(c for c in walk(header) if type(c).__name__ == "Button")
         self.assertEqual([s.handler.fn for s in fechar.event_triggers["on_click"].events], [CatalogoState.close_detail.fn])
+
+    def test_content_width_never_follows_long_unbreakable_content(self):
+        # 2026-11-18: a long option text made "Nova entrada" 832px wide on a 320px screen.
+        self.assertEqual(style_of(self.content)["contain"], "inline-size")
+
+
+def style_of(component) -> dict[str, str]:
+    return {key: getattr(value, "_var_value", value) for key, value in dict(component.style).items()}
+
+
+class EntradaItemRowTests(unittest.TestCase):
+    def test_quantity_and_cost_keep_their_width_beside_a_long_product(self):
+        # 2026-11-18: the select trigger never shrinks (Radix flex-shrink 0) and, at width 100%,
+        # squeezed quantity and cost to 0px at every screen width.
+        nodes = list(walk(item_form_row(EntradasState.itens_form[0], rx.Var.create(0))))
+        wrapper = next(c for c in nodes if any(type(child).__name__ == "SelectRoot" for child in c.children))
+        self.assertEqual(style_of(wrapper), {"flex": "1 1 16rem", "minWidth": "0"})
+        fields = [style_of(c) for c in nodes if type(c).__name__ == "DebounceInput"]
+        self.assertEqual(fields, [{"width": "6rem", "flexShrink": "0"}, {"width": "8rem", "flexShrink": "0"}])
+
+    def test_product_select_names_its_trigger(self):
+        # aria_label on rx.select lands on Select.Root, which renders no element.
+        nodes = walk(item_form_row(EntradasState.itens_form[0], rx.Var.create(0)))
+        trigger = next(c for c in nodes if type(c).__name__ == "SelectTrigger")
+        self.assertEqual(trigger.custom_attrs, {"aria-label": "Produto do item"})
 
 
 class FocusScriptTests(unittest.TestCase):

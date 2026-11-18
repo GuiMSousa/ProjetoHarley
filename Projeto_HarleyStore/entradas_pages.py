@@ -80,41 +80,56 @@ def detail_modal() -> rx.Component:
 
 def item_form_row(item: rx.Var, index: rx.Var) -> rx.Component:
     return rx.hstack(
-        rx.select(
-            EntradasState.produto_options,
-            value=item["produto"],
-            on_change=lambda value: EntradasState.set_item_field(index, "produto", value),
-            placeholder="Selecione um produto",
-            aria_label="Produto do item",
-            width="100%",
+        # Radix never lets a select trigger shrink (flex-shrink 0), so this wrapper sizes it; a
+        # long product name is cut with an ellipsis. Below ~34rem the fields drop to a line below.
+        rx.box(
+            rx.select(
+                EntradasState.produto_options,
+                value=item["produto"],
+                on_change=lambda value: EntradasState.set_item_field(index, "produto", value),
+                placeholder="Selecione um produto",
+                width="100%",
+                # aria_label would land on Select.Root, which renders no element.
+                custom_attrs={"aria-label": "Produto do item"},
+            ),
+            flex="1 1 16rem",
+            min_width="0",
         ),
-        rx.input(
-            value=item["quantidade"],
-            on_change=lambda value: EntradasState.set_item_field(index, "quantidade", value),
-            placeholder="Qtd.",
-            aria_label="Quantidade do item",
-            type="number",
-            min=1,
-            width="6rem",
-        ),
-        rx.input(
-            value=item["valor_unitario"],
-            on_change=lambda value: EntradasState.set_item_field(index, "valor_unitario", value),
-            placeholder="Preço de custo",
-            aria_label="Preço de custo do item",
-            input_mode="decimal",
-            width="9rem",
-        ),
-        rx.icon_button(
-            rx.icon("trash-2"),
-            on_click=EntradasState.remove_item(index),
-            disabled=EntradasState.itens_form.length() <= 1,
-            variant="ghost",
-            color_scheme="red",
-            aria_label="Remover item",
+        rx.hstack(
+            rx.input(
+                value=item["quantidade"],
+                on_change=lambda value: EntradasState.set_item_field(index, "quantidade", value),
+                placeholder="Qtd.",
+                aria_label="Quantidade do item",
+                type="number",
+                min=1,
+                width="6rem",
+                flex_shrink="0",
+            ),
+            rx.input(
+                value=item["valor_unitario"],
+                on_change=lambda value: EntradasState.set_item_field(index, "valor_unitario", value),
+                placeholder="Custo (R$)",
+                aria_label="Preço de custo do item",
+                input_mode="decimal",
+                width="8rem",
+                flex_shrink="0",
+            ),
+            rx.icon_button(
+                rx.icon("trash-2"),
+                on_click=EntradasState.remove_item(index),
+                disabled=EntradasState.itens_form.length() <= 1,
+                variant="ghost",
+                color_scheme="red",
+                aria_label="Remover item",
+                flex_shrink="0",
+            ),
+            align="center",
+            wrap="wrap",
         ),
         width="100%",
         align="center",
+        wrap="wrap",
     )
 
 
@@ -132,7 +147,8 @@ def entrada_form_modal() -> rx.Component:
                     placeholder="Selecione um fornecedor ativo",
                     width="100%",
                 ),
-                flex="2",
+                flex="2 1 16rem",
+                min_width="0",
             ),
             labeled(
                 "Número do documento",
@@ -142,7 +158,8 @@ def entrada_form_modal() -> rx.Component:
                     placeholder="NF-000123",
                     width="100%",
                 ),
-                flex="1",
+                flex="1 1 10rem",
+                min_width="0",
             ),
             width="100%",
             align="end",
@@ -171,6 +188,7 @@ def entrada_form_modal() -> rx.Component:
             ),
             width="100%",
             align="center",
+            wrap="wrap",
         ),
         rx.text(
             "O total é recalculado pelo servidor e o estoque é atualizado na mesma operação.",

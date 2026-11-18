@@ -39,7 +39,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest: 455 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 455 passaram e 45 foram desmarcados (2026-11-17, com o contrato do índice de `event_log`);
+- pytest: 458 passaram, 45 pulados (42 de integração e 3 de navegador); com `-m "not integration and not browser"`, 458 passaram e 45 foram desmarcados (2026-11-18, com os testes de largura do modal de entradas);
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;

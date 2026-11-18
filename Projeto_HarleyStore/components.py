@@ -478,6 +478,9 @@ def modal_panel(*children: rx.Component, on_close: rx.EventHandler, width: str =
             on_close_auto_focus=rx.call_script(RESTORE_FOCUS_SCRIPT),
             width=width,
             max_width="100%",
+            # Long unbreakable content (a select's option text) no longer widens the dialog past
+            # the screen: its width comes only from ``width``, and the content wraps or scrolls inside.
+            contain="inline-size",
             max_height="90vh",
             overflow_y="auto",
             # Scrolling a long form never scrolls the page behind the overlay.
