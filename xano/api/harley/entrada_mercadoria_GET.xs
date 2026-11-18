@@ -43,14 +43,37 @@ query entrada_mercadoria verb=GET {
       return = {type: "list"}
     } as $itens
 
+    // Os filtros só recebem variáveis: chave e contagem são calculadas antes, em passos próprios.
+    // Uma expressão entre parênteses como argumento de get/set passava no validador e falhava em
+    // execução com HTTP 500 "Invalid expression" assim que havia itens (2026-11-18).
     var $quantidades {
       value = {}
     }
 
+    var $chave {
+      value = ""
+    }
+
+    var $quantidade {
+      value = 0
+    }
+
     foreach ($itens) {
       each as $item {
+        var.update $chave {
+          value = "e" ~ $item.id_entrada
+        }
+
+        var.update $quantidade {
+          value = $quantidades|get:$chave:0
+        }
+
+        var.update $quantidade {
+          value = $quantidade + 1
+        }
+
         var.update $quantidades {
-          value = $quantidades|set:("e" ~ $item.id_entrada):(($quantidades|get:("e" ~ $item.id_entrada):0) + 1)
+          value = $quantidades|set:$chave:$quantidade
         }
       }
     }
@@ -59,10 +82,26 @@ query entrada_mercadoria verb=GET {
       value = []
     }
 
+    var $linha {
+      value = {}
+    }
+
     foreach ($entradas) {
       each as $entrada {
+        var.update $chave {
+          value = "e" ~ $entrada.id
+        }
+
+        var.update $quantidade {
+          value = $quantidades|get:$chave:0
+        }
+
+        var.update $linha {
+          value = $entrada|set:"quantidade_itens":$quantidade
+        }
+
         var.update $model {
-          value = $model|push:($entrada|set:"quantidade_itens":($quantidades|get:("e" ~ $entrada.id):0))
+          value = $model|push:$linha
         }
       }
     }

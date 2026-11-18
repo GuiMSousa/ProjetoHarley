@@ -238,11 +238,14 @@ class EstoqueContractTests(unittest.TestCase):
         self.assertNotIn('type: "count"', listing)
         self.assertLess(listing.index("db.query itens_compra_estoque"), listing.index("foreach ($entradas)"))
         # Keys are prefixed: a digits-only path may be read as an array index.
-        self.assertIn(
-            '$quantidades|set:("e" ~ $item.id_entrada):(($quantidades|get:("e" ~ $item.id_entrada):0) + 1)',
-            listing,
-        )
-        self.assertIn('set:"quantidade_itens":($quantidades|get:("e" ~ $entrada.id):0)', listing)
+        self.assertIn('value = "e" ~ $item.id_entrada', listing)
+        self.assertIn('value = "e" ~ $entrada.id', listing)
+        self.assertEqual(listing.count("value = $quantidades|get:$chave:0"), 2)
+        self.assertIn("value = $quantidades|set:$chave:$quantidade", listing)
+        self.assertIn('value = $entrada|set:"quantidade_itens":$quantidade', listing)
+        # 2026-11-18: a parenthesized expression as a filter argument, e.g. get:("e" ~ $x), passed the
+        # validator and failed at runtime with HTTP 500 "Invalid expression".
+        self.assertNotIn(":(", listing)
 
     def test_supplier_reads_are_manager_only(self):
         for relative_path in (
