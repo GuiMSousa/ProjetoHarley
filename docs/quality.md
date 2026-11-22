@@ -35,11 +35,11 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 | XanoScript | Validador do MCP `xano-developer` e `xano workspace push -d ./xano --dry-run` | Sintaxe dos `.xs` e o diff que o push aplicaria | Nada é publicado; o push exige o OK do usuário |
 | Tipos | indisponível | — | — |
 
-**Referência em 2026-11-14 (Change 16: JOINs, travas de estoque e limites):**
+**Referência em 2026-11-22 (Change 16, de 2026-11-14, e correções até 2026-11-22; cada item traz a data da última execução):**
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest offline (`-m "not integration and not browser"`): 461 passaram e 45 foram desmarcados, 42 de integração e 3 de navegador, contados com `--collect-only` (2026-11-18, com os testes do histórico da OS e do filtro de categoria do balcão). A execução sem `-m` não foi repetida;
+- pytest offline (`-m "not integration and not browser"`): 463 passaram e 45 foram desmarcados, 42 de integração e 3 de navegador, contados com `--collect-only` (2026-11-22, com o teste da descrição no histórico da OS e o de nomes de todos os `rx.select`). A execução sem `-m` não foi repetida;
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
@@ -47,7 +47,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
   - sem prova ao vivo: a ordem do resumo (0 operações em produção) e a recusa do MECANICO no balcão (sem produto ativo);
 - `reflex compile --dry`: OK;
 - validador do `@xano/developer-mcp` 2.2.6, rodado localmente em Node a partir do pacote em cache, porque o MCP `xano-developer` não conectava: 129 `.xs` válidos (2026-11-18);
-- smoke de navegador: não repetido, porque cobre só o catálogo e o login, que esta change não alterou. Última execução: 3 passaram em 2026-10-27, com o catálogo público real.
+- smoke de navegador: 3 passaram em 2026-11-17 e em 2026-11-18, antes do commit `f43e7ba`, contra o app local e com o catálogo público real. Cobre só o catálogo e o login: a oficina e o balcão foram medidos no Edge com páginas de dados fictícios, sem Xano.
 
 **Tipos:** não há checker estático. As Vars e os componentes do Reflex são dinâmicos, então mypy ou pyright gerariam ruído antes de achar defeitos; as fronteiras externas já são validadas em runtime pelo pydantic. Vale revisitar se a camada `services/` crescer sem cobertura de testes.
 

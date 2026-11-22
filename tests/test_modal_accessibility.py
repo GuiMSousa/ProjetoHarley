@@ -67,6 +67,26 @@ def modal_calls() -> dict[str, tuple[str | None, str | None]]:
     return calls
 
 
+def select_calls() -> dict[str, tuple[bool, str | None, str | None]]:
+    """Every ``rx.select`` call in the package: {"file:line": (passes aria_label, custom aria-label, labeled caption)}."""
+    calls = {}
+    for path in sorted(APP_DIR.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and ast.unparse(node.func) == "rx.select":
+                kwargs = {k.arg: k.value for k in node.keywords}
+                custom = kwargs.get("custom_attrs")
+                name = ast.literal_eval(custom).get("aria-label") if isinstance(custom, ast.Dict) else None
+                caption, parent = None, parents.get(node)
+                while parent is not None and caption is None:
+                    if isinstance(parent, ast.Call) and getattr(parent.func, "id", None) == "labeled":
+                        caption = ast.literal_eval(parent.args[0])
+                    parent = parents.get(parent)
+                calls[f"{path.relative_to(APP_DIR).as_posix()}:{node.lineno}"] = ("aria_label" in kwargs, name, caption)
+    return calls
+
+
 def substate(state_class):
     return State(_reflex_internal_init=True).get_substate(state_class.get_full_name().split("."))
 
@@ -143,10 +163,29 @@ class NarrowScreenReviewTests(unittest.TestCase):
         row = historico_moto_row(WorkshopState.historico_moto[0])
         self.assertEqual(getattr(row.wrap, "_var_value", None), "wrap")
 
+    def test_os_history_description_takes_its_own_line_below_12rem(self):
+        # 2026-11-18 review of 8e8813d: with flex 1, a 45-char description sat beside the badge at 360px
+        # in a 67px column, 7 lines of ~6 characters.
+        row = historico_moto_row(WorkshopState.historico_moto[0])
+        description = next(c for c in row.children if "descricao" in str(c))
+        self.assertEqual(style_of(description)["flex"], "1 1 12rem")
+
     def test_counter_category_filter_names_its_trigger(self):
         # With aria_label (on Select.Root) Edge exposed "combobox: Todas as categorias", without a name.
         trigger = next(c for c in walk(produtos_panel()) if type(c).__name__ == "SelectTrigger")
         self.assertEqual(trigger.custom_attrs, {"aria-label": "Filtrar por categoria"})
+
+
+class SelectNamingTests(unittest.TestCase):
+    def test_no_select_passes_aria_label_and_every_one_is_named(self):
+        # aria_label on rx.select lands on Select.Root, which renders no element (design-system.md):
+        # the name comes from custom_attrs or from the <label> of labeled.
+        calls = select_calls()
+        self.assertGreaterEqual(len(calls), 14)
+        for local, (aria_label, custom_name, caption) in calls.items():
+            with self.subTest(select=local):
+                self.assertFalse(aria_label, "use custom_attrs={'aria-label': ...}")
+                self.assertTrue(custom_name or caption, "sem nome: use labeled ou custom_attrs")
 
 
 class FocusScriptTests(unittest.TestCase):

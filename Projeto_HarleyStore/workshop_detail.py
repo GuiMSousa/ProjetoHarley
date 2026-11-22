@@ -381,7 +381,8 @@ def historico_moto_row(row: rx.Var) -> rx.Component:
         rx.text(row["abertura"], size="2", color=COLORS["muted"], min_width="8rem"),
         rx.text(row["tipo"], size="2", min_width="6rem"),
         status_badge(row["status"], row["status_label"]),
-        rx.text(row["descricao"], size="2", color=COLORS["muted"], flex="1", trim="end"),
+        # Below 12rem free the text takes its own line: at 360px it was squeezed to 67px, ~6 chars a line.
+        rx.text(row["descricao"], size="2", color=COLORS["muted"], flex="1 1 12rem", trim="end"),
         metal_button(
             "Ver",
             on_click=WorkshopState.open_detail(row["id"]),
