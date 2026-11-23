@@ -115,12 +115,34 @@ function "Oficina/detalhe_os" {
       input = {os_id: $input.os_id}
     } as $totais
 
-    // Receita lançada na conclusão (Change 10); nula se a OS não foi faturada.
+    // Receita lançada na conclusão (Change 10); nula se a OS não foi faturada. Os campos só são lidos
+    // com a transação presente: ler o id de um registro nulo como argumento de filtro respondia 500
+    // "Unable to locate var: transacao.id" em toda OS ainda não concluída (2026-11-22).
     db.query transacoes {
       where = $db.transacoes.id_os == $input.os_id
       output = ["id", "data_transacao"]
       return = {type: "single"}
     } as $transacao
+
+    var $id_transacao {
+      value = null
+    }
+
+    var $data_lancamento {
+      value = null
+    }
+
+    conditional {
+      if ($transacao != null) {
+        var.update $id_transacao {
+          value = $transacao.id
+        }
+
+        var.update $data_lancamento {
+          value = $transacao.data_transacao
+        }
+      }
+    }
 
     var $detalhe {
       value = $os
@@ -134,8 +156,8 @@ function "Oficina/detalhe_os" {
         |set:"valor_pecas":$totais.valor_pecas
         |set:"valor_servicos":$totais.valor_servicos
         |set:"valor_total":$totais.valor_total
-        |set:"id_transacao":$transacao.id
-        |set:"data_lancamento":$transacao.data_transacao
+        |set:"id_transacao":$id_transacao
+        |set:"data_lancamento":$data_lancamento
     }
   }
 

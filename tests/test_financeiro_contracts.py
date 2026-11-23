@@ -60,8 +60,11 @@ class ConclusaoOSTests(unittest.TestCase):
     def test_order_detail_returns_the_posting(self):
         detail = read("function/oficina/detalhe_os.xs")
         self.assertIn("where = $db.transacoes.id_os == $input.os_id", detail)
-        self.assertIn('|set:"id_transacao":$transacao.id', detail)
-        self.assertIn('|set:"data_lancamento":$transacao.data_transacao', detail)
+        # Read only when the order was billed (null guard: test_ordens_servico_contracts).
+        self.assertIn("value = $transacao.id", detail)
+        self.assertIn("value = $transacao.data_transacao", detail)
+        self.assertIn('|set:"id_transacao":$id_transacao', detail)
+        self.assertIn('|set:"data_lancamento":$data_lancamento', detail)
 
 
 class ImutabilidadeTests(unittest.TestCase):

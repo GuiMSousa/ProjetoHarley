@@ -302,6 +302,23 @@ class ItemOrdemServicoContractTests(unittest.TestCase):
         self.assertIn('function.run "Oficina/totais_os"', detail)
         self.assertIn('|set:"valor_total":$totais.valor_total', detail)
 
+    def test_detail_reads_the_billing_only_when_the_order_was_billed(self):
+        # 2026-11-22: an order not yet concluded has no transaction, and reading its id from the null
+        # record made the detail (and the 4 writes that return it) answer HTTP 500
+        # "Unable to locate var: transacao.id".
+        content = self.read("function/oficina/detalhe_os.xs")
+        code = "\n".join(line for line in content.splitlines() if not line.strip().startswith("//"))
+        self.assertIn(
+            "var $id_transacao { value = null } var $data_lancamento { value = null } "
+            "conditional { if ($transacao != null) { "
+            "var.update $id_transacao { value = $transacao.id } "
+            "var.update $data_lancamento { value = $transacao.data_transacao } } }",
+            " ".join(code.split()),
+        )
+        self.assertEqual(len(re.findall(r"\$transacao\.", code)), 2, "only the two reads inside the guard")
+        self.assertIn('|set:"id_transacao":$id_transacao', code)
+        self.assertIn('|set:"data_lancamento":$data_lancamento', code)
+
     def test_legacy_item_routes_point_to_the_new_routes(self):
         for relative_path in (
             "itens_ordem_servico_POST.xs",
