@@ -29,6 +29,7 @@ Regras importantes:
 
 - O push padrão é parcial e aditivo: adiciona e atualiza, mas **não remove nem relaxa restrições**. Tornar um campo anulável (por exemplo, `entrada_mercadoria.numero_documento`) ou remover colunas exige `xano workspace push -d ./xano --sync`.
 - `--sync --delete` também remove do workspace objetos ausentes em `xano/`; use apenas depois de revisar o `--dry-run`.
+- **Nunca combine `--force` com `--dry-run`.** Na CLI 1.3.3, quando a instância responde "Push preview not yet available on this instance", o `--dry-run` não para: segue para a confirmação de publicação. Em 2026-11-22, só não publicou porque, fora de um terminal interativo, a CLI exige `--force` para confirmar. Se a prévia não vier, pare e repita depois. Nunca publique sem uma prévia revisada.
 - Para testar antes de publicar no live, use um branch: `xano workspace push -d ./xano -b <branch>`.
 - O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
 - Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (MCP `xano-developer`, configurado em `.mcp.json`, `.codex/config.toml` e `.vscode/mcp.json`).
