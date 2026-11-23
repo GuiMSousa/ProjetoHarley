@@ -60,6 +60,8 @@ Entregar `/admin`, somente para o `GERENTE`, com três abas:
 - Trocar a própria senha pela interface. O endpoint existe, mas a tela fica para outra change.
 - Recuperação de acesso por email ou link.
 
-## Pré-requisito em aberto
+## Defeito encontrado no pré-requisito
 
-A desativação reutiliza `PATCH funcionarios/{id}`, cujo `pick:($raw_input|keys)` nunca rodou ao vivo, assim como o dos outros seis `PATCH` dos cadastros. A prova controlada de 2026-11-23 não pôde rodar: produção tinha um único cliente, que não é de teste. Ela continua obrigatória antes da publicação (tarefa 0.2).
+A prova ao vivo de 2026-11-23 criou o "Funcionário Teste" (id 5, VENDEDOR, ativo), e o `PATCH funcionarios/5` só com o `contato` respondeu 400 "Missing param: nome_funcionario". O `dblink` nos `PATCH` de clientes, fornecedores, funcionários, motos de clientes e produtos torna obrigatórios os campos obrigatórios da tabela. Por isso, o "Desativar" desses cinco cadastros, que envia só `{"ativo": false}`, falha em produção.
+
+A correção entra nesta change (`design.md`, D10), porque o "Desativar acesso" depende dela: os 5 `PATCH` passam a ter entradas explícitas e opcionais. Ela fica pronta localmente e será publicada junto dos endpoints de `/admin`.

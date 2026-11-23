@@ -261,8 +261,12 @@ def pager(on_previous, on_next, disabled: rx.Var | bool = False) -> rx.Component
     )
 
 
-def _header_cell(header: str | tuple[str, str]) -> rx.Component:
-    label, align = header if isinstance(header, tuple) else (header, "left")
+TableHeader = str | tuple[str, str] | tuple[str, str, dict]
+
+
+def _header_cell(header: TableHeader) -> rx.Component:
+    """A header is a label, (label, align) or (label, align, props) — e.g. a responsive `display`."""
+    label, align, *extra = header if isinstance(header, tuple) else (header, "left")
     return rx.table.column_header_cell(
         label,
         text_align=align,
@@ -270,11 +274,12 @@ def _header_cell(header: str | tuple[str, str]) -> rx.Component:
         font_size="0.75rem",
         text_transform="uppercase",
         letter_spacing="0.08em",
+        **(extra[0] if extra else {}),
     )
 
 
 def data_table(
-    headers: list[str | tuple[str, str]],
+    headers: list[TableHeader],
     rows: rx.Var,
     render_row: Callable[[rx.Var], rx.Component],
     *,

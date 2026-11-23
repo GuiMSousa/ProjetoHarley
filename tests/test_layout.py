@@ -13,13 +13,13 @@ from Projeto_HarleyStore.components import (
     app_shell,
     brand_logo,
     brand_mark,
-    guarded_page,
     login_page,
     public_shell,
     sidebar,
     top_bar,
 )
-from Projeto_HarleyStore.dashboard_pages import admin_placeholder, dashboard
+from Projeto_HarleyStore.admin_pages import admin_page
+from Projeto_HarleyStore.dashboard_pages import dashboard
 from Projeto_HarleyStore.entradas_pages import entradas_page
 from Projeto_HarleyStore.financeiro_pages import financeiro_page
 from Projeto_HarleyStore.vendas_pages import vendas_page
@@ -33,7 +33,7 @@ PAGES = {
     "/": lambda: app_shell(dashboard()),
     "/login": login_page,
     "/catalogo": catalogo_page,
-    "/admin": lambda: guarded_page(admin_placeholder(), "/admin"),
+    "/admin": admin_page,
     "/workshop": workshop_page,
     "/cadastros/clientes": lambda: cadastro_page("clientes"),
     "/cadastros/motos-clientes": lambda: cadastro_page("motos_clientes"),

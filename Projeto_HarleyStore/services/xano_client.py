@@ -10,6 +10,14 @@ from typing import Any, Self, TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from Projeto_HarleyStore.services.admin import (
+    AcessoCreate,
+    AcessoCriado,
+    EventosPagina,
+    SenhaReset,
+    UsuarioAdmin,
+    UsuarioResumo,
+)
 from Projeto_HarleyStore.services.balcao import VendaBalcaoCreate, VendaBalcaoDetalhe
 from Projeto_HarleyStore.services.motos import (
     CancelamentoReservaMoto,
@@ -527,6 +535,48 @@ class XanoClient:
 
     def deactivate_funcionario(self, funcionario_id: int) -> Funcionario:
         return self._deactivate_resource(f"funcionarios/{funcionario_id}", Funcionario)
+
+    def reactivate_funcionario(self, funcionario_id: int) -> Funcionario:
+        return self.patch(f"funcionarios/{funcionario_id}", json={"ativo": True}, response_model=Funcionario)
+
+    # ----- /admin (Change 18, GERENTE) -----
+
+    def list_usuarios_admin(self) -> list[UsuarioAdmin]:
+        """Access accounts with their employee; the endpoint never returns the password."""
+        return self._list("admin/usuarios", UsuarioAdmin)
+
+    def criar_acesso(self, acesso: AcessoCreate) -> AcessoCriado:
+        """Create the login of an active employee without one (auth/signup, no token issued)."""
+        return self.post(
+            "auth/signup",
+            json=acesso.model_dump(mode="json"),
+            response_model=AcessoCriado,
+            base_url=self._auth_base_url,
+        )
+
+    def redefinir_senha(self, usuario_id: int, senha: SenhaReset) -> UsuarioResumo:
+        """Set a temporary password for another user; the response never carries it."""
+        return self.post(
+            f"admin/usuarios/{usuario_id}/senha",
+            json=senha.model_dump(mode="json"),
+            response_model=UsuarioResumo,
+        )
+
+    def list_eventos(
+        self,
+        *,
+        page: int = 1,
+        action: str | None = None,
+        periodo: PeriodoFinanceiro | None = None,
+    ) -> EventosPagina:
+        """One page (25) of the access audit, newest first, optionally by action and period."""
+        params: dict[str, Any] = {"page": page}
+        if action:
+            params["action"] = action
+        if periodo is not None:
+            limites = periodo.params()
+            params["data_inicio"], params["data_fim"] = limites["inicio"], limites["fim"]
+        return self.get("admin/eventos", params=params, response_model=EventosPagina)
 
     def list_entradas(self) -> list[EntradaMercadoriaResumo]:
         return self._list_resource("entrada_mercadoria", EntradaMercadoriaResumo)

@@ -1,13 +1,18 @@
-// Edit clientes record
+// Edita um cliente (VENDEDOR ou GERENTE). PATCH parcial: só os campos declarados e enviados são
+// gravados. Campos opcionais e explícitos: com `dblink`, {"ativo": false} sozinho (Desativar)
+// respondia 400 "Missing param", porque o Xano exigia os campos obrigatórios da tabela (2026-11-23).
 query "clientes/{clientes_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
 
   input {
     int clientes_id? filters=min:1
-    dblink {
-      table = "clientes"
-    }
+    text? nome_cliente? filters=trim
+    text? cpf_cnpj? filters=trim
+    text? telefone? filters=trim
+    email? email? filters=trim|lower
+    text? endereco? filters=trim
+    bool? ativo?
   }
 
   stack {

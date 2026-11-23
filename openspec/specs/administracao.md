@@ -1,6 +1,6 @@
-# Nova spec: administração
+# Especificação: administração
 
-Spec nova, `openspec/specs/administracao.md`, criada no arquivamento.
+Painel `/admin` do `GERENTE` (Change 18, arquivada em 2026-11-23): acessos dos funcionários, auditoria de acessos e regras do sistema.
 
 ## Requisito: acesso ao painel
 
@@ -40,7 +40,7 @@ O painel DEVE oferecer "Criar acesso" só para funcionários ativos sem usuário
 
 ## Requisito: desativar e reativar acesso
 
-"Desativar acesso" DEVE chamar `PATCH funcionarios/{id}` com `{"ativo": false}` depois de uma confirmação, e "Reativar acesso" DEVE chamá-lo com `{"ativo": true}`. O painel NÃO DEVE oferecer "Desativar acesso" na linha do próprio gerente.
+"Desativar acesso" DEVE chamar `PATCH funcionarios/{id}` com `{"ativo": false}` depois de uma confirmação, e "Reativar acesso" DEVE chamá-lo com `{"ativo": true}`. O painel NÃO DEVE oferecer "Desativar acesso" na linha do próprio gerente. A confirmação DEVE avisar que o funcionário também sai das listas operacionais, como a escolha de mecânico das OS, e não registra operações até ser reativado.
 
 ### Cenário: acesso desativado
 
@@ -54,10 +54,17 @@ O painel DEVE oferecer "Criar acesso" só para funcionários ativos sem usuário
 
 - o usuário inexistente, com `404`;
 - o próprio gerente, com `400`, porque a troca da própria senha exige a senha atual;
-- um usuário com `role` diferente de `member`, com `403`;
+- um usuário com `role` `admin`, com `403`;
+- um usuário cujo funcionário vinculado é `GERENTE`, com `403`; o funcionário é lido só quando o `id_funcionario` existe;
 - a confirmação diferente da senha, com `400`.
 
 A senha DEVE ser gravada só como hash. A resposta DEVE conter `id`, `name` e `email`, e NUNCA a senha. O endpoint DEVE registrar `log_event` com a ação `admin_reset_password` e `metadata` com `id_usuario`, `id_funcionario` e `id_gerente`.
+
+### Cenário: gerente tenta redefinir a senha de outro gerente
+
+- **DADO** dois gerentes ativos com acesso
+- **QUANDO** um deles enviar `POST admin/usuarios/{id}/senha` com o `id` do usuário do outro
+- **ENTÃO** a resposta DEVE ser `403`, a senha NÃO DEVE mudar e o painel NÃO DEVE oferecer "Redefinir senha" na linha do outro gerente
 
 ### Cenário: gerente redefine a própria senha pelo painel
 
@@ -74,7 +81,7 @@ A senha DEVE ser gravada só como hash. A resposta DEVE conter `id`, `name` e `e
 
 ## Requisito: auditoria de acessos
 
-`GET admin/eventos` DEVE ler `event_log` paginado no servidor, com 25 registros por página, do mais recente para o mais antigo e com os totais da paginação. Cada registro DEVE trazer `id`, `created_at`, `action`, `user_id`, o nome do usuário e o do funcionário (por `left join`) e `metadata`. Os filtros opcionais são `action` e período (`inicio`/`fim`, de até 366 dias). Um período invertido ou maior que 366 dias DEVE responder `400`.
+`GET admin/eventos` DEVE ler `event_log` paginado no servidor, com 25 registros por página, do mais recente para o mais antigo e com os totais da paginação. Cada registro DEVE trazer `id`, `created_at`, `action`, `user_id`, o nome do usuário e o do funcionário (por `left join`) e `metadata`. Os filtros opcionais são `action` e período (`data_inicio`/`data_fim`, de até 366 dias), e um filtro ausente ou vazio DEVE ser ignorado. Um período invertido ou maior que 366 dias DEVE responder `400`.
 
 ### Cenário: filtro por ação
 

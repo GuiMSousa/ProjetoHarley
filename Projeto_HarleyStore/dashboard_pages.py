@@ -116,9 +116,3 @@ def dashboard() -> rx.Component:
             width="100%",
         ),
     )
-
-
-def admin_placeholder() -> rx.Component:
-    return page_body(
-        page_header("Administração", "Gestão de usuários e parâmetros do sistema: em preparação."),
-    )

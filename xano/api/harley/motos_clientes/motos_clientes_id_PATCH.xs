@@ -1,13 +1,20 @@
-// Edit motos_clientes record
+// Edita a moto de um cliente (VENDEDOR ou GERENTE). PATCH parcial: só os campos declarados e
+// enviados são gravados. Campos opcionais e explícitos: com `dblink`, {"ativo": false} sozinho
+// (Desativar) respondia 400 "Missing param", porque o Xano exigia os campos obrigatórios (2026-11-23).
 query "motos_clientes/{motos_clientes_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
 
   input {
     int motos_clientes_id? filters=min:1
-    dblink {
-      table = "motos_clientes"
+    int? id_cliente? {
+      table = "clientes"
     }
+
+    text? modelo? filters=trim
+    text? placa? filters=trim
+    text? chassi? filters=trim
+    bool? ativo?
   }
 
   stack {

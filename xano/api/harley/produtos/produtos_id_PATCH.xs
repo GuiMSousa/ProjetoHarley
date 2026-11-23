@@ -1,13 +1,19 @@
-// Edit produtos record
+// Edita um produto (GERENTE). PATCH parcial: só os campos declarados e enviados são gravados.
+// Campos opcionais e explícitos: com `dblink`, {"ativo": false} sozinho (Desativar) respondia 400
+// "Missing param", porque o Xano exigia os campos obrigatórios da tabela (2026-11-23). O saldo
+// (estoque_qtd e versao_estoque) não é declarado e ainda sai do payload: só o livro de estoque o muda.
 query "produtos/{produtos_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
 
   input {
     int produtos_id? filters=min:1
-    dblink {
-      table = "produtos"
-    }
+    text? codigo? filters=trim
+    text? nome_produto? filters=trim
+    text? descricao? filters=trim
+    text? categoria? filters=trim
+    decimal? preco_venda? filters=min:0.01
+    bool? ativo?
   }
 
   stack {

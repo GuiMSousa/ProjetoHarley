@@ -1,13 +1,20 @@
-// Edit funcionarios record
+// Edita um funcionário (GERENTE). PATCH parcial: só os campos declarados e enviados são gravados.
+// Campos opcionais e explícitos: com `dblink`, o Xano exigia todos os campos obrigatórios da
+// tabela, e {"ativo": false} sozinho respondia 400 "Missing param: nome_funcionario" (2026-11-23).
 query "funcionarios/{funcionarios_id}" verb=PATCH {
   api_group = "HARLEY"
   auth = "user"
 
   input {
     int funcionarios_id? filters=min:1
-    dblink {
-      table = "funcionarios"
+    text? nome_funcionario? filters=trim
+    text? cargo? filters=trim
+    enum? tipo? {
+      values = ["VENDEDOR", "MECANICO", "GERENTE"]
     }
+
+    text? contato? filters=trim
+    bool? ativo?
   }
 
   stack {

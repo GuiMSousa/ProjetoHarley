@@ -5,6 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from Projeto_HarleyStore.components import guarded_page, modal_panel, page_body
+from Projeto_HarleyStore.services.motos import DIAS_RESERVA_MAXIMO
 from Projeto_HarleyStore.styles.theme import COLORS, PANEL, RADII, SHADOWS
 from Projeto_HarleyStore.ui_helpers import (
     carrossel_fotos,
@@ -239,7 +240,7 @@ def reserva_modal() -> rx.Component:
                 on_change=VendasState.set_reserva_dias,
                 type="number",
                 min=1,
-                max=30,
+                max=DIAS_RESERVA_MAXIMO,
                 width="8rem",
             ),
         ),

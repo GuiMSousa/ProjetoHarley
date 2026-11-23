@@ -7,6 +7,7 @@ from pathlib import Path
 import reflex as rx
 from reflex.state import State
 
+from Projeto_HarleyStore.admin_state import AdminState
 from Projeto_HarleyStore.balcao_pages import produtos_panel
 from Projeto_HarleyStore.balcao_state import BalcaoState
 from Projeto_HarleyStore.cadastros_state import CadastrosState
@@ -25,6 +26,22 @@ APP_DIR = Path(__file__).resolve().parents[1] / "Projeto_HarleyStore"
 
 # Esc handler -> (state, values while the modal is open, values once it is closed).
 RESETS = {
+    # Change 18: closing also drops the typed passwords from the state.
+    "AdminState.close_acesso": (
+        AdminState,
+        {"acesso_open": True, "acesso_error": "x", "acesso_senha": "Senha123", "acesso_confirmacao": "Senha123"},
+        {"acesso_open": False, "acesso_error": "", "acesso_senha": "", "acesso_confirmacao": ""},
+    ),
+    "AdminState.close_senha": (
+        AdminState,
+        {"senha_usuario_id": "7", "senha_nova": "Senha123", "senha_confirmacao": "Senha123", "senha_error": "x"},
+        {"senha_usuario_id": "", "senha_nova": "", "senha_confirmacao": "", "senha_error": ""},
+    ),
+    "AdminState.close_status": (
+        AdminState,
+        {"status_funcionario_id": "5", "status_ultimo_gerente": True},
+        {"status_funcionario_id": "", "status_ultimo_gerente": False},
+    ),
     "BalcaoState.fechar_confirmacao": (BalcaoState, {"confirm_open": True}, {"confirm_open": False}),
     "BalcaoState.fechar_recibo": (
         BalcaoState,

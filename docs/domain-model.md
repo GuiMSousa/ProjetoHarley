@@ -34,7 +34,9 @@ Representa a identidade de autenticação do Xano (`user`), separada do domínio
 - **Regras:** Cada usuário operacional está vinculado a exatamente um funcionário ativo, e cada funcionário possui no máximo um usuário. O cargo de domínio vem de `Funcionarios.tipo`; `role` é apenas técnico.
 - **Criação:** somente um `GERENTE` cria usuários (`auth/signup`), com email e senha obrigatórios; o endpoint não emite token para o novo usuário.
 - **Troca de senha:** `reset/update_password` altera apenas a senha do próprio usuário, exige a senha atual e um funcionário vinculado ativo, e rejeita a nova senha igual à atual.
-- **Auditoria:** `event_log` registra login e criação de usuário com id, email, papel e vínculo; senhas, hashes e tokens nunca são gravados.
+- **Redefinição pelo gerente (Change 18):** em `/admin`, o `GERENTE` redefine a senha de outro usuário (`POST admin/usuarios/{id}/senha`). A regra não vale para o próprio gerente, que usa a troca com a senha atual, nem para usuários com `role` `admin`, nem para a conta de outro gerente. A senha temporária é entregue pessoalmente e nunca volta na resposta.
+- **Revogação:** desativar o funcionário (`ativo = false`) corta o acesso na hora, pelo `enforce_role` e pelo login. Redefinir a senha não encerra a sessão já aberta.
+- **Auditoria:** `event_log` registra login (`login`), criação de usuário (`signup`), troca da própria senha (`reset_password`), redefinição pelo gerente (`admin_reset_password`, só com ids) e email de boas-vindas. Senhas, hashes e tokens nunca são gravados. O gerente consulta esse registro em `/admin`; vendas, OS e estoque têm históricos próprios.
 
 ### Clientes
 Representa os proprietários de motocicletas ou compradores da loja.

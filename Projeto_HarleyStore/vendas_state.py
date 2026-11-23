@@ -30,6 +30,7 @@ from Projeto_HarleyStore.services.catalogo import (
     catalogo_cache,
 )
 from Projeto_HarleyStore.services.motos import (
+    DIAS_RESERVA_MAXIMO,
     DIAS_RESERVA_PADRAO,
     STATUS_MOTO_LABELS,
     CancelamentoReservaMoto,
@@ -65,7 +66,7 @@ FAMILIA_BY_LABEL = {label: value for value, label in FAMILIA_LABELS.items()}
 FAMILIA_OPTIONS = list(FAMILIA_LABELS.values())
 FIELD_MESSAGES = {
     "id_cliente": "Selecione o cliente.",
-    "dias_validade": "A validade deve ser de 1 a 30 dias.",
+    "dias_validade": f"A validade deve ser de 1 a {DIAS_RESERVA_MAXIMO} dias.",
     "observacao": "A observação deve ter até 500 caracteres.",
     "motivo": "Informe o motivo do cancelamento (até 500 caracteres).",
     "nome_modelo": "Informe o nome do modelo (até 120 caracteres).",

@@ -39,7 +39,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest offline (`-m "not integration and not browser"`): 464 passaram e 45 foram desmarcados, 42 de integração e 3 de navegador, contados com `--collect-only` (2026-11-22, com o contrato da transação nula no detalhe da OS). A execução sem `-m` não foi repetida;
+- pytest offline (`-m "not integration and not browser"`): 497 passaram e 45 foram desmarcados, 42 de integração e 3 de navegador, contados com `--collect-only` (2026-11-23, com os contratos, o estado e o cliente de `/admin` da Change 18, publicada e arquivada no mesmo dia). A execução sem `-m` não foi repetida;
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
@@ -47,8 +47,17 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
   - MECANICO (2026-11-22): `test_mechanic_cannot_sell_at_the_counter` passou com um produto ativo. A venda no balcão é recusada com 403 pelo `enforce_role`, o primeiro passo do endpoint, antes de qualquer gravação;
   - GERENTE (2026-11-22, 1 login e 2 leituras): o resumo de 360 dias trouxe 3 operações, da mais recente para a mais antiga, com o funcionário preenchido: 1 venda de balcão (2026-11-22 22:12) e 2 entradas de mercadoria (2026-11-18). A venda de balcão é posterior à publicação da correção de `vendas_POST.xs` (`28ddd3a`). A transação só é gravada depois do mapa de quantidades e da conferência do total, na mesma transação, então a venda prova que o endpoint corrigido rodou com dados; os itens dela não foram lidos. A lista de OS trouxe 1 OS aberta com autor e mecânico preenchidos pelos apelidos de join;
   - GERENTE (2026-11-22, depois do push de `Oficina/detalhe_os`; 1 login e 1 leitura): `GET ordens_servico/1` antes respondia `500 "Unable to locate var: transacao.id"`. Agora a OS aberta e não faturada responde 200, com os 26 campos e `id_transacao` e `data_lancamento` nulos, aceita pelo DTO. A mesma função monta a resposta de criar a OS, incluir ou remover item e mudar o status, que antes salvavam a alteração e mesmo assim respondiam 500. Essas 4 gravações não foram repetidas nesta leitura; o fechamento de OS, que é uma mudança de status, entrou na validação manual registrada abaixo;
+  - Change 18 (2026-11-23, depois do push dos 3 endpoints de `admin/` e dos 5 `PATCH` dos cadastros, com `--dry-run` seguinte sem mudanças; bateria com ~2,5 s entre chamadas, 8 de 8 aprovadas):
+    - **GERENTE:**
+      - `GET admin/usuarios` respondeu 200 só com os campos permitidos, sem `password` nem `password_reset`;
+      - `PATCH funcionarios/5` só com o `contato` (alterado e restaurado) e com `{"ativo": false}` e depois `{"ativo": true}` respondeu 200, e cada vez só o campo enviado mudou. Isso prova a correção D10 e que o `false` sobrevive a `filter_null|filter_empty_text`;
+      - `auth/signup` criou o usuário de teste 5 para o "Funcionário Teste";
+      - `POST admin/usuarios/5/senha` respondeu 200 com `{email, id, name}`, sem a senha;
+      - `GET admin/eventos` respondeu 200 com `itemsTotal` e `pageTotal` (totais confirmados), e o evento mais recente era `admin_reset_password`, com `metadata` só com ids;
+      - ao final, o "Funcionário Teste" ficou **inativo** e com o contato original, e o usuário de teste dele continua em produção sem acesso;
+    - **VENDEDOR:** 403 nos 3 endpoints de `admin/`. O reset foi tentado contra o usuário de teste, nunca contra uma conta real;
 - `reflex compile --dry`: OK;
-- validador do MCP `xano-developer`: 129 `.xs` válidos em 2026-11-22, com o MCP de volta. Entre 2026-11-18 e 2026-11-22 ele não conectava, e o mesmo validador (`@xano/developer-mcp` 2.2.6) rodou localmente em Node, a partir do pacote em cache;
+- validador do MCP `xano-developer`: 132 `.xs` válidos em 2026-11-23, incluindo os 3 de `/admin` e os 5 `PATCH` corrigidos (129 em 2026-11-22, quando o MCP voltou). Entre 2026-11-18 e 2026-11-22 ele não conectava, e o mesmo validador (`@xano/developer-mcp` 2.2.6) rodou localmente em Node, a partir do pacote em cache;
 - smoke de navegador: 3 passaram em 2026-11-17 e em 2026-11-18, antes do commit `f43e7ba`, contra o app local e com o catálogo público real. Cobre só o catálogo e o login: a oficina e o balcão foram medidos no Edge com páginas de dados fictícios, sem Xano;
 - validação manual ponta a ponta no navegador, em produção, feita pelo usuário e informada em 2026-11-23: detalhe e fechamento de OS, detalhe de entrada e trava de moto reservada, concluídos. Não há registro automatizado nem evidência anexada além desse relato; o smoke automatizado continua cobrindo só o catálogo e o login.
 
@@ -114,10 +123,7 @@ Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem 
 
 - **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.
 - **Expressão entre parênteses como valor de filtro:** a forma documentada (`map:($$|to_upper)`, `push:("…" ~ $x)`) continua em 13 pontos de 11 arquivos. O detalhe de entrada (`function/estoque/detalhe_entrada.xs`, 2 pontos) passou na validação manual de 2026-11-23. Os outros 11 seguem sem prova ao vivo registrada; o que já roda com dados e merece uma conferência é `function/vendas/detalhe_moto.xs` (detalhe de unidade).
-- **Sem prova ao vivo:** o `PATCH` com payload parcial (`` `$input|pick:($raw_input|keys)` ``) dos 7 cadastros (clientes, fornecedores, funcionários, motos de clientes, produtos, modelos e motos) e o `POST produtos`, que exigem escrita.
-  - Editar e desativar nos cadastros dependem desse `PATCH`, e o "Desativar acesso" da Change 18 (`openspec/changes/painel-administracao`) também.
-  - A prova controlada de 2026-11-23 (1 login GERENTE, `GET clientes`, alterar e restaurar um campo) parou antes de gravar: produção tinha um único cliente, e ele não é de teste. Nenhum `PATCH` foi enviado.
-  - A prova continua pendente: exige um registro de teste ou a autorização para usar um registro real. A ordem do resumo, a venda de balcão, os nomes da oficina e a recusa do MECANICO foram comprovados em 2026-11-22 (ver a referência acima).
+- **Sem prova ao vivo:** o `pick:($raw_input|keys)` dos `PATCH` de modelos e motos, que não usam `dblink`, e o `POST produtos`, que exigem escrita. A ordem do resumo, a venda de balcão, os nomes da oficina e a recusa do MECANICO foram comprovados em 2026-11-22 (ver a referência acima).
 
 ## Revisão após implementação ou correção
 

@@ -2,6 +2,8 @@
 
 import reflex as rx
 
+from Projeto_HarleyStore.admin_pages import admin_page
+from Projeto_HarleyStore.admin_state import ADMIN_ROUTE, AdminState
 from Projeto_HarleyStore.auth import AuthState
 from Projeto_HarleyStore.balcao_pages import balcao_page
 from Projeto_HarleyStore.balcao_state import BALCAO_ROUTE, BalcaoState
@@ -9,8 +11,8 @@ from Projeto_HarleyStore.cadastros_pages import cadastro_page
 from Projeto_HarleyStore.cadastros_state import CadastrosState
 from Projeto_HarleyStore.catalogo_pages import catalogo_page
 from Projeto_HarleyStore.catalogo_state import CATALOGO_ROUTE, CatalogoState
-from Projeto_HarleyStore.components import MODAL_FOCUS_SCRIPT, app_shell, guarded_page, login_page
-from Projeto_HarleyStore.dashboard_pages import admin_placeholder, dashboard
+from Projeto_HarleyStore.components import MODAL_FOCUS_SCRIPT, app_shell, login_page
+from Projeto_HarleyStore.dashboard_pages import dashboard
 from Projeto_HarleyStore.dashboard_state import DashboardState
 from Projeto_HarleyStore.entradas_pages import entradas_page
 from Projeto_HarleyStore.entradas_state import ENTRADAS_ROUTE, EntradasState
@@ -54,10 +56,10 @@ app.add_page(
     on_load=[AuthState.restore_session, CatalogoState.load_catalogo],
 )
 app.add_page(
-    lambda: guarded_page(admin_placeholder(), "/admin"),
-    route="/admin",
+    admin_page,
+    route=ADMIN_ROUTE,
     title="Administração | Harley Store",
-    on_load=AuthState.restore_session,
+    on_load=[AuthState.restore_session, AdminState.load_admin],
 )
 app.add_page(
     workshop_page,

@@ -19,6 +19,8 @@ VIN_PATTERN = r"^[A-HJ-NPR-Z0-9]{17}$"
 PLACA_PATTERN = r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$"
 ANO_MINIMO = 1990
 DIAS_RESERVA_PADRAO = 7
+# Same cap as dias_validade in POST motos/{id}/reserva; /admin shows it (test_admin_contracts).
+DIAS_RESERVA_MAXIMO = 30
 
 
 def _upper(value: object) -> object:
@@ -84,7 +86,7 @@ class ReservaMotoCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     id_cliente: int = Field(gt=0)
-    dias_validade: int = Field(default=DIAS_RESERVA_PADRAO, ge=1, le=30)
+    dias_validade: int = Field(default=DIAS_RESERVA_PADRAO, ge=1, le=DIAS_RESERVA_MAXIMO)
     observacao: str | None = Field(default=None, max_length=500)
 
 

@@ -29,6 +29,7 @@ Regras importantes:
 
 - O push padrão é parcial e aditivo: adiciona e atualiza, mas **não remove nem relaxa restrições**. Tornar um campo anulável (por exemplo, `entrada_mercadoria.numero_documento`) ou remover colunas exige `xano workspace push -d ./xano --sync`.
 - `--sync --delete` também remove do workspace objetos ausentes em `xano/`; use apenas depois de revisar o `--dry-run`.
+- Num `PATCH`, não use `dblink { table = … }`. Ele gera as entradas pelo esquema da tabela, e as colunas obrigatórias viram entradas obrigatórias: um `PATCH` parcial responde `400 "Missing param: <campo>"` antes de qualquer passo do stack. Declare cada campo como opcional (`text? nome? filters=trim`), como nos cadastros desde a Change 18.
 - **Nunca combine `--force` com `--dry-run`.** Na CLI 1.3.3, quando a instância responde "Push preview not yet available on this instance", o `--dry-run` não para: segue para a confirmação de publicação. Em 2026-11-22, só não publicou porque, fora de um terminal interativo, a CLI exige `--force` para confirmar. Se a prévia não vier, pare e repita depois. Nunca publique sem uma prévia revisada.
 - Para testar antes de publicar no live, use um branch: `xano workspace push -d ./xano -b <branch>`.
 - O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
@@ -127,7 +128,9 @@ O cliente usa modelos Pydantic em `Projeto_HarleyStore.services.cadastros` para 
 - `Fornecedor` / `FornecedorCreate` / `FornecedorUpdate`;
 - `Funcionario` / `FuncionarioCreate` / `FuncionarioUpdate`.
 
-`Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`. Desde o saneamento pós-Change 7, o `DELETE` físico de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações responde `403`; a única exclusão física do sistema é a remoção de item de OS aberta.
+`Produto.codigo` é alfanumérico e único. Os cinco cadastros possuem `ativo`, usado para soft delete. A desativação chama `PATCH` com `ativo = false`.
+
+O `PATCH` desses cinco cadastros é parcial desde a Change 18: as entradas são explícitas e opcionais, e só os campos enviados são gravados. Com `dblink`, `{"ativo": false}` sozinho respondia `400 "Missing param"`. Isso foi provado ao vivo em 2026-11-23, com o "Funcionário Teste" (id 5), alterando e restaurando o contato e desativando e reativando o funcionário. Desde o saneamento pós-Change 7, o `DELETE` físico de clientes, motos de clientes, produtos, fornecedores, funcionários, motos da loja e transações responde `403`; a única exclusão física do sistema é a remoção de item de OS aberta.
 
 `Produto` (modelo de leitura) trata `estoque_qtd` nulo, possível em registros legados do Xano, como `0`, a mesma leitura de `Estoque/movimentar_estoque`. `ProdutoCreate` não tem `estoque_qtd`: o produto nasce com saldo 0 e o Xano recusa outro valor (Change 16). `EntradaMercadoriaCreate` aceita de 1 a 50 itens (`MAX_ITENS_ENTRADA`), o mesmo teto de `POST entrada_mercadoria`, e o formulário recusa a 51ª linha já no "Adicionar item", como o balcão.
 
@@ -302,6 +305,36 @@ Os DTOs ficam em `Projeto_HarleyStore.services.balcao`:
 - **Idempotência:** a mesma `chave_venda` devolve a venda já registrada. O Reflex mantém a chave nas novas tentativas (timeout, resposta perdida) e só a renova após uma venda concluída ou ao limpar o carrinho.
 - **Tela `/balcao`:** filtro por categoria e busca local, carrinho, cliente opcional ("Consumidor final"), confirmação com o botão travado durante o envio e recibo.
 
+## Administração (Change 18)
+
+Os DTOs ficam em `Projeto_HarleyStore.services.admin`:
+
+- `UsuarioAdmin`: conta com o funcionário vinculado (nome, tipo, cargo, `ativo`), sem campo de senha;
+- `AcessoCreate`: nome, email, senha (política da tabela `user`: 8 caracteres, uma letra e um número, sem `trim`) e `id_funcionario`;
+- `SenhaReset`: senha e confirmação;
+- `EventosPagina`: uma página de `EventoAcesso`, com `curPage`, `nextPage`, `prevPage` e `itemsTotal`;
+- `PARAMETROS_SISTEMA`: as regras que a aba de parâmetros mostra. `tests/test_admin_contracts.py` confere cada uma contra o `.xs` que a aplica.
+
+| Método | Endpoint | Perfil |
+| --- | --- | --- |
+| `list_usuarios_admin()` | `GET admin/usuarios` | `GERENTE` |
+| `criar_acesso(acesso)` | `POST auth/signup` (grupo Authentication) | `GERENTE` |
+| `redefinir_senha(id, senha)` | `POST admin/usuarios/{id}/senha` | `GERENTE` |
+| `list_eventos(page, action, periodo)` | `GET admin/eventos` | `GERENTE` |
+| `deactivate_funcionario(id)` / `reactivate_funcionario(id)` | `PATCH funcionarios/{id}` (`ativo`) | `GERENTE` |
+
+- **Lista de usuários:** cada linha é montada com campos explícitos; `password` e `password_reset` nunca saem.
+- **Redefinição de senha:**
+  - recusa, antes de gravar, o usuário inexistente (404), o próprio gerente (400), o usuário com `role` `admin` (403) e a conta de outro `GERENTE` (403);
+  - grava só o hash e responde `{id, name, email}`;
+  - registra `admin_reset_password` com `id_usuario`, `id_funcionario` e `id_gerente`;
+  - a sessão já aberta do alvo continua válida até expirar; o corte imediato é desativar o funcionário.
+- **Auditoria:** `event_log` do mais recente para o mais antigo, 25 por página, com o nome do usuário e o do funcionário. Os filtros opcionais são ação e período (`data_inicio`/`data_fim` em milissegundos, até 366 dias), e cada um é ignorado quando ausente.
+- **Tela `/admin`:**
+  - três abas: Usuários e acessos, Auditoria de acessos, Parâmetros do sistema;
+  - até o breakpoint `lg`, cada usuário ocupa uma célula empilhada, para as ações caberem em 320 px;
+  - salvaguardas: ninguém desativa o próprio acesso, um aviso antes de desativar o último gerente, e os avisos de sessão aberta e de senha entregue pessoalmente.
+
 ## Erros
 
 | Status HTTP | Exceção | Mensagem da exceção | Mensagem exibida (`feedback.error_feedback`) | Efeito no Reflex |
@@ -348,6 +381,9 @@ O frontend pode esconder ações incompatíveis com o cargo, mas a autorização
 | Entradas de mercadoria (histórico e detalhe) | leitura | leitura | leitura |
 | Registrar entrada de mercadoria | sim | não | não |
 | Criar usuários e enviar email de boas-vindas | sim | não | não |
+| Listar usuários e acessos (`GET admin/usuarios`) | sim | não | não |
+| Redefinir a senha de outro usuário (`POST admin/usuarios/{id}/senha`; nunca a própria, de `admin` ou de outro gerente) | sim | não | não |
+| Auditoria de acessos (`GET admin/eventos`) | sim | não | não |
 | Oficina: consultar OS, detalhe e histórico por moto | sim | sim | sim |
 | Oficina: abrir OS e transicionar status | sim | não | sim |
 | Oficina: incluir e remover peças e serviços em OS aberta ou em andamento | sim | não | sim |
