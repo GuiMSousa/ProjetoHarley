@@ -26,6 +26,7 @@ Concessionárias e oficinas de grande porte frequentemente enfrentam descontrole
 - Gestão do Corpo de Funcionários e suas tipologias/cargos.
 - Gerenciamento do ciclo de vida das Ordens de Serviço e seus itens.
 - Registro de Transações financeiras unificadas e visão consolidada das operações.
+- Gestão de acessos no painel `/admin`, restrito ao gerente: criação de login para funcionário, redefinição de senha, desativação de acesso e auditoria dos eventos de acesso (`event_log`).
 
 ## 6. Principais Funcionalidades
 - Cadastro e consulta de fornecedores, produtos, clientes, funcionários e motocicletas.

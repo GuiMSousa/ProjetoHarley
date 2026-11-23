@@ -216,6 +216,10 @@ class AdminState(AuthState):
 
     @rx.event
     def load_admin(self):
+        # Coming back to /admin never reopens a modal with the passwords typed before leaving the route.
+        self._limpar_acesso()
+        self._limpar_senha()
+        self._limpar_status()
         if self.is_loading_usuarios or self.is_loading_eventos:
             return None
         self.usuarios_error = ""

@@ -114,6 +114,26 @@ class AdminStateTests(unittest.TestCase):
                 run_event(AdminState.load_admin, self.make_state(role, authenticated))
                 client_class.assert_not_called()
 
+    def test_load_drops_typed_passwords_and_open_modals(self):
+        # Post-delivery review: a manager who left /admin with a modal open comes back to a clean page.
+        for role in ("GERENTE", "VENDEDOR"):
+            state = self.make_state(role)
+            state.acesso_open, state.acesso_senha, state.acesso_confirmacao = True, "Senha1234", "Senha1234"
+            state.senha_usuario_id, state.senha_nova, state.senha_confirmacao = "2", "Temp12345", "Temp12345"
+            state.status_funcionario_id = "12"
+            client = MagicMock()
+            client.list_usuarios_admin.return_value = []
+            client.list_eventos.return_value = pagina()
+            with self.subTest(role=role), patch(CLIENT) as client_class:
+                client_class.return_value.__enter__.return_value = client
+                run_event(AdminState.load_admin, state)
+                self.assertEqual(
+                    (state.acesso_senha, state.acesso_confirmacao, state.senha_nova, state.senha_confirmacao),
+                    ("", "", "", ""),
+                )
+                self.assertFalse(state.acesso_open)
+                self.assertEqual((state.senha_usuario_id, state.status_funcionario_id), ("", ""))
+
     def test_load_reads_users_and_the_first_audit_page(self):
         state = self.make_state()
         client = MagicMock()

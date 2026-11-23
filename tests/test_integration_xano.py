@@ -38,6 +38,7 @@ from unittest.mock import patch
 
 import httpx
 
+from Projeto_HarleyStore.services.admin import EventosPagina, UsuarioAdmin
 from Projeto_HarleyStore.services.balcao import ItemVendaBalcaoCreate, VendaBalcaoCreate
 from Projeto_HarleyStore.services.catalogo import ModeloMotoCreate, ModeloMotoUpdate, VariacaoCorCreate
 from Projeto_HarleyStore.services.entradas import EntradaMercadoriaCreate
@@ -1211,3 +1212,51 @@ class XanoLiveCounterConcurrencyTests(XanoLiveWriteTestCase):
         self.assertEqual(len(errors), 1, results)
         with self.client_for("GERENTE") as gerente:
             self.assertEqual(self.stock_of(gerente, produto.id), 0)
+
+
+def secret_keys(payload) -> set[str]:
+    """Keys named like a secret anywhere in a JSON payload (values such as "admin_reset_password" do not count)."""
+    found: set[str] = set()
+    if isinstance(payload, dict):
+        found |= {key for key in payload if key in {"password", "password_reset"}}
+        for value in payload.values():
+            found |= secret_keys(value)
+    elif isinstance(payload, list):
+        for value in payload:
+            found |= secret_keys(value)
+    return found
+
+
+class XanoLiveAdminReadTests(XanoLiveTestCase):
+    """Change 18 without business writes: the /admin endpoints are manager-only and never return secrets.
+
+    The reset is aimed at a nonexistent user (999999): enforce_role refuses other roles before any lookup.
+    """
+
+    def test_manager_reads_users_and_audit_without_secrets(self):
+        with self.client_for("GERENTE") as client:
+            usuarios = client.request("GET", "admin/usuarios")
+            eventos = client.request("GET", "admin/eventos", params={"page": 1})
+        self.assertIsInstance(usuarios, list)
+        self.assertEqual(secret_keys(usuarios), set())
+        for linha in usuarios:
+            UsuarioAdmin.model_validate(linha)
+        self.assertEqual(secret_keys(eventos), set())
+        pagina = EventosPagina.model_validate(eventos)
+        self.assertEqual(pagina.pagina, 1)
+        self.assertLessEqual(len(pagina.items), 25)
+        self.assertIn("itemsTotal", eventos)  # paging with totals (Change 18, D6)
+
+    def test_other_roles_are_refused_on_every_admin_endpoint(self):
+        chamadas = (
+            ("GET", "admin/usuarios", None),
+            ("GET", "admin/eventos", None),
+            ("POST", "admin/usuarios/999999/senha", {"password": "Bloqueio123", "confirm_password": "Bloqueio123"}),
+        )
+        for index, role in enumerate(("VENDEDOR", "MECANICO")):
+            if index:
+                time.sleep(10)  # rate limit of the Free plan, as in test_every_profile_reads_shared_resources
+            with self.subTest(role=role), self.client_for(role) as client:
+                for method, path, body in chamadas:
+                    with self.subTest(endpoint=f"{method} {path}"), self.assertRaises(XanoPermissionError):
+                        client.request(method, path, json=body)

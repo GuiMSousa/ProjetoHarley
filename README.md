@@ -1,6 +1,6 @@
 # HarleyStore
 
-Sistema de gestão para concessionária e oficina Harley-Davidson: vitrine pública de motos, reservas e vendas, venda de peças no balcão, estoque com entradas de fornecedores, ordens de serviço da oficina e fechamento financeiro, com acesso por cargo (gerente, vendedor e mecânico).
+Sistema de gestão para concessionária e oficina Harley-Davidson: vitrine pública de motos, reservas e vendas, venda de peças no balcão, estoque com entradas de fornecedores, ordens de serviço da oficina, fechamento financeiro e um painel de administração (`/admin`) com gestão de acessos e auditoria de eventos, com acesso por cargo (gerente, vendedor e mecânico).
 
 O frontend é [Reflex](https://reflex.dev) 0.9.12 (Python) no pacote `Projeto_HarleyStore/`. Backend, banco, autenticação e regras de negócio ficam no [Xano](https://www.xano.com), com a fonte versionada em `xano/`.
 
