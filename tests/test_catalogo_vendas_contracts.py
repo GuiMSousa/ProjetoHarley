@@ -11,10 +11,21 @@ def read(relative_path):
     return (XANO / relative_path).read_text(encoding="utf-8")
 
 
+def block_body(content, opening):
+    """Text between the braces of the first block that starts with `opening` (ending in "{")."""
+    start = content.index(opening) + len(opening)
+    depth, end = 1, start
+    while depth:
+        depth += {"{": 1, "}": -1}.get(content[end], 0)
+        end += 1
+    return content[start:end - 1]
+
+
 def assert_regex_checked_before_write(test, content, var, expression, first_write):
-    """The regex runs in the stack (var + inputerror precondition) before the endpoint writes."""
+    """The regex is computed, then checked by an inputerror precondition, before the endpoint writes."""
     test.assertIn(f"value = {expression}", content)
     test.assertRegex(content, rf'precondition \({re.escape(var)}\) \{{\s*error_type = "inputerror"')
+    test.assertLess(content.index(f"value = {expression}"), content.index(f"precondition ({var})"))
     test.assertLess(content.index(f"precondition ({var})"), content.index(first_write))
 
 
@@ -96,7 +107,11 @@ class CatalogoContractTests(unittest.TestCase):
                 content = read(relative_path)
                 self.assertIn('startsWith:"https://"', content)
                 self.assertIn("text hex filters=trim\n", content)
-                self.assertIn("foreach ($input.variacoes_cor)", content)
+                self.assertRegex(content, r"foreach \(\$input\.variacoes_cor\) \{\s*each as \$cor \{")
+                # Inside the loop body, so every color is checked, not only the last one.
+                each = block_body(content, "each as $cor {")
+                self.assertIn("var.update $hex_valido", each)
+                self.assertIn("precondition ($hex_valido)", each)
                 assert_regex_checked_before_write(
                     self, content, "$hex_valido", '"/^#[0-9A-Fa-f]{6}$/"|regex_matches:$cor.hex', first_write
                 )

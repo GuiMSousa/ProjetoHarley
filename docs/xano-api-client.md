@@ -48,10 +48,10 @@ Regras importantes:
   }
   ```
 
-  Em 2026-11-23, nenhuma forma do `pattern` funcionou, e o validador do MCP não acusa nenhuma delas:
-  - `pattern:"^…$"` e `pattern:"/^…$/"` passaram no `--dry-run` e responderam 400 "Invalid arguments for filter method - pattern" a qualquer valor;
-  - o literal `pattern:/…/` foi recusado pelo parser do servidor;
-  - a forma sem aspas da documentação foi recusada pelo validador.
+  Em 2026-11-23, nenhuma forma do `pattern` funcionou. O validador do MCP aceitou três delas, então passar nele não prova nada:
+  - `pattern:"^…$"` e `pattern:"/^…$/"`, com aspas: passaram no validador e no `--dry-run`. No `POST motos`, responderam 400 "Invalid arguments for filter method - pattern" a todo chassi válido testado. O `hex` de `modelos_moto` nunca foi chamado com elas;
+  - o literal `pattern:/…/`, sem aspas: passou no validador, mas o parser do servidor recusou no `--dry-run` ("Syntax error: unexpected '17'");
+  - `pattern:^…$`, a forma sem aspas e sem barras da documentação: foi a única recusada pelo validador.
 
   O regex no stack respondeu certo ao vivo: aceitou chassis e cores válidos e recusou os inválidos com a mensagem da `precondition`. Num campo dentro de uma lista (o `hex` de `variacoes_cor`), percorra os itens com `foreach` e `var.update`. O teste `test_no_xs_uses_the_pattern_input_filter` impede que o `pattern` volte.
 - Um `db.get` ou `db.query` com `return = {type: "single"}` pode devolver `null`. Ler um campo dele (`$transacao.id`) sem checar antes responde `500 "Unable to locate var: transacao.id"`; o validador não acusa. Leia os campos dentro de `conditional { if ($x != null) { … } }` e passe a variável resultante aos filtros (`Oficina/detalhe_os`, 2026-11-22).
