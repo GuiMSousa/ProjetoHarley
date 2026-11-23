@@ -114,7 +114,10 @@ Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem 
 
 - **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.
 - **Expressão entre parênteses como valor de filtro:** a forma documentada (`map:($$|to_upper)`, `push:("…" ~ $x)`) continua em 13 pontos de 11 arquivos. O detalhe de entrada (`function/estoque/detalhe_entrada.xs`, 2 pontos) passou na validação manual de 2026-11-23. Os outros 11 seguem sem prova ao vivo registrada; o que já roda com dados e merece uma conferência é `function/vendas/detalhe_moto.xs` (detalhe de unidade).
-- **Sem prova ao vivo:** as gravações do `PATCH motos/{id}` e do `POST produtos`, que exigem escrita. A ordem do resumo, a venda de balcão, os nomes da oficina e a recusa do MECANICO foram comprovados em 2026-11-22 (ver a referência acima).
+- **Sem prova ao vivo:** o `PATCH` com payload parcial (`` `$input|pick:($raw_input|keys)` ``) dos 7 cadastros (clientes, fornecedores, funcionários, motos de clientes, produtos, modelos e motos) e o `POST produtos`, que exigem escrita.
+  - Editar e desativar nos cadastros dependem desse `PATCH`, e o "Desativar acesso" da Change 18 (`openspec/changes/painel-administracao`) também.
+  - A prova controlada de 2026-11-23 (1 login GERENTE, `GET clientes`, alterar e restaurar um campo) parou antes de gravar: produção tinha um único cliente, e ele não é de teste. Nenhum `PATCH` foi enviado.
+  - A prova continua pendente: exige um registro de teste ou a autorização para usar um registro real. A ordem do resumo, a venda de balcão, os nomes da oficina e a recusa do MECANICO foram comprovados em 2026-11-22 (ver a referência acima).
 
 ## Revisão após implementação ou correção
 
