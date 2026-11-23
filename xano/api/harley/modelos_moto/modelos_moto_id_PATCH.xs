@@ -17,7 +17,7 @@ query "modelos_moto/{modelos_moto_id}" verb=PATCH {
     object[]? variacoes_cor? {
       schema {
         text nome filters=trim|min:1|max:60
-        text hex filters=trim|pattern:"^#[0-9A-Fa-f]{6}$"
+        text hex filters=trim
         text imagem_url filters=trim|startsWith:"https://"
       }
     }
@@ -45,6 +45,28 @@ query "modelos_moto/{modelos_moto_id}" verb=PATCH {
     precondition ((($input.variacoes_cor ?? [])|count) <= 12) {
       error_type = "inputerror"
       error = "Informe no máximo 12 cores por modelo."
+    }
+
+    // Cor #RRGGBB validada no stack: o filtro de input pattern falha no runtime do Xano.
+    conditional {
+      if ($input.variacoes_cor != null) {
+        var $hex_valido {
+          value = true
+        }
+
+        foreach ($input.variacoes_cor) {
+          each as $cor {
+            var.update $hex_valido {
+              value = "/^#[0-9A-Fa-f]{6}$/"|regex_matches:$cor.hex
+            }
+
+            precondition ($hex_valido) {
+              error_type = "inputerror"
+              error = "Use cores no formato #RRGGBB."
+            }
+          }
+        }
+      }
     }
 
     conditional {

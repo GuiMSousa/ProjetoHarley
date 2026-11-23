@@ -35,6 +35,25 @@ Regras importantes:
 - O push grava de volta os `guid` atribuídos pelo servidor; faça commit desses arquivos.
 - Valide os arquivos antes do push com o validador do `@xano/developer-mcp` (MCP `xano-developer`, configurado em `.mcp.json`, `.codex/config.toml` e `.vscode/mcp.json`).
 - O validador confere a sintaxe, não a execução. Em `GET entrada_mercadoria`, `$quantidades|get:("e" ~ $item.id_entrada):0` passou nele e, em produção, respondeu `500 "Invalid expression"` assim que houve itens (2026-11-18). Passe só variáveis aos filtros, com a chave calculada num `var.update` antes: assim a correção respondeu 200 em produção no mesmo dia, com dados.
+- Não use o filtro de input `pattern`. Valide o regex no stack, com `regex_matches` (regex com barras à esquerda, texto como argumento) e uma `precondition` com `error_type = "inputerror"`:
+
+  ```xs
+  var $chassi_valido {
+    value = "/^[A-HJ-NPR-Z0-9]{17}$/"|regex_matches:$input.chassi
+  }
+
+  precondition ($chassi_valido) {
+    error_type = "inputerror"
+    error = "Chassi inválido: use os 17 caracteres do VIN, sem I, O e Q."
+  }
+  ```
+
+  Em 2026-11-23, nenhuma forma do `pattern` funcionou, e o validador do MCP não acusa nenhuma delas:
+  - `pattern:"^…$"` e `pattern:"/^…$/"` passaram no `--dry-run` e responderam 400 "Invalid arguments for filter method - pattern" a qualquer valor;
+  - o literal `pattern:/…/` foi recusado pelo parser do servidor;
+  - a forma sem aspas da documentação foi recusada pelo validador.
+
+  O regex no stack respondeu certo ao vivo: aceitou chassis e cores válidos e recusou os inválidos com a mensagem da `precondition`. Num campo dentro de uma lista (o `hex` de `variacoes_cor`), percorra os itens com `foreach` e `var.update`. O teste `test_no_xs_uses_the_pattern_input_filter` impede que o `pattern` volte.
 - Um `db.get` ou `db.query` com `return = {type: "single"}` pode devolver `null`. Ler um campo dele (`$transacao.id`) sem checar antes responde `500 "Unable to locate var: transacao.id"`; o validador não acusa. Leia os campos dentro de `conditional { if ($x != null) { … } }` e passe a variável resultante aos filtros (`Oficina/detalhe_os`, 2026-11-22).
 - Desde 2026-10-15, o token do Swagger em `xano/api/harley/harley.xs` é o placeholder `YOUR_XANO_SWAGGER_TOKEN`; o valor real continua no histórico do Git. Antes de qualquer push, desligue o Swagger público (`xano workspace edit --no-swagger`) ou gere um token novo, e confira se o `--dry-run` lista o grupo `HARLEY`: publicar o placeholder pode trocar o token do Swagger por um valor conhecido. Um `xano workspace pull` traz o token real de volta ao arquivo.
 - Não rode `xano workspace pull` dentro de `xano/`. Além de trazer o token, a CLI 1.3.x grava 6 endpoints em pastas aninhadas (por exemplo, `motos/motos_id/reserva_POST.xs` no lugar de `motos/motos_id_reserva_POST.xs`) e não apaga os arquivos que já existem (conferido em 2026-10-22): esses endpoints ficariam em dobro no próximo push. Para conferir mudanças feitas no painel, puxe numa pasta temporária fora do projeto, compare com `xano/` e apague a pasta, porque ela contém o token.

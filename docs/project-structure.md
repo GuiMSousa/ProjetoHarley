@@ -25,6 +25,7 @@ Esta página explica onde cada tipo de arquivo deve ficar. A ideia é permitir q
 | `docs/` | Visão geral, domínio e decisões que ajudam no entendimento do sistema. |
 | `tests/` | Suíte pytest/unittest: contratos XanoScript, DTOs, cliente e estados. `conftest.py` aplica os marcadores `integration`, `writes` e `concurrency`; `event_runner.py` executa handlers geradores como o Reflex. A configuração fica em `pytest.ini` e as dependências de teste em `requirements-dev.txt`. |
 | `xano/` | Exports, tabelas e endpoints do backend oficial Xano. Não são importados diretamente pelo Reflex. |
+| `scripts/` | `seed_demo.py`: povoamento de demonstração em produção pela API, com as credenciais `XANO_TEST_GERENTE_*` e `XANO_TEST_VENDEDOR_*`. Não duplica registros: procura cada um pela chave natural antes de criar. Sem `--executar`, só lê e mostra o plano; nos dois modos exige `XANO_TEST_LIVE=true`. Faz uma pausa de 2,5 s entre requisições. |
 | `openspec/` | Propostas, especificações, designs e tarefas de mudanças incrementais. |
 | `.vscode/` | Configurações e integrações específicas do editor. |
 

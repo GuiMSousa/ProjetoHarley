@@ -39,7 +39,7 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
 
 - ruff: sem violações;
 - compileall: OK;
-- pytest offline (`-m "not integration and not browser"`): 498 passaram e 47 foram desmarcados, 44 de integração e 3 de navegador, contados com `--collect-only` (2026-11-23, com a Change 18 e os ajustes da revisão pós-entrega). A execução sem `-m` não foi repetida;
+- pytest offline (`-m "not integration and not browser"`): 499 passaram e 47 foram desmarcados, 44 de integração e 3 de navegador, contados com `--collect-only` (2026-11-23, com a Change 18, os ajustes da revisão pós-entrega e o contrato do regex no stack). A execução sem `-m` não foi repetida;
 - integração ao vivo, só leitura e em testes isolados:
   - VENDEDOR (2026-11-14): o detalhe de OS inexistente responde 404, a oficina e as entradas são lidas, a entrada de mercadoria é recusada com 403 e o carrinho com produto inexistente é recusado com 400 antes da transação;
   - 3 perfis (2026-11-15): VENDEDOR e MECANICO recebem 403 em fornecedores, funcionários e financeiro; o MECANICO também em motos do estoque e entrada de mercadoria. O GERENTE lê fornecedores, funcionários e o resumo financeiro, com o DTO validado e período inválido recusado com 400. Os 3 leem a oficina;
@@ -57,8 +57,21 @@ Os comandos opt-in recebem variáveis de ambiente. No Git Bash, a variável vem 
       - ao final, o "Funcionário Teste" ficou **inativo** e com o contato original, e o usuário de teste dele continua em produção sem acesso;
     - **VENDEDOR:** 403 nos 3 endpoints de `admin/`. O reset foi tentado contra o usuário de teste, nunca contra uma conta real;
     - as leituras do GERENTE e as recusas de VENDEDOR e MECANICO podem ser repetidas com `XanoLiveAdminReadTests`, opt-in e só de leitura, em `tests/test_integration_xano.py`, com `XANO_TEST_LIVE=true`. O reset desse teste aponta para o id inexistente 999999. A lógica foi conferida offline contra um servidor simulado, que acusou o vazamento de `password` e o 200 para o VENDEDOR. Os testes ainda não rodaram em produção;
+  - regex no stack (2026-11-23). Contexto: o push dos 4 endpoints com `regex_matches` e `precondition` no lugar do filtro `pattern` (ver a lição em `docs/xano-api-client.md`), seguido de um `--dry-run` sem mudanças:
+    - `POST motos` cadastrou as 3 unidades do povoamento (Breakout, Fat Boy e Sportster). A Sportster foi vendida a um cliente pelo VENDEDOR, com receita `MOTO` de R$ 79.900,00;
+    - `PATCH motos/7` (a Breakout nova) só com o próprio chassi respondeu 200. Chassi, cor, ano, preço, status e modelo ficaram iguais; só o `atualizado_em` mudou. Isso também prova o `pick:($raw_input|keys)` do `PATCH` de motos e o `Vendas/detalhe_moto` da resposta;
+    - provas de recusa, montadas para não gravar nada mesmo se a validação falhasse:
+      - `PATCH motos/999999999` com chassi inválido respondeu 400 "Chassi inválido: use os 17 caracteres do VIN, sem I, O e Q.". Se a validação falhasse, a resposta seria 404;
+      - `POST modelos_moto` com o nome já usado "Fat Boy": com o hex válido `#0B0B0B`, a validação passou e a resposta foi "Já existe um modelo com esse nome."; com o hex inválido `#0B0B0G`, parou em "Use cores no formato #RRGGBB.". Continua havendo um só modelo "Fat Boy";
+      - o `PATCH modelos_moto` tem o mesmo bloco de validação, mas não foi chamado ao vivo;
+    - totais do povoamento no mês até hoje:
+      - receitas: R$ 86.149,60 (MOTO R$ 79.900,00, ORDEM_SERVICO R$ 4.080,60 e BALCAO R$ 2.169,00);
+      - despesas: R$ 11.840,60;
+      - saldo: R$ 74.309,00;
+      - motos em estoque: 8 (7 disponíveis e 1 reservada);
+      - OS ativas: 2;
 - `reflex compile --dry`: OK;
-- validador do MCP `xano-developer`: 132 `.xs` válidos em 2026-11-23, incluindo os 3 de `/admin` e os 5 `PATCH` corrigidos (129 em 2026-11-22, quando o MCP voltou). Entre 2026-11-18 e 2026-11-22 ele não conectava, e o mesmo validador (`@xano/developer-mcp` 2.2.6) rodou localmente em Node, a partir do pacote em cache;
+- validador do MCP `xano-developer`: 132 `.xs` válidos em 2026-11-23, incluindo os 3 de `/admin`, os 5 `PATCH` corrigidos e os 4 endpoints com regex no stack (129 em 2026-11-22, quando o MCP voltou). Entre 2026-11-18 e 2026-11-22 ele não conectava, e o mesmo validador (`@xano/developer-mcp` 2.2.6) rodou localmente em Node, a partir do pacote em cache;
 - smoke de navegador: 3 passaram em 2026-11-17 e em 2026-11-18, antes do commit `f43e7ba`, contra o app local e com o catálogo público real. Cobre só o catálogo e o login: a oficina e o balcão foram medidos no Edge com páginas de dados fictícios, sem Xano;
 - validação manual ponta a ponta no navegador, em produção, feita pelo usuário e informada em 2026-11-23: detalhe e fechamento de OS, detalhe de entrada e trava de moto reservada, concluídos. Não há registro automatizado nem evidência anexada além desse relato; o smoke automatizado continua cobrindo só o catálogo e o login.
 
@@ -124,15 +137,21 @@ Itens que a Change 16 (arquivada em 2026-11-15) deixou abertos, porque dependem 
 
 - **Testes com escrita e concorrência:** `XANO_TEST_ALLOW_WRITES=true` e `XANO_TEST_CONCURRENCY=true` nunca rodaram. Exigem um workspace ou branch de homologação, porque gravam dados reais e o plano Free publica em produção. Os cenários novos ainda não foram escritos: duas entradas com o mesmo documento, duas entradas com os mesmos produtos em ordens opostas, e uma entrada e uma venda de balcão do mesmo produto.
 - **Expressão entre parênteses como valor de filtro:** a forma documentada (`map:($$|to_upper)`, `push:("…" ~ $x)`) continua em 13 pontos de 11 arquivos.
-  - Comprovados (7):
+  - Comprovados (9):
     - `` `$input|pick:($raw_input|keys)` `` foi comprovado ao vivo em `PATCH funcionarios/{id}` em 2026-11-23, com payload parcial e com `{"ativo": false}`. A mesma cadeia aparece, idêntica, nos outros 4 `PATCH` corrigidos (clientes, fornecedores, motos de clientes e produtos);
-    - o detalhe de entrada (`function/estoque/detalhe_entrada.xs`, 2 pontos) passou na validação manual de 2026-11-23.
-  - Sem prova ao vivo registrada (6):
-    - o mesmo `pick` nos `PATCH` de modelos e motos, que têm cadeia própria (`unset`/`set`);
+    - o detalhe de entrada (`function/estoque/detalhe_entrada.xs`, 2 pontos) passou na validação manual de 2026-11-23;
+    - o `pick` do `PATCH motos/{id}`, com cadeia própria (`unset`/`set`), e `function/vendas/detalhe_moto.xs` responderam 200 com dados em 2026-11-23 (ver "regex no stack" acima).
+  - Sem prova ao vivo registrada (4):
+    - o mesmo `pick` no `PATCH` de modelos;
     - o prazo da reserva (`motos_id_reserva_POST.xs`);
-    - `function/vendas/detalhe_moto.xs` (detalhe de unidade, que já roda com dados e merece uma conferência);
     - `generate_magic_link` (2 pontos, sem chamadas).
-- **Sem prova ao vivo:** o `pick:($raw_input|keys)` dos `PATCH` de modelos e motos, que não usam `dblink`, e o `POST produtos`, que exigem escrita. A ordem do resumo, a venda de balcão, os nomes da oficina e a recusa do MECANICO foram comprovados em 2026-11-22 (ver a referência acima).
+- **Comprovados pelo povoamento de 2026-11-23** (`scripts/seed_demo.py`):
+  - os `POST` de fornecedores, produtos, clientes, motos de clientes e unidades à venda (`POST motos`, depois do regex no stack);
+  - a venda de moto;
+  - a entrada de mercadoria;
+  - a venda de balcão, inclusive a repetição da `chave_venda`, que devolve o recibo sem nova baixa;
+  - a OS completa: abertura, transições, peças, mão de obra e conclusão com receita.
+- **Sem prova ao vivo:** o `pick:($raw_input|keys)` e o regex de cores do `PATCH` de modelos, que exigem escrita. A ordem do resumo, a venda de balcão, os nomes da oficina e a recusa do MECANICO foram comprovados em 2026-11-22 (ver a referência acima).
 
 ## Revisão após implementação ou correção
 

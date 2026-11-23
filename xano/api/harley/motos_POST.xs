@@ -7,8 +7,8 @@ query motos verb=POST {
   input {
     int id_modelo filters=min:1
 
-    // VIN de 17 caracteres (sem I, O e Q), normalizado em caixa alta.
-    text chassi filters=trim|upper|pattern:"^[A-HJ-NPR-Z0-9]{17}$"
+    // VIN normalizado em caixa alta; o formato é validado no stack (regex_matches).
+    text chassi filters=trim|upper
     text cor filters=trim|min:1|max:60
     int ano_modelo filters=min:1990
     decimal preco_venda filters=min:0.01
@@ -28,6 +28,17 @@ query motos verb=POST {
     precondition ($auth_user.id_funcionario != null) {
       error_type = "accessdenied"
       error = "Seu usuário não está vinculado a um funcionário."
+    }
+
+    // VIN de 17 caracteres, sem I, O e Q. O filtro de input pattern falha no runtime do Xano
+    // (HTTP 400 "Invalid arguments for filter method - pattern", 2026-11-23).
+    var $chassi_valido {
+      value = "/^[A-HJ-NPR-Z0-9]{17}$/"|regex_matches:$input.chassi
+    }
+
+    precondition ($chassi_valido) {
+      error_type = "inputerror"
+      error = "Chassi inválido: use os 17 caracteres do VIN, sem I, O e Q."
     }
 
     var $ano_limite {

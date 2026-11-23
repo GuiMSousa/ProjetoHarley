@@ -9,7 +9,7 @@ query "motos/{motos_id}" verb=PATCH {
 
   input {
     int motos_id filters=min:1
-    text? chassi? filters=trim|upper|pattern:"^[A-HJ-NPR-Z0-9]{17}$"
+    text? chassi? filters=trim|upper
     text? cor? filters=trim|min:1|max:60
     int? ano_modelo? filters=min:1990
     decimal? preco_venda? filters=min:0.01
@@ -19,6 +19,21 @@ query "motos/{motos_id}" verb=PATCH {
     function.run "Quick Start/enforce_role" {
       input = {user_id: $auth.id, required_role: "GERENTE"}
     } as $role_check
+
+    // VIN de 17 caracteres, sem I, O e Q, validado no stack: o filtro de input pattern falha no
+    // runtime do Xano. Vale também quando o chassi reenviado é o atual.
+    conditional {
+      if ($input.chassi != null) {
+        var $chassi_valido {
+          value = "/^[A-HJ-NPR-Z0-9]{17}$/"|regex_matches:$input.chassi
+        }
+
+        precondition ($chassi_valido) {
+          error_type = "inputerror"
+          error = "Chassi inválido: use os 17 caracteres do VIN, sem I, O e Q."
+        }
+      }
+    }
 
     db.get motos {
       field_name = "id"

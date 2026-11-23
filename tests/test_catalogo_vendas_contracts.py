@@ -11,6 +11,13 @@ def read(relative_path):
     return (XANO / relative_path).read_text(encoding="utf-8")
 
 
+def assert_regex_checked_before_write(test, content, var, expression, first_write):
+    """The regex runs in the stack (var + inputerror precondition) before the endpoint writes."""
+    test.assertIn(f"value = {expression}", content)
+    test.assertRegex(content, rf'precondition \({re.escape(var)}\) \{{\s*error_type = "inputerror"')
+    test.assertLess(content.index(f"precondition ({var})"), content.index(first_write))
+
+
 class CatalogoContractTests(unittest.TestCase):
     def test_model_table(self):
         content = read("table/modelos_moto.xs")
@@ -81,13 +88,30 @@ class CatalogoContractTests(unittest.TestCase):
                 content = read(relative_path)
                 self.assertIn('required_role: "GERENTE"', content)
                 self.assertNotIn("dblink", content)
-        for relative_path in (f"{API}/modelos_moto_POST.xs", f"{API}/modelos_moto/modelos_moto_id_PATCH.xs"):
+        for relative_path, first_write in (
+            (f"{API}/modelos_moto_POST.xs", "db.add modelos_moto"),
+            (f"{API}/modelos_moto/modelos_moto_id_PATCH.xs", "db.patch modelos_moto"),
+        ):
             with self.subTest(path=relative_path):
                 content = read(relative_path)
                 self.assertIn('startsWith:"https://"', content)
-                self.assertIn('pattern:"^#[0-9A-Fa-f]{6}$"', content)
+                self.assertIn("text hex filters=trim\n", content)
+                self.assertIn("foreach ($input.variacoes_cor)", content)
+                assert_regex_checked_before_write(
+                    self, content, "$hex_valido", '"/^#[0-9A-Fa-f]{6}$/"|regex_matches:$cor.hex', first_write
+                )
                 self.assertIn("<= 12", content)
                 self.assertIn("Já existe um modelo com esse nome.", content)
+
+    def test_no_xs_uses_the_pattern_input_filter(self):
+        # 2026-11-23: pattern:"^…$" and pattern:"/…/" both answered HTTP 400 "Invalid arguments for
+        # filter method - pattern" at runtime, and the bare literal pattern:/…/ is refused by the server
+        # parser, although the validator accepts all of them. Regexes run in the stack (regex_matches).
+        files = list(XANO.rglob("*.xs"))
+        self.assertGreater(len(files), 100)
+        for path in files:
+            with self.subTest(path=path.relative_to(XANO).as_posix()):
+                self.assertIsNone(re.search(r"\bpattern\s*:", path.read_text(encoding="utf-8")))
 
 
 class VendasContractTests(unittest.TestCase):
@@ -152,17 +176,25 @@ class VendasContractTests(unittest.TestCase):
         self.assertIn('status_esperado: "RESERVADA"', self.transaction(content))
 
     def test_unit_writes_are_manager_only_explicit_and_never_touch_status(self):
-        for relative_path in (f"{API}/motos_POST.xs", f"{API}/motos/motos_id_PATCH.xs"):
+        for relative_path, first_write in (
+            (f"{API}/motos_POST.xs", "db.add motos"),
+            (f"{API}/motos/motos_id_PATCH.xs", "db.patch motos"),
+        ):
             with self.subTest(path=relative_path):
                 content = read(relative_path)
                 inputs = content[content.index("input {"):content.index("stack {")]
                 self.assertIn('required_role: "GERENTE"', content)
                 self.assertNotIn("dblink", content)
-                self.assertIn('pattern:"^[A-HJ-NPR-Z0-9]{17}$"', inputs)
+                self.assertRegex(inputs, r"text\?? chassi\?? filters=trim\|upper\n")
+                assert_regex_checked_before_write(
+                    self, content, "$chassi_valido", '"/^[A-HJ-NPR-Z0-9]{17}$/"|regex_matches:$input.chassi', first_write
+                )
                 for forbidden in ("status", "clientes_id", "id_vendedor_reserva", "reservada_ate"):
                     self.assertNotIn(forbidden, inputs)
                 self.assertIn("db.query motos_clientes", content)
                 self.assertIn("Este chassi já está cadastrado.", content)
+        # The PATCH validates any chassi sent, even the current one, not only a changed one.
+        self.assertIn("if ($input.chassi != null) {\n        var $chassi_valido", read(f"{API}/motos/motos_id_PATCH.xs"))
         post = read(f"{API}/motos_POST.xs")
         self.assertIn('status       : "DISPONIVEL"', post)
         self.assertIn("db.add historico_status_moto", self.transaction(post))
